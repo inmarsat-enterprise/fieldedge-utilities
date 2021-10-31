@@ -1,4 +1,6 @@
-# Inmarsat FieldEdge Ultralite Utilities
+# Inmarsat FieldEdge Utilities
 
 Provides a common logging format and facility,
-and a common MQTT client approach.
+and a common MQTT client that automatically connects.
+
+[Docmentation](docs)

@@ -1,0 +1,811 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+<meta name="generator" content="pdoc 0.10.0" />
+<title>fieldedge_utilities.mqtt API documentation</title>
+<meta name="description" content="MQTT client for local Mosquitto broker inter-service communications." />
+<link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
+<link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
+<link rel="stylesheet preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/github.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:30px;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:1em 0 .50em 0}h3{font-size:1.4em;margin:25px 0 10px 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .3s ease-in-out}a:hover{color:#e82}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900}pre code{background:#f8f8f8;font-size:.8em;line-height:1.4em}code{background:#f2f2f1;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{background:#f8f8f8;border:0;border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0;padding:1ex}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-weight:bold;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em .5em;margin-bottom:1em}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.item .name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul{padding-left:1.5em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/highlight.min.js" integrity="sha256-Uv3H6lx7dJmRfRvH8TH6kJD1TSK1aFcwgx+mdg3epi8=" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => hljs.initHighlighting())</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>fieldedge_utilities.mqtt</code></h1>
+</header>
+<section id="section-intro">
+<p>MQTT client for local Mosquitto broker inter-service communications.</p>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">&#34;&#34;&#34;MQTT client for local Mosquitto broker inter-service communications.
+&#34;&#34;&#34;
+import os
+from atexit import register as on_exit
+from json import JSONDecodeError
+from json import dumps as json_dumpstr
+from json import loads as json_loadstr
+from logging import DEBUG, Logger
+from threading import enumerate as enumerate_threads
+from time import sleep, time
+from typing import Callable, Union
+
+from dotenv import load_dotenv
+from paho.mqtt.client import MQTT_ERR_SUCCESS, Client
+
+from fieldedge_utilities.logger import get_wrapping_logger
+
+load_dotenv()
+
+CONNECTION_RESULT_CODES = {
+    0: &#39;MQTT_ERR_SUCCESS&#39;,
+    1: &#39;MQTT_ERR_INCORRECT_PROTOCOL&#39;,
+    2: &#39;MQTT_ERR_INVALID_CLIENT_ID&#39;,
+    3: &#39;MQTT_ERR_SERVER_UNAVAILABLE&#39;,
+    4: &#39;MQTT_ERR_BAD_USERNAME_PASSWORD&#39;,
+    5: &#39;MQTT_ERR_UNAUTHORIZED&#39;,
+    6: &#39;MQTT_ERR_CONNECTION_LOST&#39;,
+    7: &#39;MQTT_ERR_TIMEOUT_WAITING_FOR_LENGTH&#39;,
+    8: &#39;MQTT_ERR_TIMEOUT_WAITING_FOR_PAYLOAD&#39;,
+    9: &#39;MQTT_ERR_TIMEOUT_WAITING_FOR_CONNACK&#39;,
+    10: &#39;MQTT_ERR_TIMEOUT_WAITING_FOR_SUBACK&#39;,
+    11: &#39;MQTT_ERR_TIMEOUT_WAITING_FOR_UNSUBACK&#39;,
+    12: &#39;MQTT_ERR_TIMEOUT_WAITING_FOR_PINGRESP&#39;,
+}
+
+
+def _get_mqtt_result(rc: int) -&gt; str:
+    if rc in CONNECTION_RESULT_CODES:
+        return CONNECTION_RESULT_CODES[rc]
+    return &#39;UNKNOWN&#39;
+
+
+class MqttError(Exception):
+    &#34;&#34;&#34;A helper class for MQTT specific errors.&#34;&#34;&#34;
+    pass
+
+
+class MqttClient:
+    &#34;&#34;&#34;A customized MQTT client.
+
+    Attributes:
+        client_id (str): A unique client_id.
+        on_message (Callable): A function called when a subscribed message
+            is received from the broker .
+        on_connect (Callable): A function called when the client connects
+            to the broker.
+        on_disconnect (Callable): A function called when the client disconnects.
+        is_connected (bool): Status of the connection to the broker.
+        connect_retry_interval (int): Seconds between broker reconnect attempts.
+
+    &#34;&#34;&#34;
+    def __init__(self,
+                 client_id: str,
+                 on_message: Callable[..., &#34;tuple[str, object]&#34;],
+                 subscribe_default: Union[str, &#34;list[str]&#34;] = None,
+                 on_connect: Callable = None,
+                 on_disconnect: Callable = None,
+                 logger: Logger = None,
+                 connect_retry_interval: int = 5):
+        &#34;&#34;&#34;Initializes a managed MQTT client.
+        
+        Args:
+            client_id (str): The unique client ID
+            on_message (Callable): The callback when subscribed messages are
+                received.
+            subscribe_default (str|list): The default subscription(s) on
+                re/connection.
+            on_connect (Callable): (optional) callback when connection to the
+                broker is established.
+            on_disconnect (Callable): (optional) callback when disconnecting
+                from the broker.
+            logger (Logger): (optional) Logger
+            connect_retry_interval (int): Seconds between broker reconnect
+                attempts.
+            
+        &#34;&#34;&#34;
+        self._host = os.getenv(&#39;MQTT_HOST&#39;) or &#39;fieldedge_broker&#39;
+        self._user = os.getenv(&#39;MQTT_USERNAME&#39;) or None
+        self._pass = os.getenv(&#39;MQTT_PASS&#39;) or None
+        self._log = logger or get_wrapping_logger(name=&#39;mqtt_client&#39;)
+        if not isinstance(client_id, str) or client_id == &#39;&#39;:
+            self._log.error(&#39;Invalid client_id&#39;)
+            raise MqttError(&#39;Invalid client_id&#39;)
+        if not callable(on_message):
+            self._log.warning(&#39;No on_message specified&#39;)
+        on_exit(self._cleanup)
+        self.on_message = on_message
+        self.on_connect = on_connect
+        self.on_disconnect = on_disconnect
+        self.client_id = client_id
+        self._mqtt = Client()
+        self.is_connected = False
+        self._subscriptions = {}
+        self.connect_retry_interval = connect_retry_interval
+        if subscribe_default:
+            if not isinstance(subscribe_default, list):
+                subscribe_default = [subscribe_default]
+            for sub in subscribe_default:
+                self.subscription_add(sub)
+        self._connect()
+    
+    @property
+    def client_id(self):
+        return self._client_id
+    
+    @client_id.setter
+    def client_id(self, id: str):
+        try:
+            if isinstance(int(id.split(&#39;_&#39;)[1]), int):
+                # previously made unique, could be a bouncing MQTT connection
+                id = id.split(&#39;_&#39;)[0]
+        except (ValueError, IndexError):
+            pass   #: new id will be made unique
+        self._client_id = &#39;{}_{}&#39;.format(id, str(int(time())))
+
+    @property
+    def subscriptions(self) -&gt; dict:
+        &#34;&#34;&#34;The dictionary of subscriptions.
+        
+        Use subscription_add or subscription_del to change the dict.
+
+        &#39;topic&#39; : { &#39;qos&#39;: (int), &#39;mid&#39;: (int) }
+
+        &#34;&#34;&#34;
+        return self._subscriptions
+
+    def _cleanup(self, *args):
+        for arg in args:
+            self._log.debug(&#39;mqtt cleanup called with arg = {}&#39;.format(arg))
+        self._log.debug(&#39;Terminating MQTT connection&#39;)
+        self._mqtt.user_data_set(&#39;terminate&#39;)
+        self._mqtt.loop_stop()
+        self._mqtt.disconnect()
+    
+    def _connect(self):
+        try:
+            self._log.debug(&#39;Attempting MQTT broker connection to {} as {}&#39;
+                .format(self._host, self._client_id))
+            self._mqtt.reinitialise(client_id=self.client_id)
+            self._mqtt.user_data_set(None)
+            self._mqtt.on_connect = self._mqtt_on_connect
+            self._mqtt.on_disconnect = self._mqtt_on_disconnect
+            self._mqtt.on_subscribe = self._mqtt_on_subscribe
+            self._mqtt.on_message = self._mqtt_on_message
+            if self._user and self._pass:
+                self._mqtt.username_pw_set(username=self._user,
+                                           password=self._pass)
+            self._mqtt.connect(self._host)
+            threads_before = enumerate_threads()
+            self._mqtt.loop_start()
+            threads_after = enumerate_threads()
+            for thread in threads_after:
+                if thread in threads_before:
+                    continue
+                thread.name = &#39;MqttThread&#39;
+                break
+        except ConnectionError as e:
+            self._log.warning(f&#39;Unable to connect to {self._host} ({e})...&#39;
+                f&#39;retrying in {self.connect_retry_interval} seconds&#39;)
+            sleep(self.connect_retry_interval)
+            # raise MqttError(&#39;MQTT {}&#39;.format(e))
+
+    def _mqtt_on_connect(self, client, userdata, flags, rc):
+        self._log.debug(&#39;MQTT broker connection result code: {} ({})&#39;
+            .format(rc, _get_mqtt_result(rc)))
+        if rc == 0:
+            self._log.info(&#39;MQTT connection to {}&#39;.format(self._host))
+            if not self.is_connected:
+                for sub in self.subscriptions:
+                    self._mqtt_subscribe(sub, self.subscriptions[sub][&#39;qos&#39;])
+                self.is_connected = True
+            if self.on_connect:
+                self.on_connect(client, userdata, flags, rc)
+        else:
+            self._log.error(&#39;MQTT connection result code {}&#39;.format(rc))
+    
+    def _mqtt_subscribe(self, topic: str, qos: int = 0):
+        self._log.debug(&#39;{} subscribing to {}&#39;.format(self._client_id, topic))
+        (result, mid) = self._mqtt.subscribe(topic=topic, qos=2)
+        if result == MQTT_ERR_SUCCESS:
+            self._subscriptions[topic][&#39;mid&#39;] = mid
+        else:
+            self._log.error(&#39;MQTT Error {} subscribing to {}&#39;.format(
+                result, topic))
+
+    def _mqtt_unsubscribe(self, topic: str):
+        self._log.debug(&#39;{} unsubscribing to {}&#39;.format(self._client_id, topic))
+        (result, mid) = self._mqtt.unsubscribe(topic)
+        if result != MQTT_ERR_SUCCESS:
+            self._log.error(&#39;MQTT Error {} unsubscribing to {}&#39;.format(
+                result, topic))
+
+    def subscription_add(self, topic: str, qos: int = 0) -&gt; None:
+        &#34;&#34;&#34;Adds a subscription.
+        
+        Subscriptions property is updated with qos and message id.
+
+        Args:
+            topic (str): The MQTT topic to subscribe to
+            qos (int): The MQTT qos 0..2
+
+        &#34;&#34;&#34;
+        self._log.debug(&#39;Adding subscription {} qos={}&#39;.format(topic, qos))
+        self._subscriptions[topic] = {&#39;qos&#39;: qos, &#39;mid&#39;: 0}
+        if self.is_connected:
+            self._mqtt_subscribe(topic, qos)
+        else:
+            self._log.warning(&#39;MQTT not connected will subscribe later&#39;)
+
+    def subscription_del(self, topic: str) -&gt; None:
+        &#34;&#34;&#34;Removes a subscription.
+        
+        Args:
+            topic (str): The MQTT topic to unsubscribe
+
+        &#34;&#34;&#34;
+        self._log.debug(&#39;Removing subscription {}&#39;.format(topic))
+        if topic in self._subscriptions:
+            del self._subscriptions[topic]
+        if self.is_connected:
+            self._mqtt_unsubscribe(topic)
+
+    def _mqtt_on_disconnect(self, client, userdata, rc):
+        if self.on_disconnect:
+            self.on_disconnect(client, userdata, rc)
+        if userdata != &#39;terminate&#39;:
+            self._log.warning(&#39;MQTT broker disconnected: result code {} ({})&#39;
+                .format(rc, _get_mqtt_result(rc)))
+            self._mqtt.loop_stop()
+            # get new unique ID to avoid bouncing connection
+            self.client_id = self.client_id
+            self.is_connected = False
+            #TODO: delay before retrying
+            self._connect()
+
+    def _mqtt_on_subscribe(self, client, userdata, mid, granted_qos):
+        self._log.debug(&#39;MQTT subscription message id: {}&#39;.format(mid))
+        for sub in self.subscriptions:
+            if mid != self.subscriptions[sub][&#39;mid&#39;]:
+                self._log.error(&#39;Subscription failed message id={} expected {}&#39;
+                    .format(mid, self.subscriptions[sub][&#39;mid&#39;]))
+            else:
+                self._log.info(&#39;Subscription to {} successful&#39;.format(sub))
+
+    def _mqtt_on_message(self, client, userdata, message):
+        payload = message.payload.decode()
+        try:
+            payload = json_loadstr(payload)
+        except JSONDecodeError as e:
+            self._log.debug(&#39;MQTT message payload non-JSON ({})&#39;.format(e))
+        self._log.debug(&#39;MQTT received {} message: {}&#39;.format(
+            message.topic, payload))
+        self.on_message(message.topic, payload)
+
+    def publish(self, topic: str, message: str, qos: int = 1):
+        &#34;&#34;&#34;Publishes a message to a MQTT topic.
+        
+        Args:
+            topic (str): The MQTT topic
+            message (str): The message to publish
+            qos (int): The MQTT Quality of Service (0, 1 or 2)
+
+        &#34;&#34;&#34;
+        if not isinstance(message, str):
+            message = json_dumpstr(message)
+        if not isinstance(qos, int) or qos not in range(0, 3):
+            self._log.warning(f&#39;Invalid MQTT QoS {qos} - using QoS 1&#39;)
+            qos = 1
+        self._log.info(&#39;MQTT publishing: {}: {}&#39;.format(topic, message))
+        (rc, mid) = self._mqtt.publish(topic=topic, payload=message, qos=qos)
+        del mid
+        if rc != MQTT_ERR_SUCCESS:
+            self._log.error(&#39;Publishing error {}&#39;.format(rc))
+            # raise MqttError(&#39;Publishing error {}&#39;.format(rc))</code></pre>
+</details>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="fieldedge_utilities.mqtt.MqttClient"><code class="flex name class">
+<span>class <span class="ident">MqttClient</span></span>
+<span>(</span><span>client_id: str, on_message: Callable[..., ForwardRef('tuple[str, object]')], subscribe_default: Union[str, ForwardRef('list[str]')] = None, on_connect: Callable = None, on_disconnect: Callable = None, logger: logging.Logger = None, connect_retry_interval: int = 5)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>A customized MQTT client.</p>
+<h2 id="attributes">Attributes</h2>
+<dl>
+<dt><strong><code>client_id</code></strong> :&ensp;<code>str</code></dt>
+<dd>A unique client_id.</dd>
+<dt><strong><code>on_message</code></strong> :&ensp;<code>Callable</code></dt>
+<dd>A function called when a subscribed message
+is received from the broker .</dd>
+<dt><strong><code>on_connect</code></strong> :&ensp;<code>Callable</code></dt>
+<dd>A function called when the client connects
+to the broker.</dd>
+<dt><strong><code>on_disconnect</code></strong> :&ensp;<code>Callable</code></dt>
+<dd>A function called when the client disconnects.</dd>
+<dt><strong><code>is_connected</code></strong> :&ensp;<code>bool</code></dt>
+<dd>Status of the connection to the broker.</dd>
+<dt><strong><code>connect_retry_interval</code></strong> :&ensp;<code>int</code></dt>
+<dd>Seconds between broker reconnect attempts.</dd>
+</dl>
+<p>Initializes a managed MQTT client.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>client_id</code></strong> :&ensp;<code>str</code></dt>
+<dd>The unique client ID</dd>
+<dt><strong><code>on_message</code></strong> :&ensp;<code>Callable</code></dt>
+<dd>The callback when subscribed messages are
+received.</dd>
+<dt>subscribe_default (str|list): The default subscription(s) on</dt>
+<dt>re/connection.</dt>
+<dt><strong><code>on_connect</code></strong> :&ensp;<code>Callable</code></dt>
+<dd>(optional) callback when connection to the
+broker is established.</dd>
+<dt><strong><code>on_disconnect</code></strong> :&ensp;<code>Callable</code></dt>
+<dd>(optional) callback when disconnecting
+from the broker.</dd>
+<dt><strong><code>logger</code></strong> :&ensp;<code>Logger</code></dt>
+<dd>(optional) Logger</dd>
+<dt><strong><code>connect_retry_interval</code></strong> :&ensp;<code>int</code></dt>
+<dd>Seconds between broker reconnect
+attempts.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class MqttClient:
+    &#34;&#34;&#34;A customized MQTT client.
+
+    Attributes:
+        client_id (str): A unique client_id.
+        on_message (Callable): A function called when a subscribed message
+            is received from the broker .
+        on_connect (Callable): A function called when the client connects
+            to the broker.
+        on_disconnect (Callable): A function called when the client disconnects.
+        is_connected (bool): Status of the connection to the broker.
+        connect_retry_interval (int): Seconds between broker reconnect attempts.
+
+    &#34;&#34;&#34;
+    def __init__(self,
+                 client_id: str,
+                 on_message: Callable[..., &#34;tuple[str, object]&#34;],
+                 subscribe_default: Union[str, &#34;list[str]&#34;] = None,
+                 on_connect: Callable = None,
+                 on_disconnect: Callable = None,
+                 logger: Logger = None,
+                 connect_retry_interval: int = 5):
+        &#34;&#34;&#34;Initializes a managed MQTT client.
+        
+        Args:
+            client_id (str): The unique client ID
+            on_message (Callable): The callback when subscribed messages are
+                received.
+            subscribe_default (str|list): The default subscription(s) on
+                re/connection.
+            on_connect (Callable): (optional) callback when connection to the
+                broker is established.
+            on_disconnect (Callable): (optional) callback when disconnecting
+                from the broker.
+            logger (Logger): (optional) Logger
+            connect_retry_interval (int): Seconds between broker reconnect
+                attempts.
+            
+        &#34;&#34;&#34;
+        self._host = os.getenv(&#39;MQTT_HOST&#39;) or &#39;fieldedge_broker&#39;
+        self._user = os.getenv(&#39;MQTT_USERNAME&#39;) or None
+        self._pass = os.getenv(&#39;MQTT_PASS&#39;) or None
+        self._log = logger or get_wrapping_logger(name=&#39;mqtt_client&#39;)
+        if not isinstance(client_id, str) or client_id == &#39;&#39;:
+            self._log.error(&#39;Invalid client_id&#39;)
+            raise MqttError(&#39;Invalid client_id&#39;)
+        if not callable(on_message):
+            self._log.warning(&#39;No on_message specified&#39;)
+        on_exit(self._cleanup)
+        self.on_message = on_message
+        self.on_connect = on_connect
+        self.on_disconnect = on_disconnect
+        self.client_id = client_id
+        self._mqtt = Client()
+        self.is_connected = False
+        self._subscriptions = {}
+        self.connect_retry_interval = connect_retry_interval
+        if subscribe_default:
+            if not isinstance(subscribe_default, list):
+                subscribe_default = [subscribe_default]
+            for sub in subscribe_default:
+                self.subscription_add(sub)
+        self._connect()
+    
+    @property
+    def client_id(self):
+        return self._client_id
+    
+    @client_id.setter
+    def client_id(self, id: str):
+        try:
+            if isinstance(int(id.split(&#39;_&#39;)[1]), int):
+                # previously made unique, could be a bouncing MQTT connection
+                id = id.split(&#39;_&#39;)[0]
+        except (ValueError, IndexError):
+            pass   #: new id will be made unique
+        self._client_id = &#39;{}_{}&#39;.format(id, str(int(time())))
+
+    @property
+    def subscriptions(self) -&gt; dict:
+        &#34;&#34;&#34;The dictionary of subscriptions.
+        
+        Use subscription_add or subscription_del to change the dict.
+
+        &#39;topic&#39; : { &#39;qos&#39;: (int), &#39;mid&#39;: (int) }
+
+        &#34;&#34;&#34;
+        return self._subscriptions
+
+    def _cleanup(self, *args):
+        for arg in args:
+            self._log.debug(&#39;mqtt cleanup called with arg = {}&#39;.format(arg))
+        self._log.debug(&#39;Terminating MQTT connection&#39;)
+        self._mqtt.user_data_set(&#39;terminate&#39;)
+        self._mqtt.loop_stop()
+        self._mqtt.disconnect()
+    
+    def _connect(self):
+        try:
+            self._log.debug(&#39;Attempting MQTT broker connection to {} as {}&#39;
+                .format(self._host, self._client_id))
+            self._mqtt.reinitialise(client_id=self.client_id)
+            self._mqtt.user_data_set(None)
+            self._mqtt.on_connect = self._mqtt_on_connect
+            self._mqtt.on_disconnect = self._mqtt_on_disconnect
+            self._mqtt.on_subscribe = self._mqtt_on_subscribe
+            self._mqtt.on_message = self._mqtt_on_message
+            if self._user and self._pass:
+                self._mqtt.username_pw_set(username=self._user,
+                                           password=self._pass)
+            self._mqtt.connect(self._host)
+            threads_before = enumerate_threads()
+            self._mqtt.loop_start()
+            threads_after = enumerate_threads()
+            for thread in threads_after:
+                if thread in threads_before:
+                    continue
+                thread.name = &#39;MqttThread&#39;
+                break
+        except ConnectionError as e:
+            self._log.warning(f&#39;Unable to connect to {self._host} ({e})...&#39;
+                f&#39;retrying in {self.connect_retry_interval} seconds&#39;)
+            sleep(self.connect_retry_interval)
+            # raise MqttError(&#39;MQTT {}&#39;.format(e))
+
+    def _mqtt_on_connect(self, client, userdata, flags, rc):
+        self._log.debug(&#39;MQTT broker connection result code: {} ({})&#39;
+            .format(rc, _get_mqtt_result(rc)))
+        if rc == 0:
+            self._log.info(&#39;MQTT connection to {}&#39;.format(self._host))
+            if not self.is_connected:
+                for sub in self.subscriptions:
+                    self._mqtt_subscribe(sub, self.subscriptions[sub][&#39;qos&#39;])
+                self.is_connected = True
+            if self.on_connect:
+                self.on_connect(client, userdata, flags, rc)
+        else:
+            self._log.error(&#39;MQTT connection result code {}&#39;.format(rc))
+    
+    def _mqtt_subscribe(self, topic: str, qos: int = 0):
+        self._log.debug(&#39;{} subscribing to {}&#39;.format(self._client_id, topic))
+        (result, mid) = self._mqtt.subscribe(topic=topic, qos=2)
+        if result == MQTT_ERR_SUCCESS:
+            self._subscriptions[topic][&#39;mid&#39;] = mid
+        else:
+            self._log.error(&#39;MQTT Error {} subscribing to {}&#39;.format(
+                result, topic))
+
+    def _mqtt_unsubscribe(self, topic: str):
+        self._log.debug(&#39;{} unsubscribing to {}&#39;.format(self._client_id, topic))
+        (result, mid) = self._mqtt.unsubscribe(topic)
+        if result != MQTT_ERR_SUCCESS:
+            self._log.error(&#39;MQTT Error {} unsubscribing to {}&#39;.format(
+                result, topic))
+
+    def subscription_add(self, topic: str, qos: int = 0) -&gt; None:
+        &#34;&#34;&#34;Adds a subscription.
+        
+        Subscriptions property is updated with qos and message id.
+
+        Args:
+            topic (str): The MQTT topic to subscribe to
+            qos (int): The MQTT qos 0..2
+
+        &#34;&#34;&#34;
+        self._log.debug(&#39;Adding subscription {} qos={}&#39;.format(topic, qos))
+        self._subscriptions[topic] = {&#39;qos&#39;: qos, &#39;mid&#39;: 0}
+        if self.is_connected:
+            self._mqtt_subscribe(topic, qos)
+        else:
+            self._log.warning(&#39;MQTT not connected will subscribe later&#39;)
+
+    def subscription_del(self, topic: str) -&gt; None:
+        &#34;&#34;&#34;Removes a subscription.
+        
+        Args:
+            topic (str): The MQTT topic to unsubscribe
+
+        &#34;&#34;&#34;
+        self._log.debug(&#39;Removing subscription {}&#39;.format(topic))
+        if topic in self._subscriptions:
+            del self._subscriptions[topic]
+        if self.is_connected:
+            self._mqtt_unsubscribe(topic)
+
+    def _mqtt_on_disconnect(self, client, userdata, rc):
+        if self.on_disconnect:
+            self.on_disconnect(client, userdata, rc)
+        if userdata != &#39;terminate&#39;:
+            self._log.warning(&#39;MQTT broker disconnected: result code {} ({})&#39;
+                .format(rc, _get_mqtt_result(rc)))
+            self._mqtt.loop_stop()
+            # get new unique ID to avoid bouncing connection
+            self.client_id = self.client_id
+            self.is_connected = False
+            #TODO: delay before retrying
+            self._connect()
+
+    def _mqtt_on_subscribe(self, client, userdata, mid, granted_qos):
+        self._log.debug(&#39;MQTT subscription message id: {}&#39;.format(mid))
+        for sub in self.subscriptions:
+            if mid != self.subscriptions[sub][&#39;mid&#39;]:
+                self._log.error(&#39;Subscription failed message id={} expected {}&#39;
+                    .format(mid, self.subscriptions[sub][&#39;mid&#39;]))
+            else:
+                self._log.info(&#39;Subscription to {} successful&#39;.format(sub))
+
+    def _mqtt_on_message(self, client, userdata, message):
+        payload = message.payload.decode()
+        try:
+            payload = json_loadstr(payload)
+        except JSONDecodeError as e:
+            self._log.debug(&#39;MQTT message payload non-JSON ({})&#39;.format(e))
+        self._log.debug(&#39;MQTT received {} message: {}&#39;.format(
+            message.topic, payload))
+        self.on_message(message.topic, payload)
+
+    def publish(self, topic: str, message: str, qos: int = 1):
+        &#34;&#34;&#34;Publishes a message to a MQTT topic.
+        
+        Args:
+            topic (str): The MQTT topic
+            message (str): The message to publish
+            qos (int): The MQTT Quality of Service (0, 1 or 2)
+
+        &#34;&#34;&#34;
+        if not isinstance(message, str):
+            message = json_dumpstr(message)
+        if not isinstance(qos, int) or qos not in range(0, 3):
+            self._log.warning(f&#39;Invalid MQTT QoS {qos} - using QoS 1&#39;)
+            qos = 1
+        self._log.info(&#39;MQTT publishing: {}: {}&#39;.format(topic, message))
+        (rc, mid) = self._mqtt.publish(topic=topic, payload=message, qos=qos)
+        del mid
+        if rc != MQTT_ERR_SUCCESS:
+            self._log.error(&#39;Publishing error {}&#39;.format(rc))</code></pre>
+</details>
+<h3>Instance variables</h3>
+<dl>
+<dt id="fieldedge_utilities.mqtt.MqttClient.client_id"><code class="name">var <span class="ident">client_id</span></code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def client_id(self):
+    return self._client_id</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttClient.subscriptions"><code class="name">var <span class="ident">subscriptions</span> : dict</code></dt>
+<dd>
+<div class="desc"><p>The dictionary of subscriptions.</p>
+<p>Use subscription_add or subscription_del to change the dict.</p>
+<p>'topic' : { 'qos': (int), 'mid': (int) }</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def subscriptions(self) -&gt; dict:
+    &#34;&#34;&#34;The dictionary of subscriptions.
+    
+    Use subscription_add or subscription_del to change the dict.
+
+    &#39;topic&#39; : { &#39;qos&#39;: (int), &#39;mid&#39;: (int) }
+
+    &#34;&#34;&#34;
+    return self._subscriptions</code></pre>
+</details>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="fieldedge_utilities.mqtt.MqttClient.publish"><code class="name flex">
+<span>def <span class="ident">publish</span></span>(<span>self, topic: str, message: str, qos: int = 1)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Publishes a message to a MQTT topic.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>topic</code></strong> :&ensp;<code>str</code></dt>
+<dd>The MQTT topic</dd>
+<dt><strong><code>message</code></strong> :&ensp;<code>str</code></dt>
+<dd>The message to publish</dd>
+<dt><strong><code>qos</code></strong> :&ensp;<code>int</code></dt>
+<dd>The MQTT Quality of Service (0, 1 or 2)</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def publish(self, topic: str, message: str, qos: int = 1):
+    &#34;&#34;&#34;Publishes a message to a MQTT topic.
+    
+    Args:
+        topic (str): The MQTT topic
+        message (str): The message to publish
+        qos (int): The MQTT Quality of Service (0, 1 or 2)
+
+    &#34;&#34;&#34;
+    if not isinstance(message, str):
+        message = json_dumpstr(message)
+    if not isinstance(qos, int) or qos not in range(0, 3):
+        self._log.warning(f&#39;Invalid MQTT QoS {qos} - using QoS 1&#39;)
+        qos = 1
+    self._log.info(&#39;MQTT publishing: {}: {}&#39;.format(topic, message))
+    (rc, mid) = self._mqtt.publish(topic=topic, payload=message, qos=qos)
+    del mid
+    if rc != MQTT_ERR_SUCCESS:
+        self._log.error(&#39;Publishing error {}&#39;.format(rc))</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttClient.subscription_add"><code class="name flex">
+<span>def <span class="ident">subscription_add</span></span>(<span>self, topic: str, qos: int = 0) ‑> None</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Adds a subscription.</p>
+<p>Subscriptions property is updated with qos and message id.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>topic</code></strong> :&ensp;<code>str</code></dt>
+<dd>The MQTT topic to subscribe to</dd>
+<dt><strong><code>qos</code></strong> :&ensp;<code>int</code></dt>
+<dd>The MQTT qos 0..2</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def subscription_add(self, topic: str, qos: int = 0) -&gt; None:
+    &#34;&#34;&#34;Adds a subscription.
+    
+    Subscriptions property is updated with qos and message id.
+
+    Args:
+        topic (str): The MQTT topic to subscribe to
+        qos (int): The MQTT qos 0..2
+
+    &#34;&#34;&#34;
+    self._log.debug(&#39;Adding subscription {} qos={}&#39;.format(topic, qos))
+    self._subscriptions[topic] = {&#39;qos&#39;: qos, &#39;mid&#39;: 0}
+    if self.is_connected:
+        self._mqtt_subscribe(topic, qos)
+    else:
+        self._log.warning(&#39;MQTT not connected will subscribe later&#39;)</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttClient.subscription_del"><code class="name flex">
+<span>def <span class="ident">subscription_del</span></span>(<span>self, topic: str) ‑> None</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Removes a subscription.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>topic</code></strong> :&ensp;<code>str</code></dt>
+<dd>The MQTT topic to unsubscribe</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def subscription_del(self, topic: str) -&gt; None:
+    &#34;&#34;&#34;Removes a subscription.
+    
+    Args:
+        topic (str): The MQTT topic to unsubscribe
+
+    &#34;&#34;&#34;
+    self._log.debug(&#39;Removing subscription {}&#39;.format(topic))
+    if topic in self._subscriptions:
+        del self._subscriptions[topic]
+    if self.is_connected:
+        self._mqtt_unsubscribe(topic)</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttError"><code class="flex name class">
+<span>class <span class="ident">MqttError</span></span>
+<span>(</span><span>*args, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>A helper class for MQTT specific errors.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class MqttError(Exception):
+    &#34;&#34;&#34;A helper class for MQTT specific errors.&#34;&#34;&#34;
+    pass</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>builtins.Exception</li>
+<li>builtins.BaseException</li>
+</ul>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<h1>Index</h1>
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="fieldedge_utilities" href="index.html">fieldedge_utilities</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="fieldedge_utilities.mqtt.MqttClient" href="#fieldedge_utilities.mqtt.MqttClient">MqttClient</a></code></h4>
+<ul class="">
+<li><code><a title="fieldedge_utilities.mqtt.MqttClient.client_id" href="#fieldedge_utilities.mqtt.MqttClient.client_id">client_id</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttClient.publish" href="#fieldedge_utilities.mqtt.MqttClient.publish">publish</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttClient.subscription_add" href="#fieldedge_utilities.mqtt.MqttClient.subscription_add">subscription_add</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttClient.subscription_del" href="#fieldedge_utilities.mqtt.MqttClient.subscription_del">subscription_del</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttClient.subscriptions" href="#fieldedge_utilities.mqtt.MqttClient.subscriptions">subscriptions</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="fieldedge_utilities.mqtt.MqttError" href="#fieldedge_utilities.mqtt.MqttError">MqttError</a></code></h4>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.10.0</a>.</p>
+</footer>
+</body>
+</html>

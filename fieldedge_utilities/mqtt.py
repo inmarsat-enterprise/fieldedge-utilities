@@ -34,13 +34,14 @@ CONNECTION_RESULT_CODES = {
 }
 
 
-def get_mqtt_result(rc: int) -> str:
+def _get_mqtt_result(rc: int) -> str:
     if rc in CONNECTION_RESULT_CODES:
         return CONNECTION_RESULT_CODES[rc]
     return 'UNKNOWN'
 
 
 class MqttError(Exception):
+    """A helper class for MQTT specific errors."""
     pass
 
 
@@ -55,6 +56,7 @@ class MqttClient:
             to the broker.
         on_disconnect (Callable): A function called when the client disconnects.
         is_connected (bool): Status of the connection to the broker.
+        connect_retry_interval (int): Seconds between broker reconnect attempts.
 
     """
     def __init__(self,
@@ -68,11 +70,19 @@ class MqttClient:
         """Initializes a managed MQTT client.
         
         Args:
-            client_id: The unique client ID
-            on_message: The callback when subscribed messages are received
-            subscribe_default: The default subscription(s) on re/connection
-            logger: (optional) Logger
-            connect_retry_interval: Seconds between broker reconnect attempts
+            client_id (str): The unique client ID
+            on_message (Callable): The callback when subscribed messages are
+                received.
+            subscribe_default (str|list): The default subscription(s) on
+                re/connection.
+            on_connect (Callable): (optional) callback when connection to the
+                broker is established.
+            on_disconnect (Callable): (optional) callback when disconnecting
+                from the broker.
+            logger (Logger): (optional) Logger
+            connect_retry_interval (int): Seconds between broker reconnect
+                attempts.
+            
         """
         self._host = os.getenv('MQTT_HOST') or 'fieldedge_broker'
         self._user = os.getenv('MQTT_USERNAME') or None
@@ -162,7 +172,7 @@ class MqttClient:
 
     def _mqtt_on_connect(self, client, userdata, flags, rc):
         self._log.debug('MQTT broker connection result code: {} ({})'
-            .format(rc, get_mqtt_result(rc)))
+            .format(rc, _get_mqtt_result(rc)))
         if rc == 0:
             self._log.info('MQTT connection to {}'.format(self._host))
             if not self.is_connected:
@@ -225,7 +235,7 @@ class MqttClient:
             self.on_disconnect(client, userdata, rc)
         if userdata != 'terminate':
             self._log.warning('MQTT broker disconnected: result code {} ({})'
-                .format(rc, get_mqtt_result(rc)))
+                .format(rc, _get_mqtt_result(rc)))
             self._mqtt.loop_stop()
             # get new unique ID to avoid bouncing connection
             self.client_id = self.client_id
@@ -252,23 +262,23 @@ class MqttClient:
             message.topic, payload))
         self.on_message(message.topic, payload)
 
-    def publish(self, topic: str, message: str, qos: int = 2):
+    def publish(self, topic: str, message: str, qos: int = 1):
         """Publishes a message to a MQTT topic.
         
         Args:
             topic (str): The MQTT topic
             message (str): The message to publish
-            qos (int): The MQTT qos 0..2
-
-        Raises:
-            MqttError: if publishing fails
+            qos (int): The MQTT Quality of Service (0, 1 or 2)
 
         """
         if not isinstance(message, str):
             message = json_dumpstr(message)
+        if not isinstance(qos, int) or qos not in range(0, 3):
+            self._log.warning(f'Invalid MQTT QoS {qos} - using QoS 1')
+            qos = 1
         self._log.info('MQTT publishing: {}: {}'.format(topic, message))
         (rc, mid) = self._mqtt.publish(topic=topic, payload=message, qos=qos)
         del mid
         if rc != MQTT_ERR_SUCCESS:
             self._log.error('Publishing error {}'.format(rc))
-            raise MqttError('Publishing error {}'.format(rc))
+            # raise MqttError('Publishing error {}'.format(rc))

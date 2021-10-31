@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "fieldedge-utilities"
+version = "0.1.0"
+description = "Utilities package for the FieldEdge project."
+authors = ["geoffbrucepayne <geoff.bruce-payne@inmarsat.com>"]
+license = "Apache2.0"
+
+[tool.poetry.dependencies]
+python = "^3.7"
+paho-mqtt = "^1.6.1"
+python-dotenv = "^0.19.1"
+
+[tool.poetry.dev-dependencies]
+pylint = "^2.11.1"
+pytest = "^6.2.5"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

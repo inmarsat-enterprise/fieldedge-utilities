@@ -1,0 +1,9 @@
+"""
+# FieldEdge Utilities
+
+This Python library contains common functionality used by many of the Inmarsat
+**FieldEdge** embedded microservices.
+
+"""
+
+__version__ = '0.1.0'

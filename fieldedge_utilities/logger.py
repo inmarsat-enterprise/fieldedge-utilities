@@ -22,7 +22,7 @@ import os
 import sys
 from time import gmtime
 
-from .path import clean_filename, get_caller_name
+from fieldedge_utilities.path import clean_filename, get_caller_name
 
 FORMAT = ('%(asctime)s.%(msecs)03dZ,[%(levelname)s],(%(threadName)s),'
           '%(module)s.%(funcName)s:%(lineno)d,%(message)s')

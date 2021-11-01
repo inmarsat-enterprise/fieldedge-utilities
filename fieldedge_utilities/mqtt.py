@@ -1,6 +1,7 @@
 """MQTT client for local broker inter-service communications.
 
 Reads from a local `.env` file or environment variables allowing:
+
  - `MQTT_HOST` the IP address or hostname of the broker (e.g. 127.0.0.1)
  - `MQTT_USER` the authentication username for the broker
  - `MQTT_PASS` the authentication password for the broker

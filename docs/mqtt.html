@@ -153,7 +153,7 @@ class MqttClient:
             if not isinstance(subscribe_default, list):
                 subscribe_default = [subscribe_default]
             for sub in subscribe_default:
-                self.subscription_add(sub)
+                self.subscribe(sub)
         self._connect()
     
     @property
@@ -174,7 +174,7 @@ class MqttClient:
     def subscriptions(self) -&gt; dict:
         &#34;&#34;&#34;The dictionary of subscriptions.
         
-        Use subscription_add or subscription_del to change the dict.
+        Use subscribe or unsubscribe to change the dict.
 
         &#39;topic&#39; : { &#39;qos&#39;: (int), &#39;mid&#39;: (int) }
 
@@ -247,7 +247,7 @@ class MqttClient:
             self._log.error(&#39;MQTT Error {} unsubscribing to {}&#39;.format(
                 result, topic))
 
-    def subscription_add(self, topic: str, qos: int = 0) -&gt; None:
+    def subscribe(self, topic: str, qos: int = 0) -&gt; None:
         &#34;&#34;&#34;Adds a subscription.
         
         Subscriptions property is updated with qos and message id.
@@ -264,7 +264,7 @@ class MqttClient:
         else:
             self._log.warning(&#39;MQTT not connected will subscribe later&#39;)
 
-    def subscription_del(self, topic: str) -&gt; None:
+    def unsubscribe(self, topic: str) -&gt; None:
         &#34;&#34;&#34;Removes a subscription.
         
         Args:
@@ -450,7 +450,7 @@ attempts.</dd>
             if not isinstance(subscribe_default, list):
                 subscribe_default = [subscribe_default]
             for sub in subscribe_default:
-                self.subscription_add(sub)
+                self.subscribe(sub)
         self._connect()
     
     @property
@@ -471,7 +471,7 @@ attempts.</dd>
     def subscriptions(self) -&gt; dict:
         &#34;&#34;&#34;The dictionary of subscriptions.
         
-        Use subscription_add or subscription_del to change the dict.
+        Use subscribe or unsubscribe to change the dict.
 
         &#39;topic&#39; : { &#39;qos&#39;: (int), &#39;mid&#39;: (int) }
 
@@ -544,7 +544,7 @@ attempts.</dd>
             self._log.error(&#39;MQTT Error {} unsubscribing to {}&#39;.format(
                 result, topic))
 
-    def subscription_add(self, topic: str, qos: int = 0) -&gt; None:
+    def subscribe(self, topic: str, qos: int = 0) -&gt; None:
         &#34;&#34;&#34;Adds a subscription.
         
         Subscriptions property is updated with qos and message id.
@@ -561,7 +561,7 @@ attempts.</dd>
         else:
             self._log.warning(&#39;MQTT not connected will subscribe later&#39;)
 
-    def subscription_del(self, topic: str) -&gt; None:
+    def unsubscribe(self, topic: str) -&gt; None:
         &#34;&#34;&#34;Removes a subscription.
         
         Args:
@@ -643,7 +643,7 @@ def client_id(self):
 <dt id="fieldedge_utilities.mqtt.MqttClient.subscriptions"><code class="name">var <span class="ident">subscriptions</span> : dict</code></dt>
 <dd>
 <div class="desc"><p>The dictionary of subscriptions.</p>
-<p>Use subscription_add or subscription_del to change the dict.</p>
+<p>Use subscribe or unsubscribe to change the dict.</p>
 <p>'topic' : { 'qos': (int), 'mid': (int) }</p></div>
 <details class="source">
 <summary>
@@ -653,7 +653,7 @@ def client_id(self):
 def subscriptions(self) -&gt; dict:
     &#34;&#34;&#34;The dictionary of subscriptions.
     
-    Use subscription_add or subscription_del to change the dict.
+    Use subscribe or unsubscribe to change the dict.
 
     &#39;topic&#39; : { &#39;qos&#39;: (int), &#39;mid&#39;: (int) }
 
@@ -703,8 +703,8 @@ def subscriptions(self) -&gt; dict:
         self._log.error(&#39;Publishing error {}&#39;.format(rc))</code></pre>
 </details>
 </dd>
-<dt id="fieldedge_utilities.mqtt.MqttClient.subscription_add"><code class="name flex">
-<span>def <span class="ident">subscription_add</span></span>(<span>self, topic: str, qos: int = 0) ‑> None</span>
+<dt id="fieldedge_utilities.mqtt.MqttClient.subscribe"><code class="name flex">
+<span>def <span class="ident">subscribe</span></span>(<span>self, topic: str, qos: int = 0) ‑> None</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Adds a subscription.</p>
@@ -720,7 +720,7 @@ def subscriptions(self) -&gt; dict:
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def subscription_add(self, topic: str, qos: int = 0) -&gt; None:
+<pre><code class="python">def subscribe(self, topic: str, qos: int = 0) -&gt; None:
     &#34;&#34;&#34;Adds a subscription.
     
     Subscriptions property is updated with qos and message id.
@@ -738,8 +738,8 @@ def subscriptions(self) -&gt; dict:
         self._log.warning(&#39;MQTT not connected will subscribe later&#39;)</code></pre>
 </details>
 </dd>
-<dt id="fieldedge_utilities.mqtt.MqttClient.subscription_del"><code class="name flex">
-<span>def <span class="ident">subscription_del</span></span>(<span>self, topic: str) ‑> None</span>
+<dt id="fieldedge_utilities.mqtt.MqttClient.unsubscribe"><code class="name flex">
+<span>def <span class="ident">unsubscribe</span></span>(<span>self, topic: str) ‑> None</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Removes a subscription.</p>
@@ -752,7 +752,7 @@ def subscriptions(self) -&gt; dict:
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def subscription_del(self, topic: str) -&gt; None:
+<pre><code class="python">def unsubscribe(self, topic: str) -&gt; None:
     &#34;&#34;&#34;Removes a subscription.
     
     Args:
@@ -809,9 +809,9 @@ def subscriptions(self) -&gt; dict:
 <ul class="">
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.client_id" href="#fieldedge_utilities.mqtt.MqttClient.client_id">client_id</a></code></li>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.publish" href="#fieldedge_utilities.mqtt.MqttClient.publish">publish</a></code></li>
-<li><code><a title="fieldedge_utilities.mqtt.MqttClient.subscription_add" href="#fieldedge_utilities.mqtt.MqttClient.subscription_add">subscription_add</a></code></li>
-<li><code><a title="fieldedge_utilities.mqtt.MqttClient.subscription_del" href="#fieldedge_utilities.mqtt.MqttClient.subscription_del">subscription_del</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttClient.subscribe" href="#fieldedge_utilities.mqtt.MqttClient.subscribe">subscribe</a></code></li>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.subscriptions" href="#fieldedge_utilities.mqtt.MqttClient.subscriptions">subscriptions</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttClient.unsubscribe" href="#fieldedge_utilities.mqtt.MqttClient.unsubscribe">unsubscribe</a></code></li>
 </ul>
 </li>
 <li>

@@ -116,7 +116,7 @@ class MqttClient:
             if not isinstance(subscribe_default, list):
                 subscribe_default = [subscribe_default]
             for sub in subscribe_default:
-                self.subscription_add(sub)
+                self.subscribe(sub)
         self._connect()
     
     @property
@@ -137,7 +137,7 @@ class MqttClient:
     def subscriptions(self) -> dict:
         """The dictionary of subscriptions.
         
-        Use subscription_add or subscription_del to change the dict.
+        Use subscribe or unsubscribe to change the dict.
 
         'topic' : { 'qos': (int), 'mid': (int) }
 
@@ -210,7 +210,7 @@ class MqttClient:
             self._log.error('MQTT Error {} unsubscribing to {}'.format(
                 result, topic))
 
-    def subscription_add(self, topic: str, qos: int = 0) -> None:
+    def subscribe(self, topic: str, qos: int = 0) -> None:
         """Adds a subscription.
         
         Subscriptions property is updated with qos and message id.
@@ -227,7 +227,7 @@ class MqttClient:
         else:
             self._log.warning('MQTT not connected will subscribe later')
 
-    def subscription_del(self, topic: str) -> None:
+    def unsubscribe(self, topic: str) -> None:
         """Removes a subscription.
         
         Args:

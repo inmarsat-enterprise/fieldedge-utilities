@@ -1,13 +1,16 @@
 """MQTT client for local broker inter-service communications.
 
-Reads from a local `.env` file or environment variables allowing:
+This MQTT client sets up automatic connection and reconnection intended mainly
+for use with a local broker on an edge device e.g. Raspberry Pi.
+
+Reads configuration from a local `.env` file or environment variables:
 
 * `MQTT_HOST` the IP address or hostname of the broker (e.g. 127.0.0.1)
 * `MQTT_USER` the authentication username for the broker
 * `MQTT_PASS` the authentication password for the broker
 
-Typically the broker will be a Mosquitto service running locally in a Docker
-container listening on port 1883.
+Typically the `fieldedge-broker` will be a **Mosquitto** service running locally
+in a **Docker** container listening on port 1883 for authenticated connections.
 
 """
 import os
@@ -83,8 +86,8 @@ class MqttClient:
             client_id (str): The unique client ID
             on_message (Callable): The callback when subscribed messages are
                 received.
-            subscribe_default (str|list): The default subscription(s) on
-                re/connection.
+            subscribe_default (Union[str, list[str]]): The default
+                subscription(s) established on re/connection.
             on_connect (Callable): (optional) callback when connection to the
                 broker is established.
             on_disconnect (Callable): (optional) callback when disconnecting

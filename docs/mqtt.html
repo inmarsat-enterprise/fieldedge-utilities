@@ -23,28 +23,33 @@
 </header>
 <section id="section-intro">
 <p>MQTT client for local broker inter-service communications.</p>
-<p>Reads from a local <code>.env</code> file or environment variables allowing:</p>
+<p>This MQTT client sets up automatic connection and reconnection intended mainly
+for use with a local broker on an edge device e.g. Raspberry Pi.</p>
+<p>Reads configuration from a local <code>.env</code> file or environment variables:</p>
 <ul>
 <li><code>MQTT_HOST</code> the IP address or hostname of the broker (e.g. 127.0.0.1)</li>
 <li><code>MQTT_USER</code> the authentication username for the broker</li>
 <li><code>MQTT_PASS</code> the authentication password for the broker</li>
 </ul>
-<p>Typically the broker will be a Mosquitto service running locally in a Docker
-container listening on port 1883.</p>
+<p>Typically the <code>fieldedge-broker</code> will be a <strong>Mosquitto</strong> service running locally
+in a <strong>Docker</strong> container listening on port 1883 for authenticated connections.</p>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">&#34;&#34;&#34;MQTT client for local broker inter-service communications.
 
-Reads from a local `.env` file or environment variables allowing:
+This MQTT client sets up automatic connection and reconnection intended mainly
+for use with a local broker on an edge device e.g. Raspberry Pi.
+
+Reads configuration from a local `.env` file or environment variables:
 
 * `MQTT_HOST` the IP address or hostname of the broker (e.g. 127.0.0.1)
 * `MQTT_USER` the authentication username for the broker
 * `MQTT_PASS` the authentication password for the broker
 
-Typically the broker will be a Mosquitto service running locally in a Docker
-container listening on port 1883.
+Typically the `fieldedge-broker` will be a **Mosquitto** service running locally
+in a **Docker** container listening on port 1883 for authenticated connections.
 
 &#34;&#34;&#34;
 import os
@@ -120,7 +125,7 @@ class MqttClient:
             client_id (str): The unique client ID
             on_message (Callable): The callback when subscribed messages are
                 received.
-            subscribe_default (str|list): The default subscription(s) on
+            subscribe_default (Union[str, list[str]]): The default subscription(s) on
                 re/connection.
             on_connect (Callable): (optional) callback when connection to the
                 broker is established.
@@ -371,8 +376,9 @@ to the broker.</dd>
 <dt><strong><code>on_message</code></strong> :&ensp;<code>Callable</code></dt>
 <dd>The callback when subscribed messages are
 received.</dd>
-<dt>subscribe_default (str|list): The default subscription(s) on</dt>
-<dt>re/connection.</dt>
+<dt><strong><code>subscribe_default</code></strong> :&ensp;<code>Union[str, list[str]]</code></dt>
+<dd>The default subscription(s) on
+re/connection.</dd>
 <dt><strong><code>on_connect</code></strong> :&ensp;<code>Callable</code></dt>
 <dd>(optional) callback when connection to the
 broker is established.</dd>
@@ -417,7 +423,7 @@ attempts.</dd>
             client_id (str): The unique client ID
             on_message (Callable): The callback when subscribed messages are
                 received.
-            subscribe_default (str|list): The default subscription(s) on
+            subscribe_default (Union[str, list[str]]): The default subscription(s) on
                 re/connection.
             on_connect (Callable): (optional) callback when connection to the
                 broker is established.

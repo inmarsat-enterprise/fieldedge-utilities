@@ -1,9 +1,12 @@
 [tool.poetry]
 name = "fieldedge-utilities"
-version = "0.1.0"
+version = "0.1.2"
 description = "Utilities package for the FieldEdge project."
 authors = ["geoffbrucepayne <geoff.bruce-payne@inmarsat.com>"]
 license = "Apache2.0"
+readme = "README.md"
+repository = "https://github.com/inmarsat-enterprise/fieldedge-utilities"
+keywords = ["Inmarsat", "FieldEdge"]
 
 [tool.poetry.dependencies]
 python = "^3.7"

@@ -1,6 +1,13 @@
 # Inmarsat FieldEdge Utilities
 
-Provides a common logging format and facility,
-and a common MQTT client that automatically connects.
+Inmarsat FieldEdge project supports *Internet of Things* (**IoT**) using
+satellite communications technology.
+
+This library available on **PyPI** provides:
+
+* A common **`logger`** format and wrapping file facility
+* A simplified **`mqtt`** client that automatically connects
+(to a `fieldedge-broker`)
+* Helper functions for managing files and **`path`** on different OS
 
 [Docmentation](https://inmarsat-enterprise.github.io/fieldedge-utilities/)

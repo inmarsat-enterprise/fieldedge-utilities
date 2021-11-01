@@ -7,4 +7,4 @@ This Python library contains common functionality used by many of the Inmarsat
 """
 __docformat__ = 'google'
 
-__version__ = '0.1.0'
+__version__ = '0.1.2'

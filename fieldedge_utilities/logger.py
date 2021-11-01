@@ -4,13 +4,14 @@ Provides a common log format with a console and file handler.
 The file is a wrapping log of configurable size using `RotatingFileHandler`.
 
 Format is:
-* ISO UTC timestamp including milliseconds
-* Log level in square brackets
-* Thread name in round brackets
-* ModuleName.FunctionName:(LineNumber)
-* Message
+ - ISO UTC timestamp including milliseconds
+ - Log level in square brackets
+ - Thread name in round brackets
+ - ModuleName.FunctionName:(LineNumber)
+ - Message
 
 Example:
+
 `2021-10-30T14:19:51.012Z,[INFO],(MainThread),main.<module>:6,This is a test`
 
 """

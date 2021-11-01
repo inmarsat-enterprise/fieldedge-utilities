@@ -57,53 +57,32 @@ Format is:
 `2021-10-30T14:19:51.012Z,[INFO],(MainThread),main.&lt;module&gt;:6,This is a test`
 
 &#34;&#34;&#34;
-import inspect
 import logging
 from logging.handlers import RotatingFileHandler
 import os
-from pathlib import Path
 import sys
 from time import gmtime
+
+from .path import clean_filename, get_caller_name
 
 FORMAT = (&#39;%(asctime)s.%(msecs)03dZ,[%(levelname)s],(%(threadName)s),&#39;
           &#39;%(module)s.%(funcName)s:%(lineno)d,%(message)s&#39;)
 
 
 # Logging to STDOUT or STDERR
-class LessThanFilter(logging.Filter):
+class _LessThanFilter(logging.Filter):
     &#34;&#34;&#34;Filters logs below a specified level for routing to a given handler.&#34;&#34;&#34;
     def __init__(self,
                  exclusive_maximum: int = logging.WARNING,
                  name: str = None):
         if name is None:
             name = f&#39;LessThan{logging.getLevelName(exclusive_maximum)}&#39;
-        super(LessThanFilter, self).__init__(name)
+        super(_LessThanFilter, self).__init__(name)
         self.max_level = exclusive_maximum
 
     def filter(self, record):
         #non-zero return means we log this message
         return 1 if record.levelno &lt; self.max_level else 0
-
-
-def clean_filename(filename: str) -&gt; str:
-    &#34;&#34;&#34;Adjusts relative and shorthand filenames for OS independence.
-    
-    Args:
-        filename: The full path/to/file
-    
-    Returns:
-        A clean file/path name for the current OS and directory structure.
-    &#34;&#34;&#34;
-    if filename.startswith(&#39;$HOME/&#39;):
-        filename = filename.replace(&#39;$HOME&#39;, str(Path.home()))
-    elif filename.startswith(&#39;~/&#39;):
-        filename = filename.replace(&#39;~&#39;, str(Path.home()))
-    elif filename.startswith(&#39;../&#39;):
-        mod_path = Path(__file__).parent
-        src_path = (mod_path / filename).resolve()
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-        filename = os.path.join(dir_path, src_path)
-    return filename
 
 
 def get_logfile_name(logger: logging.Logger) -&gt; str:
@@ -114,42 +93,7 @@ def get_logfile_name(logger: logging.Logger) -&gt; str:
     return None
 
 
-def get_caller_name(depth: int = 2,
-                    mod: bool = True,
-                    cls: bool =False,
-                    mth: bool = False) -&gt; str:
-    &#34;&#34;&#34;Returns the name of the calling function.
-
-    Args:
-        depth: Starting depth of stack inspection.
-        mod: Include module name.
-        cls: Include class name.
-        mth: Include method name.
-    
-    Returns:
-        Name (string) including module[.class][.method]
-
-    &#34;&#34;&#34;
-    stack = inspect.stack()
-    start = 0 + depth
-    if len(stack) &lt; start + 1:
-        return &#39;&#39;
-    parent_frame = stack[start][0]
-    name = []
-    module = inspect.getmodule(parent_frame)
-    if module and mod:
-        name.append(module.__name__)
-    if cls and &#39;self&#39; in parent_frame.f_locals:
-        name.append(parent_frame.f_locals[&#39;self&#39;].__class__.__name__)
-    if mth:
-        codename = parent_frame.f_code.co_name
-        if codename != &#39;&lt;module&gt;&#39;:
-            name.append(codename)
-    del parent_frame, stack
-    return &#39;.&#39;.join(name)
-
-
-def is_log_handler(logger: logging.Logger, handler: object) -&gt; bool:
+def _is_log_handler(logger: logging.Logger, handler: object) -&gt; bool:
     &#34;&#34;&#34;Returns true if the handler is found in the logger.
     
     Args:
@@ -216,7 +160,7 @@ def get_wrapping_logger(name: str = None,
             handler_file.name = name + &#39;_file_handler&#39;
             handler_file.setFormatter(log_formatter)
             handler_file.setLevel(log_level)
-            if not is_log_handler(logger, handler_file):
+            if not _is_log_handler(logger, handler_file):
                 logger.addHandler(handler_file)
         except Exception as e:
             logger.exception(f&#39;Could not create RotatingFileHandler {filename}&#39;
@@ -226,14 +170,14 @@ def get_wrapping_logger(name: str = None,
     handler_stdout.name = name + &#39;_stdout_handler&#39;
     handler_stdout.setFormatter(log_formatter)
     handler_stdout.setLevel(log_level)
-    handler_stdout.addFilter(LessThanFilter(logging.WARNING))
-    if not is_log_handler(logger, handler_stdout):
+    handler_stdout.addFilter(_LessThanFilter(logging.WARNING))
+    if not _is_log_handler(logger, handler_stdout):
         logger.addHandler(handler_stdout)
     handler_stderr = logging.StreamHandler(sys.stderr)
     handler_stderr.name = name + &#39;_stderr_handler&#39;
     handler_stderr.setFormatter(log_formatter)
     handler_stderr.setLevel(logging.WARNING)
-    if not is_log_handler(logger, handler_stderr):
+    if not _is_log_handler(logger, handler_stderr):
         logger.addHandler(handler_stderr)
     return logger</code></pre>
 </details>
@@ -245,100 +189,6 @@ def get_wrapping_logger(name: str = None,
 <section>
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
-<dt id="fieldedge_utilities.logger.clean_filename"><code class="name flex">
-<span>def <span class="ident">clean_filename</span></span>(<span>filename: str) ‑> str</span>
-</code></dt>
-<dd>
-<div class="desc"><p>Adjusts relative and shorthand filenames for OS independence.</p>
-<h2 id="args">Args</h2>
-<dl>
-<dt><strong><code>filename</code></strong></dt>
-<dd>The full path/to/file</dd>
-</dl>
-<h2 id="returns">Returns</h2>
-<p>A clean file/path name for the current OS and directory structure.</p></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def clean_filename(filename: str) -&gt; str:
-    &#34;&#34;&#34;Adjusts relative and shorthand filenames for OS independence.
-    
-    Args:
-        filename: The full path/to/file
-    
-    Returns:
-        A clean file/path name for the current OS and directory structure.
-    &#34;&#34;&#34;
-    if filename.startswith(&#39;$HOME/&#39;):
-        filename = filename.replace(&#39;$HOME&#39;, str(Path.home()))
-    elif filename.startswith(&#39;~/&#39;):
-        filename = filename.replace(&#39;~&#39;, str(Path.home()))
-    elif filename.startswith(&#39;../&#39;):
-        mod_path = Path(__file__).parent
-        src_path = (mod_path / filename).resolve()
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-        filename = os.path.join(dir_path, src_path)
-    return filename</code></pre>
-</details>
-</dd>
-<dt id="fieldedge_utilities.logger.get_caller_name"><code class="name flex">
-<span>def <span class="ident">get_caller_name</span></span>(<span>depth: int = 2, mod: bool = True, cls: bool = False, mth: bool = False) ‑> str</span>
-</code></dt>
-<dd>
-<div class="desc"><p>Returns the name of the calling function.</p>
-<h2 id="args">Args</h2>
-<dl>
-<dt><strong><code>depth</code></strong></dt>
-<dd>Starting depth of stack inspection.</dd>
-<dt><strong><code>mod</code></strong></dt>
-<dd>Include module name.</dd>
-<dt><strong><code>cls</code></strong></dt>
-<dd>Include class name.</dd>
-<dt><strong><code>mth</code></strong></dt>
-<dd>Include method name.</dd>
-</dl>
-<h2 id="returns">Returns</h2>
-<p>Name (string) including module[.class][.method]</p></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def get_caller_name(depth: int = 2,
-                    mod: bool = True,
-                    cls: bool =False,
-                    mth: bool = False) -&gt; str:
-    &#34;&#34;&#34;Returns the name of the calling function.
-
-    Args:
-        depth: Starting depth of stack inspection.
-        mod: Include module name.
-        cls: Include class name.
-        mth: Include method name.
-    
-    Returns:
-        Name (string) including module[.class][.method]
-
-    &#34;&#34;&#34;
-    stack = inspect.stack()
-    start = 0 + depth
-    if len(stack) &lt; start + 1:
-        return &#39;&#39;
-    parent_frame = stack[start][0]
-    name = []
-    module = inspect.getmodule(parent_frame)
-    if module and mod:
-        name.append(module.__name__)
-    if cls and &#39;self&#39; in parent_frame.f_locals:
-        name.append(parent_frame.f_locals[&#39;self&#39;].__class__.__name__)
-    if mth:
-        codename = parent_frame.f_code.co_name
-        if codename != &#39;&lt;module&gt;&#39;:
-            name.append(codename)
-    del parent_frame, stack
-    return &#39;.&#39;.join(name)</code></pre>
-</details>
-</dd>
 <dt id="fieldedge_utilities.logger.get_logfile_name"><code class="name flex">
 <span>def <span class="ident">get_logfile_name</span></span>(<span>logger: logging.Logger) ‑> str</span>
 </code></dt>
@@ -431,7 +281,7 @@ Timestamps are UTC/GMT/Zulu.</p>
             handler_file.name = name + &#39;_file_handler&#39;
             handler_file.setFormatter(log_formatter)
             handler_file.setLevel(log_level)
-            if not is_log_handler(logger, handler_file):
+            if not _is_log_handler(logger, handler_file):
                 logger.addHandler(handler_file)
         except Exception as e:
             logger.exception(f&#39;Could not create RotatingFileHandler {filename}&#39;
@@ -441,111 +291,21 @@ Timestamps are UTC/GMT/Zulu.</p>
     handler_stdout.name = name + &#39;_stdout_handler&#39;
     handler_stdout.setFormatter(log_formatter)
     handler_stdout.setLevel(log_level)
-    handler_stdout.addFilter(LessThanFilter(logging.WARNING))
-    if not is_log_handler(logger, handler_stdout):
+    handler_stdout.addFilter(_LessThanFilter(logging.WARNING))
+    if not _is_log_handler(logger, handler_stdout):
         logger.addHandler(handler_stdout)
     handler_stderr = logging.StreamHandler(sys.stderr)
     handler_stderr.name = name + &#39;_stderr_handler&#39;
     handler_stderr.setFormatter(log_formatter)
     handler_stderr.setLevel(logging.WARNING)
-    if not is_log_handler(logger, handler_stderr):
+    if not _is_log_handler(logger, handler_stderr):
         logger.addHandler(handler_stderr)
     return logger</code></pre>
-</details>
-</dd>
-<dt id="fieldedge_utilities.logger.is_log_handler"><code class="name flex">
-<span>def <span class="ident">is_log_handler</span></span>(<span>logger: logging.Logger, handler: object) ‑> bool</span>
-</code></dt>
-<dd>
-<div class="desc"><p>Returns true if the handler is found in the logger.</p>
-<h2 id="args">Args</h2>
-<p>logger (logging.Logger)
-handler (logging handler)</p>
-<h2 id="returns">Returns</h2>
-<p>True if the handler is in the logger.</p></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def is_log_handler(logger: logging.Logger, handler: object) -&gt; bool:
-    &#34;&#34;&#34;Returns true if the handler is found in the logger.
-    
-    Args:
-        logger (logging.Logger)
-        handler (logging handler)
-    
-    Returns:
-        True if the handler is in the logger.
-
-    &#34;&#34;&#34;
-    if not isinstance(logger, logging.Logger):
-        return False
-    found = False
-    for h in logger.handlers:
-        if h.name == handler.name:
-            found = True
-            break
-    return found</code></pre>
 </details>
 </dd>
 </dl>
 </section>
 <section>
-<h2 class="section-title" id="header-classes">Classes</h2>
-<dl>
-<dt id="fieldedge_utilities.logger.LessThanFilter"><code class="flex name class">
-<span>class <span class="ident">LessThanFilter</span></span>
-<span>(</span><span>exclusive_maximum: int = 30, name: str = None)</span>
-</code></dt>
-<dd>
-<div class="desc"><p>Filters logs below a specified level for routing to a given handler.</p>
-<p>Initialize a filter.</p>
-<p>Initialize with the name of the logger which, together with its
-children, will have its events allowed through the filter. If no
-name is specified, allow every event.</p></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">class LessThanFilter(logging.Filter):
-    &#34;&#34;&#34;Filters logs below a specified level for routing to a given handler.&#34;&#34;&#34;
-    def __init__(self,
-                 exclusive_maximum: int = logging.WARNING,
-                 name: str = None):
-        if name is None:
-            name = f&#39;LessThan{logging.getLevelName(exclusive_maximum)}&#39;
-        super(LessThanFilter, self).__init__(name)
-        self.max_level = exclusive_maximum
-
-    def filter(self, record):
-        #non-zero return means we log this message
-        return 1 if record.levelno &lt; self.max_level else 0</code></pre>
-</details>
-<h3>Ancestors</h3>
-<ul class="hlist">
-<li>logging.Filter</li>
-</ul>
-<h3>Methods</h3>
-<dl>
-<dt id="fieldedge_utilities.logger.LessThanFilter.filter"><code class="name flex">
-<span>def <span class="ident">filter</span></span>(<span>self, record)</span>
-</code></dt>
-<dd>
-<div class="desc"><p>Determine if the specified record is to be logged.</p>
-<p>Is the specified record to be logged? Returns 0 for no, nonzero for
-yes. If deemed appropriate, the record may be modified in-place.</p></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def filter(self, record):
-    #non-zero return means we log this message
-    return 1 if record.levelno &lt; self.max_level else 0</code></pre>
-</details>
-</dd>
-</dl>
-</dd>
-</dl>
 </section>
 </article>
 <nav id="sidebar">
@@ -561,21 +321,8 @@ yes. If deemed appropriate, the record may be modified in-place.</p></div>
 </li>
 <li><h3><a href="#header-functions">Functions</a></h3>
 <ul class="">
-<li><code><a title="fieldedge_utilities.logger.clean_filename" href="#fieldedge_utilities.logger.clean_filename">clean_filename</a></code></li>
-<li><code><a title="fieldedge_utilities.logger.get_caller_name" href="#fieldedge_utilities.logger.get_caller_name">get_caller_name</a></code></li>
 <li><code><a title="fieldedge_utilities.logger.get_logfile_name" href="#fieldedge_utilities.logger.get_logfile_name">get_logfile_name</a></code></li>
 <li><code><a title="fieldedge_utilities.logger.get_wrapping_logger" href="#fieldedge_utilities.logger.get_wrapping_logger">get_wrapping_logger</a></code></li>
-<li><code><a title="fieldedge_utilities.logger.is_log_handler" href="#fieldedge_utilities.logger.is_log_handler">is_log_handler</a></code></li>
-</ul>
-</li>
-<li><h3><a href="#header-classes">Classes</a></h3>
-<ul>
-<li>
-<h4><code><a title="fieldedge_utilities.logger.LessThanFilter" href="#fieldedge_utilities.logger.LessThanFilter">LessThanFilter</a></code></h4>
-<ul class="">
-<li><code><a title="fieldedge_utilities.logger.LessThanFilter.filter" href="#fieldedge_utilities.logger.LessThanFilter.filter">filter</a></code></li>
-</ul>
-</li>
 </ul>
 </li>
 </ul>

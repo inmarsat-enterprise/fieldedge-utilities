@@ -23,7 +23,7 @@
 </header>
 <section id="section-intro">
 <p>Wrapping logger common format for FieldEdge project(s) with UTC timestamp.</p>
-<p>This module provides a common log format with a console and file handler.
+<p>Provides a common log format with a console and file handler.
 The file is a wrapping log of configurable size using <code>RotatingFileHandler</code>.</p>
 <p>Format is:
 * ISO UTC timestamp including milliseconds
@@ -31,23 +31,25 @@ The file is a wrapping log of configurable size using <code>RotatingFileHandler<
 * Thread name in round brackets
 * ModuleName.FunctionName:(LineNumber)
 * Message</p>
-<p><code>2021-10-30T14:19:51.012Z,[INFO],(MainThread),main.&lt;module&gt;:6,This is a test</code></p>
+<p>Example:
+<code>2021-10-30T14:19:51.012Z,[INFO],(MainThread),main.&lt;module&gt;:6,This is a test</code></p>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">&#34;&#34;&#34;Wrapping logger common format for FieldEdge project(s) with UTC timestamp.
 
-This module provides a common log format with a console and file handler.
+Provides a common log format with a console and file handler.
 The file is a wrapping log of configurable size using `RotatingFileHandler`.
 
 Format is:
-    * ISO UTC timestamp including milliseconds
-    * Log level in square brackets
-    * Thread name in round brackets
-    * ModuleName.FunctionName:(LineNumber)
-    * Message
+* ISO UTC timestamp including milliseconds
+* Log level in square brackets
+* Thread name in round brackets
+* ModuleName.FunctionName:(LineNumber)
+* Message
 
+Example:
 `2021-10-30T14:19:51.012Z,[INFO],(MainThread),main.&lt;module&gt;:6,This is a test`
 
 &#34;&#34;&#34;

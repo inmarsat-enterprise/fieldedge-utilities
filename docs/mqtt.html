@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
 <meta name="generator" content="pdoc 0.10.0" />
 <title>fieldedge_utilities.mqtt API documentation</title>
-<meta name="description" content="MQTT client for local Mosquitto broker inter-service communications." />
+<meta name="description" content="MQTT client for local broker inter-service communications …" />
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
 <link rel="stylesheet preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/github.min.css" crossorigin>
@@ -22,12 +22,27 @@
 <h1 class="title">Module <code>fieldedge_utilities.mqtt</code></h1>
 </header>
 <section id="section-intro">
-<p>MQTT client for local Mosquitto broker inter-service communications.</p>
+<p>MQTT client for local broker inter-service communications.</p>
+<p>Reads from a local <code>.env</code> file or environment variables allowing:
+* <code>MQTT_HOST</code> the IP address or hostname of the broker (e.g. 127.0.0.1)
+* <code>MQTT_USER</code> the authentication username for the broker
+* <code>MQTT_PASS</code> the authentication password for the broker</p>
+<p>Typically the broker will be a Mosquitto service running locally in a Docker
+container listening on port 1883.</p>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">&#34;&#34;&#34;MQTT client for local Mosquitto broker inter-service communications.
+<pre><code class="python">&#34;&#34;&#34;MQTT client for local broker inter-service communications.
+
+Reads from a local `.env` file or environment variables allowing:
+* `MQTT_HOST` the IP address or hostname of the broker (e.g. 127.0.0.1)
+* `MQTT_USER` the authentication username for the broker
+* `MQTT_PASS` the authentication password for the broker
+
+Typically the broker will be a Mosquitto service running locally in a Docker
+container listening on port 1883.
+
 &#34;&#34;&#34;
 import os
 from atexit import register as on_exit
@@ -70,7 +85,7 @@ def _get_mqtt_result(rc: int) -&gt; str:
 
 
 class MqttError(Exception):
-    &#34;&#34;&#34;A helper class for MQTT specific errors.&#34;&#34;&#34;
+    &#34;&#34;&#34;A wrapper for MQTT-specific errors.&#34;&#34;&#34;
     pass
 
 
@@ -114,7 +129,7 @@ class MqttClient:
             
         &#34;&#34;&#34;
         self._host = os.getenv(&#39;MQTT_HOST&#39;) or &#39;fieldedge_broker&#39;
-        self._user = os.getenv(&#39;MQTT_USERNAME&#39;) or None
+        self._user = os.getenv(&#39;MQTT_USER&#39;) or None
         self._pass = os.getenv(&#39;MQTT_PASS&#39;) or None
         self._log = logger or get_wrapping_logger(name=&#39;mqtt_client&#39;)
         if not isinstance(client_id, str) or client_id == &#39;&#39;:
@@ -411,7 +426,7 @@ attempts.</dd>
             
         &#34;&#34;&#34;
         self._host = os.getenv(&#39;MQTT_HOST&#39;) or &#39;fieldedge_broker&#39;
-        self._user = os.getenv(&#39;MQTT_USERNAME&#39;) or None
+        self._user = os.getenv(&#39;MQTT_USER&#39;) or None
         self._pass = os.getenv(&#39;MQTT_PASS&#39;) or None
         self._log = logger or get_wrapping_logger(name=&#39;mqtt_client&#39;)
         if not isinstance(client_id, str) or client_id == &#39;&#39;:
@@ -755,13 +770,13 @@ def subscriptions(self) -&gt; dict:
 <span>(</span><span>*args, **kwargs)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>A helper class for MQTT specific errors.</p></div>
+<div class="desc"><p>A wrapper for MQTT-specific errors.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class MqttError(Exception):
-    &#34;&#34;&#34;A helper class for MQTT specific errors.&#34;&#34;&#34;
+    &#34;&#34;&#34;A wrapper for MQTT-specific errors.&#34;&#34;&#34;
     pass</code></pre>
 </details>
 <h3>Ancestors</h3>

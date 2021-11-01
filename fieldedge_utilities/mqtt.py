@@ -1,4 +1,13 @@
-"""MQTT client for local Mosquitto broker inter-service communications.
+"""MQTT client for local broker inter-service communications.
+
+Reads from a local `.env` file or environment variables allowing:
+* `MQTT_HOST` the IP address or hostname of the broker (e.g. 127.0.0.1)
+* `MQTT_USER` the authentication username for the broker
+* `MQTT_PASS` the authentication password for the broker
+
+Typically the broker will be a Mosquitto service running locally in a Docker
+container listening on port 1883.
+
 """
 import os
 from atexit import register as on_exit
@@ -41,7 +50,7 @@ def _get_mqtt_result(rc: int) -> str:
 
 
 class MqttError(Exception):
-    """A helper class for MQTT specific errors."""
+    """A wrapper for MQTT-specific errors."""
     pass
 
 
@@ -85,7 +94,7 @@ class MqttClient:
             
         """
         self._host = os.getenv('MQTT_HOST') or 'fieldedge_broker'
-        self._user = os.getenv('MQTT_USERNAME') or None
+        self._user = os.getenv('MQTT_USER') or None
         self._pass = os.getenv('MQTT_PASS') or None
         self._log = logger or get_wrapping_logger(name='mqtt_client')
         if not isinstance(client_id, str) or client_id == '':

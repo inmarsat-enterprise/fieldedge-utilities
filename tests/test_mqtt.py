@@ -1,9 +1,9 @@
 
+from logging import DEBUG
 import os
 from time import sleep
 
-import pytest
-from fieldedge_utilities import mqtt
+from fieldedge_utilities import logger, mqtt
 
 TEST_TOPIC = 'fieldedge/test'
 TEST_PAYLOAD = 'payload'
@@ -15,18 +15,24 @@ def on_message(topic, payload):
     message_received = f'{topic}: {payload}'
 
 
-def test_basic_pubsub():
+def test_basic_pubsub(capsys):
     global message_received
     os.environ['MQTT_HOST'] = 'test.mosquitto.org'
+    log = logger.get_wrapping_logger(log_level=DEBUG)
     mqttc = mqtt.MqttClient(client_id='test_client',
                             on_message=on_message,
-                            subscribe_default=TEST_TOPIC + '/#')
+                            subscribe_default=TEST_TOPIC + '/#',
+                            logger=log)
+    captured = capsys.readouterr()
     assert isinstance(mqttc, mqtt.MqttClient)
     while not mqttc.is_connected:
         sleep(0.5)
+    captured = capsys.readouterr()
     mqttc.publish(TEST_TOPIC, TEST_PAYLOAD)
+    captured = capsys.readouterr()
     while not message_received:
         sleep(0.5)
+    captured = capsys.readouterr()
     assert message_received == f'{TEST_TOPIC}: {TEST_PAYLOAD}'
 
 

@@ -25,7 +25,7 @@
 <p>MQTT client for local broker inter-service communications.</p>
 <p>This MQTT client sets up automatic connection and reconnection intended mainly
 for use with a local broker on an edge device e.g. Raspberry Pi.</p>
-<p>Reads configuration from a local <code>.env</code> file or environment variables:</p>
+<p>Reads broker configuration from a local <code>.env</code> file or environment variables:</p>
 <ul>
 <li><code>MQTT_HOST</code> the IP address or hostname of the broker (e.g. 127.0.0.1)</li>
 <li><code>MQTT_USER</code> the authentication username for the broker</li>
@@ -42,7 +42,7 @@ in a <strong>Docker</strong> container listening on port 1883 for authenticated 
 This MQTT client sets up automatic connection and reconnection intended mainly
 for use with a local broker on an edge device e.g. Raspberry Pi.
 
-Reads configuration from a local `.env` file or environment variables:
+Reads broker configuration from a local `.env` file or environment variables:
 
 * `MQTT_HOST` the IP address or hostname of the broker (e.g. 127.0.0.1)
 * `MQTT_USER` the authentication username for the broker
@@ -93,7 +93,7 @@ def _get_mqtt_result(rc: int) -&gt; str:
 
 
 class MqttError(Exception):
-    &#34;&#34;&#34;A wrapper for MQTT-specific errors.&#34;&#34;&#34;
+    &#34;&#34;&#34;A MQTT-specific error.&#34;&#34;&#34;
     pass
 
 
@@ -103,7 +103,7 @@ class MqttClient:
     Attributes:
         client_id (str): A unique client_id.
         on_message (Callable): A function called when a subscribed message
-            is received from the broker .
+            is received from the broker.
         on_connect (Callable): A function called when the client connects
             to the broker.
         on_disconnect (Callable): A function called when the client disconnects.
@@ -113,7 +113,7 @@ class MqttClient:
     &#34;&#34;&#34;
     def __init__(self,
                  client_id: str,
-                 on_message: Callable[..., &#34;tuple[str, object]&#34;],
+                 on_message: Callable[..., &#34;tuple[str, object]&#34;] = None,
                  subscribe_default: Union[str, &#34;list[str]&#34;] = None,
                  on_connect: Callable = None,
                  on_disconnect: Callable = None,
@@ -124,9 +124,9 @@ class MqttClient:
         Args:
             client_id (str): The unique client ID
             on_message (Callable): The callback when subscribed messages are
-                received.
-            subscribe_default (Union[str, list[str]]): The default subscription(s) on
-                re/connection.
+                received as `topic, message`.
+            subscribe_default (Union[str, list[str]]): The default
+                subscription(s) established on re/connection.
             on_connect (Callable): (optional) callback when connection to the
                 broker is established.
             on_disconnect (Callable): (optional) callback when disconnecting
@@ -134,7 +134,10 @@ class MqttClient:
             logger (Logger): (optional) Logger
             connect_retry_interval (int): Seconds between broker reconnect
                 attempts.
-            
+
+        Raises:
+            `MqttError` if the client_id is not valid.
+
         &#34;&#34;&#34;
         self._host = os.getenv(&#39;MQTT_HOST&#39;) or &#39;fieldedge_broker&#39;
         self._user = os.getenv(&#39;MQTT_USER&#39;) or None
@@ -217,10 +220,11 @@ class MqttClient:
                 thread.name = &#39;MqttThread&#39;
                 break
         except ConnectionError as e:
+            # raise MqttError(f&#39;MQTT {e}&#39;)
             self._log.warning(f&#39;Unable to connect to {self._host} ({e})...&#39;
                 f&#39;retrying in {self.connect_retry_interval} seconds&#39;)
             sleep(self.connect_retry_interval)
-            # raise MqttError(&#39;MQTT {}&#39;.format(e))
+            self._connect()
 
     def _mqtt_on_connect(self, client, userdata, flags, rc):
         self._log.debug(&#39;MQTT broker connection result code: {} ({})&#39;
@@ -292,7 +296,6 @@ class MqttClient:
             # get new unique ID to avoid bouncing connection
             self.client_id = self.client_id
             self.is_connected = False
-            #TODO: delay before retrying
             self._connect()
 
     def _mqtt_on_subscribe(self, client, userdata, mid, granted_qos):
@@ -309,9 +312,11 @@ class MqttClient:
         try:
             payload = json_loadstr(payload)
         except JSONDecodeError as e:
-            self._log.debug(&#39;MQTT message payload non-JSON ({})&#39;.format(e))
-        self._log.debug(&#39;MQTT received {} message: {}&#39;.format(
-            message.topic, payload))
+            self._log.debug(f&#39;MQTT message payload non-JSON ({e})&#39;)
+        self._log.debug(f&#39;MQTT received message &#34;{payload}&#34;&#39;
+            f&#39;on topic &#34;{message.topic}&#34; with QoS {message.qos}&#39;)
+        if userdata:
+            self._log.debug(f&#39;MQTT client userdata: {userdata}&#39;)
         self.on_message(message.topic, payload)
 
     def publish(self, topic: str, message: str, qos: int = 1):
@@ -347,7 +352,7 @@ class MqttClient:
 <dl>
 <dt id="fieldedge_utilities.mqtt.MqttClient"><code class="flex name class">
 <span>class <span class="ident">MqttClient</span></span>
-<span>(</span><span>client_id: str, on_message: Callable[..., ForwardRef('tuple[str, object]')], subscribe_default: Union[str, ForwardRef('list[str]')] = None, on_connect: Callable = None, on_disconnect: Callable = None, logger: logging.Logger = None, connect_retry_interval: int = 5)</span>
+<span>(</span><span>client_id: str, on_message: Callable[..., ForwardRef('tuple[str, object]')] = None, subscribe_default: Union[str, ForwardRef('list[str]')] = None, on_connect: Callable = None, on_disconnect: Callable = None, logger: logging.Logger = None, connect_retry_interval: int = 5)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>A customized MQTT client.</p>
@@ -357,7 +362,7 @@ class MqttClient:
 <dd>A unique client_id.</dd>
 <dt><strong><code>on_message</code></strong> :&ensp;<code>Callable</code></dt>
 <dd>A function called when a subscribed message
-is received from the broker .</dd>
+is received from the broker.</dd>
 <dt><strong><code>on_connect</code></strong> :&ensp;<code>Callable</code></dt>
 <dd>A function called when the client connects
 to the broker.</dd>
@@ -375,10 +380,10 @@ to the broker.</dd>
 <dd>The unique client ID</dd>
 <dt><strong><code>on_message</code></strong> :&ensp;<code>Callable</code></dt>
 <dd>The callback when subscribed messages are
-received.</dd>
+received as <code>topic, message</code>.</dd>
 <dt><strong><code>subscribe_default</code></strong> :&ensp;<code>Union[str, list[str]]</code></dt>
-<dd>The default subscription(s) on
-re/connection.</dd>
+<dd>The default
+subscription(s) established on re/connection.</dd>
 <dt><strong><code>on_connect</code></strong> :&ensp;<code>Callable</code></dt>
 <dd>(optional) callback when connection to the
 broker is established.</dd>
@@ -390,7 +395,9 @@ from the broker.</dd>
 <dt><strong><code>connect_retry_interval</code></strong> :&ensp;<code>int</code></dt>
 <dd>Seconds between broker reconnect
 attempts.</dd>
-</dl></div>
+</dl>
+<h2 id="raises">Raises</h2>
+<p><code><a title="fieldedge_utilities.mqtt.MqttError" href="#fieldedge_utilities.mqtt.MqttError">MqttError</a></code> if the client_id is not valid.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -401,7 +408,7 @@ attempts.</dd>
     Attributes:
         client_id (str): A unique client_id.
         on_message (Callable): A function called when a subscribed message
-            is received from the broker .
+            is received from the broker.
         on_connect (Callable): A function called when the client connects
             to the broker.
         on_disconnect (Callable): A function called when the client disconnects.
@@ -411,7 +418,7 @@ attempts.</dd>
     &#34;&#34;&#34;
     def __init__(self,
                  client_id: str,
-                 on_message: Callable[..., &#34;tuple[str, object]&#34;],
+                 on_message: Callable[..., &#34;tuple[str, object]&#34;] = None,
                  subscribe_default: Union[str, &#34;list[str]&#34;] = None,
                  on_connect: Callable = None,
                  on_disconnect: Callable = None,
@@ -422,9 +429,9 @@ attempts.</dd>
         Args:
             client_id (str): The unique client ID
             on_message (Callable): The callback when subscribed messages are
-                received.
-            subscribe_default (Union[str, list[str]]): The default subscription(s) on
-                re/connection.
+                received as `topic, message`.
+            subscribe_default (Union[str, list[str]]): The default
+                subscription(s) established on re/connection.
             on_connect (Callable): (optional) callback when connection to the
                 broker is established.
             on_disconnect (Callable): (optional) callback when disconnecting
@@ -432,7 +439,10 @@ attempts.</dd>
             logger (Logger): (optional) Logger
             connect_retry_interval (int): Seconds between broker reconnect
                 attempts.
-            
+
+        Raises:
+            `MqttError` if the client_id is not valid.
+
         &#34;&#34;&#34;
         self._host = os.getenv(&#39;MQTT_HOST&#39;) or &#39;fieldedge_broker&#39;
         self._user = os.getenv(&#39;MQTT_USER&#39;) or None
@@ -515,10 +525,11 @@ attempts.</dd>
                 thread.name = &#39;MqttThread&#39;
                 break
         except ConnectionError as e:
+            # raise MqttError(f&#39;MQTT {e}&#39;)
             self._log.warning(f&#39;Unable to connect to {self._host} ({e})...&#39;
                 f&#39;retrying in {self.connect_retry_interval} seconds&#39;)
             sleep(self.connect_retry_interval)
-            # raise MqttError(&#39;MQTT {}&#39;.format(e))
+            self._connect()
 
     def _mqtt_on_connect(self, client, userdata, flags, rc):
         self._log.debug(&#39;MQTT broker connection result code: {} ({})&#39;
@@ -590,7 +601,6 @@ attempts.</dd>
             # get new unique ID to avoid bouncing connection
             self.client_id = self.client_id
             self.is_connected = False
-            #TODO: delay before retrying
             self._connect()
 
     def _mqtt_on_subscribe(self, client, userdata, mid, granted_qos):
@@ -607,9 +617,11 @@ attempts.</dd>
         try:
             payload = json_loadstr(payload)
         except JSONDecodeError as e:
-            self._log.debug(&#39;MQTT message payload non-JSON ({})&#39;.format(e))
-        self._log.debug(&#39;MQTT received {} message: {}&#39;.format(
-            message.topic, payload))
+            self._log.debug(f&#39;MQTT message payload non-JSON ({e})&#39;)
+        self._log.debug(f&#39;MQTT received message &#34;{payload}&#34;&#39;
+            f&#39;on topic &#34;{message.topic}&#34; with QoS {message.qos}&#39;)
+        if userdata:
+            self._log.debug(f&#39;MQTT client userdata: {userdata}&#39;)
         self.on_message(message.topic, payload)
 
     def publish(self, topic: str, message: str, qos: int = 1):
@@ -779,13 +791,13 @@ def subscriptions(self) -&gt; dict:
 <span>(</span><span>*args, **kwargs)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>A wrapper for MQTT-specific errors.</p></div>
+<div class="desc"><p>A MQTT-specific error.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class MqttError(Exception):
-    &#34;&#34;&#34;A wrapper for MQTT-specific errors.&#34;&#34;&#34;
+    &#34;&#34;&#34;A MQTT-specific error.&#34;&#34;&#34;
     pass</code></pre>
 </details>
 <h3>Ancestors</h3>

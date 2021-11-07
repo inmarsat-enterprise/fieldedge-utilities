@@ -5,15 +5,20 @@ The file is a wrapping log of configurable size using `RotatingFileHandler`.
 
 Format is:
 
-* ISO UTC timestamp including milliseconds
-* Log level in square brackets
-* Thread name in round brackets
-* ModuleName.FunctionName:(LineNumber)
+* ISO UTC timestamp (datetime) e.g. `2021-01-01T00:00:00.000Z`
+* Log level, CSV encloses in square brackets e.g. `[INFO]`
+* Thread name, CSV encloses in round brackets
+* Module, Function and Line. CSV uses `ModuleName.FunctionName:(LineNumber)`
 * Message
 
-*Example:*
+*CSV Example:*
 
 `2021-10-30T14:19:51.012Z,[INFO],(MainThread),main.<module>:6,This is a test`
+
+*JSON Example:*
+
+`{"timestamp":"2021-01-01T00:00:00Z","level":"INFO","thread":"MainThread",
+"module":"main","function":"<module>","line":6,"message":"This is a test"}`
 
 """
 import logging
@@ -24,8 +29,17 @@ from time import gmtime
 
 from fieldedge_utilities.path import clean_filename, get_caller_name
 
-FORMAT = ('%(asctime)s.%(msecs)03dZ,[%(levelname)s],(%(threadName)s),'
-          '%(module)s.%(funcName)s:%(lineno)d,%(message)s')
+FORMAT_CSV = ('%(asctime)s.%(msecs)03dZ,[%(levelname)s],(%(threadName)s),'
+              '%(module)s.%(funcName)s:%(lineno)d,%(message)s')
+FORMAT_JSON = ('{'
+                '"datetime":"%(asctime)s.%(msecs)03dZ"'
+                ',"level":"%(levelname)s"'
+                ',"thread":"%(threadName)s"'
+                ',"module":"%(module)s"'
+                ',"function":"%(funcName)s"'
+                ',"line":%(lineno)d'
+                ',"message":"%(message)s"'
+                '}')
 
 
 # Logging to STDOUT or STDERR
@@ -36,12 +50,31 @@ class _LessThanFilter(logging.Filter):
                  name: str = None):
         if name is None:
             name = f'LessThan{logging.getLevelName(exclusive_maximum)}'
-        super(_LessThanFilter, self).__init__(name)
+        # super(_LessThanFilter, self).__init__(name)
+        super().__init__(name)
         self.max_level = exclusive_maximum
 
     def filter(self, record):
         #non-zero return means we log this message
         return 1 if record.levelno < self.max_level else 0
+
+
+class _OneLineExceptionFormatter(logging.Formatter):
+    """Formats exceptions into a single line stack trace."""
+    def formatException(self, exc_info):
+        original = super().formatException(exc_info)
+        lines = original.splitlines()
+        result = ''
+        for i, line in enumerate(lines):
+            result += (' -> ' if i > 0 else '') + line.strip()
+        return result
+
+    def format(self, record):
+        result = super().format(record)
+        if record.exc_text:
+            err_type = type(record.msg).__name__
+            result = result.replace(f'{record.msg}\n', f'{err_type}: ')
+        return result
 
 
 def get_logfile_name(logger: logging.Logger) -> str:
@@ -65,38 +98,47 @@ def _is_log_handler(logger: logging.Logger, handler: object) -> bool:
     """
     if not isinstance(logger, logging.Logger):
         return False
-    found = False
     for h in logger.handlers:
         if h.name == handler.name:
-            found = True
-            break
-    return found
+            return True
 
 
 def get_wrapping_logger(name: str = None,
                         filename: str = None,
                         file_size: int = 5,
                         log_level: int = logging.INFO,
+                        format: str = 'csv',
                         **kwargs) -> logging.Logger:
     """Sets up a wrapping logger that writes to console and optionally a file.
 
-    Initializes logging to stdout/stderr, and optionally a CSV formatted file.
-    Wraps at a given file_size in MB, with default 2 backups.
+    * Default logging level is `INFO`
+    * Timestamps are UTC ISO 8601 format
+    * Initializes logging to stdout/stderr, and optionally a CSV or JSON
+    formatted file. Default is CSV.
+    * Wraps files at a given `file_size` in MB, with default 2 backups.
+    
     CSV format: timestamp,[level],(thread),module.function:line,message
-    Default logging level is INFO.
-    Timestamps are UTC/GMT/Zulu.
 
     Args:
         name: Name of the logger (if None, uses name of calling module).
         filename: Name of the file/path if writing to a file.
         file_size: Max size of the file in megabytes, before wrapping.
         log_level: the logging level (default INFO)
+        format: `csv` or `json`
         kwargs: Optional overrides for RotatingFileHandler
+            mode (str): defaults to `a` (append)
+            maxBytes (int): overrides file_size
+            backupCount (int): defaults to 2
     
     Returns:
         A logger with console stream handler and (optional) file handler.
     """
-    log_formatter = logging.Formatter(fmt=FORMAT, datefmt='%Y-%m-%dT%H:%M:%S')
+    if format == 'json':
+        fmt = FORMAT_JSON
+    else:
+        fmt = FORMAT_CSV
+    log_formatter = _OneLineExceptionFormatter(fmt=fmt,
+                                               datefmt='%Y-%m-%dT%H:%M:%S')
     log_formatter.converter = gmtime
     if name is None:
         name = get_caller_name()

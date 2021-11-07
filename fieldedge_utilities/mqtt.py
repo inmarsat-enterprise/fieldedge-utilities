@@ -3,7 +3,7 @@
 This MQTT client sets up automatic connection and reconnection intended mainly
 for use with a local broker on an edge device e.g. Raspberry Pi.
 
-Reads configuration from a local `.env` file or environment variables:
+Reads broker configuration from a local `.env` file or environment variables:
 
 * `MQTT_HOST` the IP address or hostname of the broker (e.g. 127.0.0.1)
 * `MQTT_USER` the authentication username for the broker
@@ -54,7 +54,7 @@ def _get_mqtt_result(rc: int) -> str:
 
 
 class MqttError(Exception):
-    """A wrapper for MQTT-specific errors."""
+    """A MQTT-specific error."""
     pass
 
 
@@ -64,7 +64,7 @@ class MqttClient:
     Attributes:
         client_id (str): A unique client_id.
         on_message (Callable): A function called when a subscribed message
-            is received from the broker .
+            is received from the broker.
         on_connect (Callable): A function called when the client connects
             to the broker.
         on_disconnect (Callable): A function called when the client disconnects.
@@ -74,7 +74,7 @@ class MqttClient:
     """
     def __init__(self,
                  client_id: str,
-                 on_message: Callable[..., "tuple[str, object]"],
+                 on_message: Callable[..., "tuple[str, object]"] = None,
                  subscribe_default: Union[str, "list[str]"] = None,
                  on_connect: Callable = None,
                  on_disconnect: Callable = None,
@@ -85,7 +85,7 @@ class MqttClient:
         Args:
             client_id (str): The unique client ID
             on_message (Callable): The callback when subscribed messages are
-                received.
+                received as `topic, message`.
             subscribe_default (Union[str, list[str]]): The default
                 subscription(s) established on re/connection.
             on_connect (Callable): (optional) callback when connection to the
@@ -95,7 +95,10 @@ class MqttClient:
             logger (Logger): (optional) Logger
             connect_retry_interval (int): Seconds between broker reconnect
                 attempts.
-            
+
+        Raises:
+            `MqttError` if the client_id is not valid.
+
         """
         self._host = os.getenv('MQTT_HOST') or 'fieldedge_broker'
         self._user = os.getenv('MQTT_USER') or None
@@ -178,10 +181,11 @@ class MqttClient:
                 thread.name = 'MqttThread'
                 break
         except ConnectionError as e:
+            # raise MqttError(f'MQTT {e}')
             self._log.warning(f'Unable to connect to {self._host} ({e})...'
                 f'retrying in {self.connect_retry_interval} seconds')
             sleep(self.connect_retry_interval)
-            # raise MqttError('MQTT {}'.format(e))
+            self._connect()
 
     def _mqtt_on_connect(self, client, userdata, flags, rc):
         self._log.debug('MQTT broker connection result code: {} ({})'
@@ -253,7 +257,6 @@ class MqttClient:
             # get new unique ID to avoid bouncing connection
             self.client_id = self.client_id
             self.is_connected = False
-            #TODO: delay before retrying
             self._connect()
 
     def _mqtt_on_subscribe(self, client, userdata, mid, granted_qos):
@@ -270,9 +273,11 @@ class MqttClient:
         try:
             payload = json_loadstr(payload)
         except JSONDecodeError as e:
-            self._log.debug('MQTT message payload non-JSON ({})'.format(e))
-        self._log.debug('MQTT received {} message: {}'.format(
-            message.topic, payload))
+            self._log.debug(f'MQTT message payload non-JSON ({e})')
+        self._log.debug(f'MQTT received message "{payload}"'
+            f'on topic "{message.topic}" with QoS {message.qos}')
+        if userdata:
+            self._log.debug(f'MQTT client userdata: {userdata}')
         self.on_message(message.topic, payload)
 
     def publish(self, topic: str, message: str, qos: int = 1):

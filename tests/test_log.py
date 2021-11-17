@@ -1,5 +1,6 @@
 import json
 import os
+import pytest
 
 from fieldedge_utilities import logger
 
@@ -64,3 +65,9 @@ def test_exception_singleline(capsys):
     f = open(TEST_FILE, 'r')
     assert 'ZeroDivisionError: ' in f.readlines()[1]
     os.remove(TEST_FILE)
+
+
+def test_invalid_file_path(capsys):
+    with pytest.raises(FileNotFoundError, match='Invalid logfile path'):
+        log = logger.get_wrapping_logger(name='test',
+                                         filename='/bad/path/test.log')

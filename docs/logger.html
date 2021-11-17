@@ -176,6 +176,11 @@ def get_wrapping_logger(name: str = None,
     
     Returns:
         A logger with console stream handler and (optional) file handler.
+    
+    Raises:
+        FileNotFoundError if a logfile name is specified with an invalid
+            directory.
+    
     &#34;&#34;&#34;
     if format == &#39;json&#39;:
         fmt = FORMAT_JSON
@@ -194,7 +199,8 @@ def get_wrapping_logger(name: str = None,
         try:
             filename = clean_filename(filename)
             if not os.path.isdir(os.path.dirname(filename)):
-                os.mkdir(os.path.dirname(filename))
+                raise FileNotFoundError(&#39;Invalid logfile path&#39;
+                    f&#39; {os.path.dirname(filename)}&#39;)
             handler_file = RotatingFileHandler(
                 filename=filename,
                 mode=kwargs.pop(&#39;mode&#39;, &#39;a&#39;),
@@ -210,6 +216,7 @@ def get_wrapping_logger(name: str = None,
         except Exception as e:
             logger.exception(f&#39;Could not create RotatingFileHandler {filename}&#39;
                 f&#39; ({e})&#39;)
+            raise e
     logger.setLevel(log_level)
     handler_stdout = logging.StreamHandler(sys.stdout)
     handler_stdout.name = name + &#39;_stdout_handler&#39;
@@ -283,7 +290,10 @@ maxBytes (int): overrides file_size
 backupCount (int): defaults to 2</dd>
 </dl>
 <h2 id="returns">Returns</h2>
-<p>A logger with console stream handler and (optional) file handler.</p></div>
+<p>A logger with console stream handler and (optional) file handler.</p>
+<h2 id="raises">Raises</h2>
+<p>FileNotFoundError if a logfile name is specified with an invalid
+directory.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -317,6 +327,11 @@ backupCount (int): defaults to 2</dd>
     
     Returns:
         A logger with console stream handler and (optional) file handler.
+    
+    Raises:
+        FileNotFoundError if a logfile name is specified with an invalid
+            directory.
+    
     &#34;&#34;&#34;
     if format == &#39;json&#39;:
         fmt = FORMAT_JSON
@@ -335,7 +350,8 @@ backupCount (int): defaults to 2</dd>
         try:
             filename = clean_filename(filename)
             if not os.path.isdir(os.path.dirname(filename)):
-                os.mkdir(os.path.dirname(filename))
+                raise FileNotFoundError(&#39;Invalid logfile path&#39;
+                    f&#39; {os.path.dirname(filename)}&#39;)
             handler_file = RotatingFileHandler(
                 filename=filename,
                 mode=kwargs.pop(&#39;mode&#39;, &#39;a&#39;),
@@ -351,6 +367,7 @@ backupCount (int): defaults to 2</dd>
         except Exception as e:
             logger.exception(f&#39;Could not create RotatingFileHandler {filename}&#39;
                 f&#39; ({e})&#39;)
+            raise e
     logger.setLevel(log_level)
     handler_stdout = logging.StreamHandler(sys.stdout)
     handler_stdout.name = name + &#39;_stdout_handler&#39;

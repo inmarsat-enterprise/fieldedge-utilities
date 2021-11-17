@@ -132,6 +132,11 @@ def get_wrapping_logger(name: str = None,
     
     Returns:
         A logger with console stream handler and (optional) file handler.
+    
+    Raises:
+        FileNotFoundError if a logfile name is specified with an invalid
+            directory.
+    
     """
     if format == 'json':
         fmt = FORMAT_JSON
@@ -150,7 +155,8 @@ def get_wrapping_logger(name: str = None,
         try:
             filename = clean_filename(filename)
             if not os.path.isdir(os.path.dirname(filename)):
-                os.mkdir(os.path.dirname(filename))
+                raise FileNotFoundError('Invalid logfile path'
+                    f' {os.path.dirname(filename)}')
             handler_file = RotatingFileHandler(
                 filename=filename,
                 mode=kwargs.pop('mode', 'a'),
@@ -166,6 +172,7 @@ def get_wrapping_logger(name: str = None,
         except Exception as e:
             logger.exception(f'Could not create RotatingFileHandler {filename}'
                 f' ({e})')
+            raise e
     logger.setLevel(log_level)
     handler_stdout = logging.StreamHandler(sys.stdout)
     handler_stdout.name = name + '_stdout_handler'

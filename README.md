@@ -9,5 +9,6 @@ This library available on **PyPI** provides:
 * A simplified **`mqtt`** client that automatically connects
 (to a `fieldedge-broker`)
 * Helper functions for managing files and **`path`** on different OS
+* Tools for **`pcap`** packet capture and analysis
 
 [Docmentation](https://inmarsat-enterprise.github.io/fieldedge-utilities/)

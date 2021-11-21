@@ -1,4 +1,6 @@
+import asyncio
 import os
+from multiprocessing import Process, Queue
 
 from fieldedge_utilities import pcap
 
@@ -42,3 +44,12 @@ def test_packet_statistics():
             assert isinstance(datapoint, tuple)
             assert isinstance(datapoint[0], float)
             assert isinstance(datapoint[1], int)
+
+def test_flask_workaround():
+    filename = '../pcaps/mqtts_sample.pcap'
+    queue = Queue()
+    process = Process(target=pcap.process_pcap, args=(filename, None, queue))
+    process.start()
+    process.join()
+    packet_stats = queue.get()
+    assert isinstance(packet_stats, pcap.PacketStatistics)

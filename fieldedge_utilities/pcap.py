@@ -11,9 +11,10 @@ e.g. DNS cache, local NTP
 report by exception be used with a less frequent update pushed?
 
 """
+import asyncio
 import json
 import logging
-import threading
+from multiprocessing import Queue
 from datetime import datetime
 from enum import Enum
 
@@ -557,12 +558,45 @@ class PacketStatistics:
         return results
 
 
-def process_pcap(filename: str, display_filter: str = None) -> PacketStatistics:
+def _get_event_loop():
+    err = None
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError as e:
+        err = e
+        loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    asyncio.get_child_watcher().attach_loop(loop)
+    return loop, err
+
+
+def process_pcap(filename: str,
+                 display_filter: str = None,
+                 queue: Queue = None,
+                 debug: bool = False,
+                 ) -> PacketStatistics:
     """Processes a PCAP file to create metrics for conversations.
 
+    To run in the background use a multiprocessing.Process and Queue:
+    ```
+    queue = multiprocessing.Queue()
+    kwargs = {
+        'filename': filename,
+        'display_filter': display_filter,
+        'queue': queue,
+    }
+    capture_process = multiprocessing.Process(target=process_pcap,
+                                      name='packet_capture', kwargs=kwargs)
+    process.start()
+    process.join()
+    capture_file = queue.get()
+    ```
+    
     Args:
         filename: The path/name of the PCAP file
         display_filter: An optional tshark display filter
+        queue: An optional multiprocessing Queue (e.g. required for Flask)
+        debug: Enables pyshark debug output
     
     Returns:
         A PacketStatistics object with data and analytics functions.
@@ -571,8 +605,16 @@ def process_pcap(filename: str, display_filter: str = None) -> PacketStatistics:
     log = get_wrapping_logger()
     packet_stats = PacketStatistics(log=log)
     file = clean_filename(filename)
-    capture = pyshark.FileCapture(file, display_filter=display_filter)
-    capture.set_debug(True)
+    loop = None
+    newloop = False
+    if queue is not None:
+        loop, err = _get_event_loop()
+        if err is not None:
+            newloop = True
+            log.error(err)
+    capture = pyshark.FileCapture(input_file=file,
+        display_filter=display_filter, eventloop=loop)
+    capture.set_debug(debug)
     packet_count = 0
     try:
         for packet in capture:
@@ -582,7 +624,12 @@ def process_pcap(filename: str, display_filter: str = None) -> PacketStatistics:
         #TODO: better error capture e.g. appears to have been cut short use editcap
         # https://tshark.dev/share/pcap_preparation/
         log.error(f'Packet {packet_count} processing ERROR:\n{e}')
-    return packet_stats
+    if queue is not None:
+        queue.put(packet_stats)
+        if newloop:
+            loop.close()
+    else:
+        return packet_stats
 
 
 def pcap_filename(duration: int) -> str:
@@ -603,32 +650,30 @@ def create_pcap(interface: str = 'eth1',
                 duration: int = 60,
                 filename: str = None,
                 target_directory: str = '$HOME',
-                finish_event: threading.Event = None) -> None:
+                queue: Queue = None,
+                debug: bool = False,
+                ) -> str:
     """Creates a packet capture file of a specified interface.
 
     The file is created in the `target_directory`, if none is specified it
     stores to the user's home directory.
     The filename can be specified or `capture_YYYYmmddTHHMMSS_DDDDD.pcap`
     format will be used.
-    To run in the background:
-    1. Create a threading.Event
-    2. Call `pcap_filename` to get the filename to pass in
-    3. Create a Thread with this function as the target, passing in the event:
+    To run in the background use a multiprocessing.Process and Queue:
     ```
-    capture_finished = threading.Event()
+    queue = multiprocessing.Queue()
     kwargs = {
         'interface': my_interface,
         'duration': my_duration,
         'filename': pcap_filename(),
         'target_directory': my_folder,
-        'finish_event': capture_finished,
+        'queue': queue,
     }
-    capture_thread = threading.Thread(target=create_pcap,
+    capture_process = multiprocessing.Process(target=create_pcap,
                                       name='packet_capture', kwargs=kwargs)
-    capture_thread.setDaemon(True)
-    capture_thread.start()
-    while not capture_finished.is_set():
-        # do other stuff
+    process.start()
+    process.join()
+    capture_file = queue.get()
     ```
     
     Args:
@@ -641,13 +686,24 @@ def create_pcap(interface: str = 'eth1',
         The full file/path name if no event is passed in.
 
     """
+    log = get_wrapping_logger()
     if filename is None:
         filename = pcap_filename(duration)
     filepath = clean_filename(f'{target_directory}/{filename}')
-    capture = pyshark.LiveCapture(interface=interface, output_file=filepath)
-    capture.set_debug(True)
+    loop = None
+    newloop = False
+    if queue is not None:
+        loop, err = _get_event_loop()
+        if err is not None:
+            newloop = True
+            log.error(err)
+    capture = pyshark.LiveCapture(interface=interface, output_file=filepath,
+        eventloop=loop)
+    capture.set_debug(debug)
     capture.sniff(timeout=duration)
-    if finish_event is not None:
-        finish_event.set()
+    if queue is not None:
+        queue.put(filepath)
+        if newloop:
+            loop.close()
     else:
         return filepath

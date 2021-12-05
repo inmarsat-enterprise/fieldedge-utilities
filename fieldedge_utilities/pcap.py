@@ -14,6 +14,7 @@ report by exception be used with a less frequent update pushed?
 import asyncio
 import json
 import logging
+import os
 from multiprocessing import Queue
 from datetime import datetime
 from enum import Enum
@@ -22,7 +23,7 @@ import pyshark
 from pyshark.packet.packet import Packet as SharkPacket
 
 from fieldedge_utilities.logger import get_wrapping_logger
-from fieldedge_utilities.path import clean_filename
+from fieldedge_utilities.path import clean_path
 
 
 # Ethernet packet types
@@ -604,7 +605,7 @@ def process_pcap(filename: str,
     """
     log = get_wrapping_logger()
     packet_stats = PacketStatistics(log=log)
-    file = clean_filename(filename)
+    file = clean_path(filename)
     loop = None
     newloop = False
     if queue is not None:
@@ -652,11 +653,13 @@ def create_pcap(interface: str = 'eth1',
                 target_directory: str = '$HOME',
                 queue: Queue = None,
                 debug: bool = False,
+                log: logging.Logger = None,
                 ) -> str:
     """Creates a packet capture file of a specified interface.
 
-    The file is created in the `target_directory`, if none is specified it
+    A subdirectory is created in the `target_directory`, if none is specified it
     stores to the user's home directory.
+    The subdirectory name is `capture_YYYYmmdd`.
     The filename can be specified or `capture_YYYYmmddTHHMMSS_DDDDD.pcap`
     format will be used.
     To run in the background use a multiprocessing.Process and Queue:
@@ -671,8 +674,8 @@ def create_pcap(interface: str = 'eth1',
     }
     capture_process = multiprocessing.Process(target=create_pcap,
                                       name='packet_capture', kwargs=kwargs)
-    process.start()
-    process.join()
+    capture_process.start()
+    capture_process.join()
     capture_file = queue.get()
     ```
     
@@ -686,10 +689,14 @@ def create_pcap(interface: str = 'eth1',
         The full file/path name if no event is passed in.
 
     """
-    log = get_wrapping_logger()
+    log = log or get_wrapping_logger()
     if filename is None:
         filename = pcap_filename(duration)
-    filepath = clean_filename(f'{target_directory}/{filename}')
+    target_directory = clean_path(target_directory)
+    subdir = f'{target_directory}/{filename[0:len("capture_YYYYmmdd")]}'
+    filepath = f'{subdir}/{filename}'
+    if not os.path.isdir(subdir):
+        os.makedirs(subdir)
     loop = None
     newloop = False
     if queue is not None:

@@ -1,16 +1,26 @@
 import asyncio
 import os
+import shutil
 from multiprocessing import Process, Queue
 
 from fieldedge_utilities import pcap
 
 def test_create_and_read_pcap():
     filename = pcap.create_pcap(interface='en0', duration=5,
-        directory='../pcaps')
+        target_directory='../pcaps')
     assert(os.path.isfile(filename))
     packet_statistics = pcap.process_pcap(filename=filename)
     assert(isinstance(packet_statistics, pcap.PacketStatistics))
     os.remove(filename)
+
+def test_create_new_dir():
+    target_directory = '../dontexist'
+    filename = pcap.create_pcap(interface='en0', duration=5,
+        target_directory=target_directory)
+    assert(os.path.isfile(filename))
+    packet_statistics = pcap.process_pcap(filename=filename)
+    assert(isinstance(packet_statistics, pcap.PacketStatistics))
+    shutil.rmtree(os.path.dirname(filename))
 
 def test_packet_statistics():
     filename = '../pcaps/mqtts_sample.pcap'

@@ -146,11 +146,17 @@ def _get_application(packet: SharkPacket) -> str:
     else:
         (srcport, dstport) = _get_ports(packet)
         known_ports = tuple(item.value for item in ApplicationPort)
+        application = str(packet.highest_layer).upper()
         if srcport in known_ports:
-            return _shorthand(ApplicationPort(srcport).name)
-        if dstport in known_ports:
-            return _shorthand(ApplicationPort(dstport).name)
-        return str(packet.highest_layer).upper()
+            application = _shorthand(ApplicationPort(srcport).name)
+        elif dstport in known_ports:
+            application = _shorthand(ApplicationPort(dstport).name)
+        if f'{packet.transport_layer}_PORT' not in application:
+            application = f'{packet.transport_layer}_PORT_{application}'
+        # identified workarounds for observed pyshark/tshark mismatches
+        if 'HTTP-OVER-TLS' in application:
+            application.replace('HTTP-OVER-TLS', 'HTTPS')
+        return application
 
 
 def is_valid_ip(ip_addr: str) -> bool:
@@ -559,16 +565,18 @@ class PacketStatistics:
         return results
 
 
-def _get_event_loop():
-    err = None
+def _get_event_loop() -> tuple:
+    newloop = False
     try:
         loop = asyncio.get_running_loop()
-    except RuntimeError as e:
-        err = e
+    except RuntimeError as err:
+        if 'no running event loop' not in f'{err}':
+            raise err
         loop = asyncio.new_event_loop()
+        newloop = True
     asyncio.set_event_loop(loop)
     asyncio.get_child_watcher().attach_loop(loop)
-    return loop, err
+    return loop, newloop
 
 
 def process_pcap(filename: str,
@@ -609,10 +617,7 @@ def process_pcap(filename: str,
     loop = None
     newloop = False
     if queue is not None:
-        loop, err = _get_event_loop()
-        if err is not None:
-            newloop = True
-            log.error(err)
+        loop, newloop = _get_event_loop()
     capture = pyshark.FileCapture(input_file=file,
         display_filter=display_filter, eventloop=loop)
     capture.set_debug(debug)
@@ -700,10 +705,7 @@ def create_pcap(interface: str = 'eth1',
     loop = None
     newloop = False
     if queue is not None:
-        loop, err = _get_event_loop()
-        if err is not None:
-            newloop = True
-            log.error(err)
+        loop, newloop = _get_event_loop()
     capture = pyshark.LiveCapture(interface=interface, output_file=filepath,
         eventloop=loop)
     capture.set_debug(debug)

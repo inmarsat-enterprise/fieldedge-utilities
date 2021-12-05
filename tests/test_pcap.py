@@ -1,4 +1,3 @@
-import asyncio
 import os
 import shutil
 from multiprocessing import Process, Queue
@@ -6,16 +5,10 @@ from multiprocessing import Process, Queue
 from fieldedge_utilities import pcap
 
 def test_create_and_read_pcap():
-    filename = pcap.create_pcap(interface='en0', duration=5,
-        target_directory='../pcaps')
-    assert(os.path.isfile(filename))
-    packet_statistics = pcap.process_pcap(filename=filename)
-    assert(isinstance(packet_statistics, pcap.PacketStatistics))
-    os.remove(filename)
-
-def test_create_new_dir():
-    target_directory = '../dontexist'
-    filename = pcap.create_pcap(interface='en0', duration=5,
+    """Creates and reads a pcap file on a local interface."""
+    interface = 'en0'
+    target_directory = '../pcaps'
+    filename = pcap.create_pcap(interface=interface, duration=5,
         target_directory=target_directory)
     assert(os.path.isfile(filename))
     packet_statistics = pcap.process_pcap(filename=filename)
@@ -23,6 +16,7 @@ def test_create_new_dir():
     shutil.rmtree(os.path.dirname(filename))
 
 def test_packet_statistics():
+    """Validates content of the PacketStatistics object."""
     filename = '../pcaps/mqtts_sample.pcap'
     packet_stats = pcap.process_pcap(filename=filename)
     assert isinstance(packet_stats, pcap.PacketStatistics)
@@ -55,8 +49,9 @@ def test_packet_statistics():
             assert isinstance(datapoint[0], float)
             assert isinstance(datapoint[1], int)
 
-def test_flask_workaround():
-    filename = '../pcaps/mqtts_sample.pcap'
+def test_process_multiprocessing():
+    """Processes a pcap separately using multiprocessing."""
+    filename = '../pcaps/samples/mqtts_sample.pcap'
     queue = Queue()
     process = Process(target=pcap.process_pcap, args=(filename, None, queue))
     process.start()

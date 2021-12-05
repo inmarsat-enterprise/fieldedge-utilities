@@ -19,6 +19,7 @@ from json import JSONDecodeError
 from json import dumps as json_dumpstr
 from json import loads as json_loadstr
 from logging import DEBUG, Logger
+from socket import timeout   #: for Python < 3.10 compatibility vs TimeoutError
 from threading import enumerate as enumerate_threads
 from time import sleep, time
 from typing import Callable, Union
@@ -118,6 +119,7 @@ class MqttClient:
         self.is_connected = False
         self._subscriptions = {}
         self.connect_retry_interval = connect_retry_interval
+        self._failed_connect_attempts = 0
         if subscribe_default:
             if not isinstance(subscribe_default, list):
                 subscribe_default = [subscribe_default]
@@ -150,10 +152,15 @@ class MqttClient:
         """
         return self._subscriptions
 
+    @property
+    def failed_connection_attempts(self) -> int:
+        return self._failed_connect_attempts
+
     def _cleanup(self, *args):
-        for arg in args:
-            self._log.debug('mqtt cleanup called with arg = {}'.format(arg))
-        self._log.debug('Terminating MQTT connection')
+        # TODO: logging raises an error since the log file was closed
+        # for arg in args:
+        #     self._log.debug('mqtt cleanup called with arg = {}'.format(arg))
+        # self._log.debug('Terminating MQTT connection')
         self._mqtt.user_data_set('terminate')
         self._mqtt.loop_stop()
         self._mqtt.disconnect()
@@ -180,14 +187,18 @@ class MqttClient:
                     continue
                 thread.name = 'MqttThread'
                 break
-        except ConnectionError as e:
-            # raise MqttError(f'MQTT {e}')
-            self._log.warning(f'Unable to connect to {self._host} ({e})...'
+        except (ConnectionError, timeout, TimeoutError) as err:
+            self._failed_connect_attempts += 1
+            self._log.warning(f'Unable to connect to {self._host} ({err})...'
                 f'retrying in {self.connect_retry_interval} seconds')
-            sleep(self.connect_retry_interval)
-            self._connect()
+            if self.connect_retry_interval > 0:
+                sleep(self.connect_retry_interval)
+                self._connect()
+            else:
+                raise MqttError(f'{err}')
 
     def _mqtt_on_connect(self, client, userdata, flags, rc):
+        self._failed_connect_attempts = 0
         self._log.debug('MQTT broker connection result code: {} ({})'
             .format(rc, _get_mqtt_result(rc)))
         if rc == 0:

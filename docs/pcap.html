@@ -53,6 +53,7 @@ report by exception be used with a less frequent update pushed?
 import asyncio
 import json
 import logging
+import os
 from multiprocessing import Queue
 from datetime import datetime
 from enum import Enum
@@ -61,7 +62,7 @@ import pyshark
 from pyshark.packet.packet import Packet as SharkPacket
 
 from fieldedge_utilities.logger import get_wrapping_logger
-from fieldedge_utilities.path import clean_filename
+from fieldedge_utilities.path import clean_path
 
 
 # Ethernet packet types
@@ -643,7 +644,7 @@ def process_pcap(filename: str,
     &#34;&#34;&#34;
     log = get_wrapping_logger()
     packet_stats = PacketStatistics(log=log)
-    file = clean_filename(filename)
+    file = clean_path(filename)
     loop = None
     newloop = False
     if queue is not None:
@@ -691,11 +692,13 @@ def create_pcap(interface: str = &#39;eth1&#39;,
                 target_directory: str = &#39;$HOME&#39;,
                 queue: Queue = None,
                 debug: bool = False,
+                log: logging.Logger = None,
                 ) -&gt; str:
     &#34;&#34;&#34;Creates a packet capture file of a specified interface.
 
-    The file is created in the `target_directory`, if none is specified it
+    A subdirectory is created in the `target_directory`, if none is specified it
     stores to the user&#39;s home directory.
+    The subdirectory name is `capture_YYYYmmdd`.
     The filename can be specified or `capture_YYYYmmddTHHMMSS_DDDDD.pcap`
     format will be used.
     To run in the background use a multiprocessing.Process and Queue:
@@ -710,8 +713,8 @@ def create_pcap(interface: str = &#39;eth1&#39;,
     }
     capture_process = multiprocessing.Process(target=create_pcap,
                                       name=&#39;packet_capture&#39;, kwargs=kwargs)
-    process.start()
-    process.join()
+    capture_process.start()
+    capture_process.join()
     capture_file = queue.get()
     ```
     
@@ -725,10 +728,14 @@ def create_pcap(interface: str = &#39;eth1&#39;,
         The full file/path name if no event is passed in.
 
     &#34;&#34;&#34;
-    log = get_wrapping_logger()
+    log = log or get_wrapping_logger()
     if filename is None:
         filename = pcap_filename(duration)
-    filepath = clean_filename(f&#39;{target_directory}/{filename}&#39;)
+    target_directory = clean_path(target_directory)
+    subdir = f&#39;{target_directory}/{filename[0:len(&#34;capture_YYYYmmdd&#34;)]}&#39;
+    filepath = f&#39;{subdir}/{filename}&#39;
+    if not os.path.isdir(subdir):
+        os.makedirs(subdir)
     loop = None
     newloop = False
     if queue is not None:
@@ -756,12 +763,13 @@ def create_pcap(interface: str = &#39;eth1&#39;,
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="fieldedge_utilities.pcap.create_pcap"><code class="name flex">
-<span>def <span class="ident">create_pcap</span></span>(<span>interface: str = 'eth1', duration: int = 60, filename: str = None, target_directory: str = '$HOME', queue: <bound method BaseContext.Queue of <multiprocessing.context.DefaultContext object at 0x109f6c6d8>> = None, debug: bool = False) ‑> str</span>
+<span>def <span class="ident">create_pcap</span></span>(<span>interface: str = 'eth1', duration: int = 60, filename: str = None, target_directory: str = '$HOME', queue: <bound method BaseContext.Queue of <multiprocessing.context.DefaultContext object at 0x10a8a0748>> = None, debug: bool = False, log: logging.Logger = None) ‑> str</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Creates a packet capture file of a specified interface.</p>
-<p>The file is created in the <code>target_directory</code>, if none is specified it
+<p>A subdirectory is created in the <code>target_directory</code>, if none is specified it
 stores to the user's home directory.
+The subdirectory name is <code>capture_YYYYmmdd</code>.
 The filename can be specified or <code>capture_YYYYmmddTHHMMSS_DDDDD.pcap</code>
 format will be used.
 To run in the background use a multiprocessing.Process and Queue:</p>
@@ -775,8 +783,8 @@ kwargs = {
 }
 capture_process = multiprocessing.Process(target=create_pcap,
                                   name='packet_capture', kwargs=kwargs)
-process.start()
-process.join()
+capture_process.start()
+capture_process.join()
 capture_file = queue.get()
 </code></pre>
 <h2 id="args">Args</h2>
@@ -802,11 +810,13 @@ capture_file = queue.get()
                 target_directory: str = &#39;$HOME&#39;,
                 queue: Queue = None,
                 debug: bool = False,
+                log: logging.Logger = None,
                 ) -&gt; str:
     &#34;&#34;&#34;Creates a packet capture file of a specified interface.
 
-    The file is created in the `target_directory`, if none is specified it
+    A subdirectory is created in the `target_directory`, if none is specified it
     stores to the user&#39;s home directory.
+    The subdirectory name is `capture_YYYYmmdd`.
     The filename can be specified or `capture_YYYYmmddTHHMMSS_DDDDD.pcap`
     format will be used.
     To run in the background use a multiprocessing.Process and Queue:
@@ -821,8 +831,8 @@ capture_file = queue.get()
     }
     capture_process = multiprocessing.Process(target=create_pcap,
                                       name=&#39;packet_capture&#39;, kwargs=kwargs)
-    process.start()
-    process.join()
+    capture_process.start()
+    capture_process.join()
     capture_file = queue.get()
     ```
     
@@ -836,10 +846,14 @@ capture_file = queue.get()
         The full file/path name if no event is passed in.
 
     &#34;&#34;&#34;
-    log = get_wrapping_logger()
+    log = log or get_wrapping_logger()
     if filename is None:
         filename = pcap_filename(duration)
-    filepath = clean_filename(f&#39;{target_directory}/{filename}&#39;)
+    target_directory = clean_path(target_directory)
+    subdir = f&#39;{target_directory}/{filename[0:len(&#34;capture_YYYYmmdd&#34;)]}&#39;
+    filepath = f&#39;{subdir}/{filename}&#39;
+    if not os.path.isdir(subdir):
+        os.makedirs(subdir)
     loop = None
     newloop = False
     if queue is not None:
@@ -959,7 +973,7 @@ capture_file = queue.get()
 </details>
 </dd>
 <dt id="fieldedge_utilities.pcap.process_pcap"><code class="name flex">
-<span>def <span class="ident">process_pcap</span></span>(<span>filename: str, display_filter: str = None, queue: <bound method BaseContext.Queue of <multiprocessing.context.DefaultContext object at 0x109f6c6d8>> = None, debug: bool = False) ‑> <a title="fieldedge_utilities.pcap.PacketStatistics" href="#fieldedge_utilities.pcap.PacketStatistics">PacketStatistics</a></span>
+<span>def <span class="ident">process_pcap</span></span>(<span>filename: str, display_filter: str = None, queue: <bound method BaseContext.Queue of <multiprocessing.context.DefaultContext object at 0x10a8a0748>> = None, debug: bool = False) ‑> <a title="fieldedge_utilities.pcap.PacketStatistics" href="#fieldedge_utilities.pcap.PacketStatistics">PacketStatistics</a></span>
 </code></dt>
 <dd>
 <div class="desc"><p>Processes a PCAP file to create metrics for conversations.</p>
@@ -1027,7 +1041,7 @@ capture_file = queue.get()
     &#34;&#34;&#34;
     log = get_wrapping_logger()
     packet_stats = PacketStatistics(log=log)
-    file = clean_filename(filename)
+    file = clean_path(filename)
     loop = None
     newloop = False
     if queue is not None:

@@ -36,23 +36,29 @@ from pathlib import Path
 
 def clean_filename(filename: str) -&gt; str:
     &#34;&#34;&#34;Adjusts relative and shorthand filenames for OS independence.
+    &#34;&#34;&#34;
+    return clean_path(filename)
+
+
+def clean_path(pathname: str) -&gt; str:
+    &#34;&#34;&#34;Adjusts relative and shorthand filenames for OS independence.
     
     Args:
-        filename: The full path/to/file
+        pathname: The full path/to/file
     
     Returns:
         A clean file/path name for the current OS and directory structure.
     &#34;&#34;&#34;
-    if filename.startswith(&#39;$HOME/&#39;):
-        filename = filename.replace(&#39;$HOME&#39;, str(Path.home()))
-    elif filename.startswith(&#39;~/&#39;):
-        filename = filename.replace(&#39;~&#39;, str(Path.home()))
-    elif filename.startswith(&#39;../&#39;):
+    if pathname.startswith(&#39;$HOME/&#39;):
+        pathname = pathname.replace(&#39;$HOME&#39;, str(Path.home()))
+    elif pathname.startswith(&#39;~/&#39;):
+        pathname = pathname.replace(&#39;~&#39;, str(Path.home()))
+    elif pathname.startswith(&#39;../&#39;):
         mod_path = Path(__file__).parent
-        src_path = (mod_path / filename).resolve()
+        src_path = (mod_path / pathname).resolve()
         dir_path = os.path.dirname(os.path.realpath(__file__))
-        filename = os.path.join(dir_path, src_path)
-    return filename
+        pathname = os.path.join(dir_path, src_path)
+    return pathname
 
 
 def get_caller_name(depth: int = 2,
@@ -101,10 +107,25 @@ def get_caller_name(depth: int = 2,
 <span>def <span class="ident">clean_filename</span></span>(<span>filename: str) ‑> str</span>
 </code></dt>
 <dd>
+<div class="desc"><p>Adjusts relative and shorthand filenames for OS independence.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def clean_filename(filename: str) -&gt; str:
+    &#34;&#34;&#34;Adjusts relative and shorthand filenames for OS independence.
+    &#34;&#34;&#34;
+    return clean_path(filename)</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.path.clean_path"><code class="name flex">
+<span>def <span class="ident">clean_path</span></span>(<span>pathname: str) ‑> str</span>
+</code></dt>
+<dd>
 <div class="desc"><p>Adjusts relative and shorthand filenames for OS independence.</p>
 <h2 id="args">Args</h2>
 <dl>
-<dt><strong><code>filename</code></strong></dt>
+<dt><strong><code>pathname</code></strong></dt>
 <dd>The full path/to/file</dd>
 </dl>
 <h2 id="returns">Returns</h2>
@@ -113,25 +134,25 @@ def get_caller_name(depth: int = 2,
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def clean_filename(filename: str) -&gt; str:
+<pre><code class="python">def clean_path(pathname: str) -&gt; str:
     &#34;&#34;&#34;Adjusts relative and shorthand filenames for OS independence.
     
     Args:
-        filename: The full path/to/file
+        pathname: The full path/to/file
     
     Returns:
         A clean file/path name for the current OS and directory structure.
     &#34;&#34;&#34;
-    if filename.startswith(&#39;$HOME/&#39;):
-        filename = filename.replace(&#39;$HOME&#39;, str(Path.home()))
-    elif filename.startswith(&#39;~/&#39;):
-        filename = filename.replace(&#39;~&#39;, str(Path.home()))
-    elif filename.startswith(&#39;../&#39;):
+    if pathname.startswith(&#39;$HOME/&#39;):
+        pathname = pathname.replace(&#39;$HOME&#39;, str(Path.home()))
+    elif pathname.startswith(&#39;~/&#39;):
+        pathname = pathname.replace(&#39;~&#39;, str(Path.home()))
+    elif pathname.startswith(&#39;../&#39;):
         mod_path = Path(__file__).parent
-        src_path = (mod_path / filename).resolve()
+        src_path = (mod_path / pathname).resolve()
         dir_path = os.path.dirname(os.path.realpath(__file__))
-        filename = os.path.join(dir_path, src_path)
-    return filename</code></pre>
+        pathname = os.path.join(dir_path, src_path)
+    return pathname</code></pre>
 </details>
 </dd>
 <dt id="fieldedge_utilities.path.get_caller_name"><code class="name flex">
@@ -210,6 +231,7 @@ def get_caller_name(depth: int = 2,
 <li><h3><a href="#header-functions">Functions</a></h3>
 <ul class="">
 <li><code><a title="fieldedge_utilities.path.clean_filename" href="#fieldedge_utilities.path.clean_filename">clean_filename</a></code></li>
+<li><code><a title="fieldedge_utilities.path.clean_path" href="#fieldedge_utilities.path.clean_path">clean_path</a></code></li>
 <li><code><a title="fieldedge_utilities.path.get_caller_name" href="#fieldedge_utilities.path.get_caller_name">get_caller_name</a></code></li>
 </ul>
 </li>

@@ -27,7 +27,7 @@ import os
 import sys
 from time import gmtime
 
-from fieldedge_utilities.path import clean_filename, get_caller_name
+from fieldedge_utilities.path import clean_path, get_caller_name
 
 FORMAT_CSV = ('%(asctime)s.%(msecs)03dZ,[%(levelname)s],(%(threadName)s),'
               '%(module)s.%(funcName)s:%(lineno)d,%(message)s')
@@ -153,7 +153,7 @@ def get_wrapping_logger(name: str = None,
     #: Set up log file
     if filename is not None:
         try:
-            filename = clean_filename(filename)
+            filename = clean_path(filename)
             if not os.path.isdir(os.path.dirname(filename)):
                 raise FileNotFoundError('Invalid logfile path'
                     f' {os.path.dirname(filename)}')

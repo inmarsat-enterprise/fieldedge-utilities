@@ -7,23 +7,29 @@ from pathlib import Path
 
 def clean_filename(filename: str) -> str:
     """Adjusts relative and shorthand filenames for OS independence.
+    """
+    return clean_path(filename)
+
+
+def clean_path(pathname: str) -> str:
+    """Adjusts relative and shorthand filenames for OS independence.
     
     Args:
-        filename: The full path/to/file
+        pathname: The full path/to/file
     
     Returns:
         A clean file/path name for the current OS and directory structure.
     """
-    if filename.startswith('$HOME/'):
-        filename = filename.replace('$HOME', str(Path.home()))
-    elif filename.startswith('~/'):
-        filename = filename.replace('~', str(Path.home()))
-    elif filename.startswith('../'):
+    if pathname.startswith('$HOME/'):
+        pathname = pathname.replace('$HOME', str(Path.home()))
+    elif pathname.startswith('~/'):
+        pathname = pathname.replace('~', str(Path.home()))
+    elif pathname.startswith('../'):
         mod_path = Path(__file__).parent
-        src_path = (mod_path / filename).resolve()
+        src_path = (mod_path / pathname).resolve()
         dir_path = os.path.dirname(os.path.realpath(__file__))
-        filename = os.path.join(dir_path, src_path)
-    return filename
+        pathname = os.path.join(dir_path, src_path)
+    return pathname
 
 
 def get_caller_name(depth: int = 2,

@@ -58,6 +58,7 @@ from json import JSONDecodeError
 from json import dumps as json_dumpstr
 from json import loads as json_loadstr
 from logging import DEBUG, Logger
+from socket import timeout   #: for Python &lt; 3.10 compatibility vs TimeoutError
 from threading import enumerate as enumerate_threads
 from time import sleep, time
 from typing import Callable, Union
@@ -157,6 +158,7 @@ class MqttClient:
         self.is_connected = False
         self._subscriptions = {}
         self.connect_retry_interval = connect_retry_interval
+        self._failed_connect_attempts = 0
         if subscribe_default:
             if not isinstance(subscribe_default, list):
                 subscribe_default = [subscribe_default]
@@ -189,10 +191,15 @@ class MqttClient:
         &#34;&#34;&#34;
         return self._subscriptions
 
+    @property
+    def failed_connection_attempts(self) -&gt; int:
+        return self._failed_connect_attempts
+
     def _cleanup(self, *args):
-        for arg in args:
-            self._log.debug(&#39;mqtt cleanup called with arg = {}&#39;.format(arg))
-        self._log.debug(&#39;Terminating MQTT connection&#39;)
+        # TODO: logging raises an error since the log file was closed
+        # for arg in args:
+        #     self._log.debug(&#39;mqtt cleanup called with arg = {}&#39;.format(arg))
+        # self._log.debug(&#39;Terminating MQTT connection&#39;)
         self._mqtt.user_data_set(&#39;terminate&#39;)
         self._mqtt.loop_stop()
         self._mqtt.disconnect()
@@ -219,14 +226,18 @@ class MqttClient:
                     continue
                 thread.name = &#39;MqttThread&#39;
                 break
-        except ConnectionError as e:
-            # raise MqttError(f&#39;MQTT {e}&#39;)
-            self._log.warning(f&#39;Unable to connect to {self._host} ({e})...&#39;
+        except (ConnectionError, timeout, TimeoutError) as err:
+            self._failed_connect_attempts += 1
+            self._log.warning(f&#39;Unable to connect to {self._host} ({err})...&#39;
                 f&#39;retrying in {self.connect_retry_interval} seconds&#39;)
-            sleep(self.connect_retry_interval)
-            self._connect()
+            if self.connect_retry_interval &gt; 0:
+                sleep(self.connect_retry_interval)
+                self._connect()
+            else:
+                raise MqttError(f&#39;{err}&#39;)
 
     def _mqtt_on_connect(self, client, userdata, flags, rc):
+        self._failed_connect_attempts = 0
         self._log.debug(&#39;MQTT broker connection result code: {} ({})&#39;
             .format(rc, _get_mqtt_result(rc)))
         if rc == 0:
@@ -462,6 +473,7 @@ attempts.</dd>
         self.is_connected = False
         self._subscriptions = {}
         self.connect_retry_interval = connect_retry_interval
+        self._failed_connect_attempts = 0
         if subscribe_default:
             if not isinstance(subscribe_default, list):
                 subscribe_default = [subscribe_default]
@@ -494,10 +506,15 @@ attempts.</dd>
         &#34;&#34;&#34;
         return self._subscriptions
 
+    @property
+    def failed_connection_attempts(self) -&gt; int:
+        return self._failed_connect_attempts
+
     def _cleanup(self, *args):
-        for arg in args:
-            self._log.debug(&#39;mqtt cleanup called with arg = {}&#39;.format(arg))
-        self._log.debug(&#39;Terminating MQTT connection&#39;)
+        # TODO: logging raises an error since the log file was closed
+        # for arg in args:
+        #     self._log.debug(&#39;mqtt cleanup called with arg = {}&#39;.format(arg))
+        # self._log.debug(&#39;Terminating MQTT connection&#39;)
         self._mqtt.user_data_set(&#39;terminate&#39;)
         self._mqtt.loop_stop()
         self._mqtt.disconnect()
@@ -524,14 +541,18 @@ attempts.</dd>
                     continue
                 thread.name = &#39;MqttThread&#39;
                 break
-        except ConnectionError as e:
-            # raise MqttError(f&#39;MQTT {e}&#39;)
-            self._log.warning(f&#39;Unable to connect to {self._host} ({e})...&#39;
+        except (ConnectionError, timeout, TimeoutError) as err:
+            self._failed_connect_attempts += 1
+            self._log.warning(f&#39;Unable to connect to {self._host} ({err})...&#39;
                 f&#39;retrying in {self.connect_retry_interval} seconds&#39;)
-            sleep(self.connect_retry_interval)
-            self._connect()
+            if self.connect_retry_interval &gt; 0:
+                sleep(self.connect_retry_interval)
+                self._connect()
+            else:
+                raise MqttError(f&#39;{err}&#39;)
 
     def _mqtt_on_connect(self, client, userdata, flags, rc):
+        self._failed_connect_attempts = 0
         self._log.debug(&#39;MQTT broker connection result code: {} ({})&#39;
             .format(rc, _get_mqtt_result(rc)))
         if rc == 0:
@@ -656,6 +677,18 @@ attempts.</dd>
 <pre><code class="python">@property
 def client_id(self):
     return self._client_id</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttClient.failed_connection_attempts"><code class="name">var <span class="ident">failed_connection_attempts</span> : int</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def failed_connection_attempts(self) -&gt; int:
+    return self._failed_connect_attempts</code></pre>
 </details>
 </dd>
 <dt id="fieldedge_utilities.mqtt.MqttClient.subscriptions"><code class="name">var <span class="ident">subscriptions</span> : dict</code></dt>
@@ -826,6 +859,7 @@ def subscriptions(self) -&gt; dict:
 <h4><code><a title="fieldedge_utilities.mqtt.MqttClient" href="#fieldedge_utilities.mqtt.MqttClient">MqttClient</a></code></h4>
 <ul class="">
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.client_id" href="#fieldedge_utilities.mqtt.MqttClient.client_id">client_id</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttClient.failed_connection_attempts" href="#fieldedge_utilities.mqtt.MqttClient.failed_connection_attempts">failed_connection_attempts</a></code></li>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.publish" href="#fieldedge_utilities.mqtt.MqttClient.publish">publish</a></code></li>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.subscribe" href="#fieldedge_utilities.mqtt.MqttClient.subscribe">subscribe</a></code></li>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.subscriptions" href="#fieldedge_utilities.mqtt.MqttClient.subscriptions">subscriptions</a></code></li>

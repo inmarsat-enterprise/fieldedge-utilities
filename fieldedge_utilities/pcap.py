@@ -21,6 +21,7 @@ from enum import Enum
 
 import pyshark
 from pyshark.packet.packet import Packet as SharkPacket
+from pyshark.capture.capture import TSharkCrashException
 
 from fieldedge_utilities.logger import get_wrapping_logger
 from fieldedge_utilities.path import clean_path
@@ -54,34 +55,34 @@ class EthernetProtocol(Enum):
 # Common/registered IP protocol ports
 class ApplicationPort(Enum):
     """Mappings for application layer ports."""
-    TCP_PORT_SMTP = 25
-    TCP_PORT_HTTP = 80
-    TCP_PORT_HTTPS = 443
-    TCP_PORT_DNS = 53
-    TCP_PORT_FTP = 20
-    TCP_PORT_FTPC = 21
-    TCP_PORT_TELNET = 23
-    TCP_PORT_IMAP = 143
-    TCP_PORT_RDP = 3389
-    TCP_PORT_SSH = 22
-    TCP_PORT_HTTP2 = 8080
-    TCP_PORT_MODBUS = 502
-    TCP_PORT_MODBUSSEC = 802
-    TCP_PORT_MQTT = 1883
-    TCP_PORT_MQTTS = 8883
-    TCP_PORT_DOCKERAPI = 2375
-    TCP_PORT_DOCKERAPISSL = 2376
-    TCP_PORT_SRCP = 4303
-    TCP_PORT_COAP = 5683
-    TCP_PORT_COAPS = 5684
-    TCP_PORT_DNP2 = 19999
-    TCP_PORT_DNP = 20000
-    TCP_PORT_IEC60870 = 2404
-    UDP_PORT_SNMP = 161
-    UDP_PORT_DNS = 53
-    UDP_PORT_DHCPQ = 67
-    UDP_PORT_DHCPR = 68
-    UDP_PORT_NTP = 123
+    TCP_SMTP = 25
+    TCP_HTTP = 80
+    TCP_HTTPS = 443
+    TCP_DNS = 53
+    TCP_FTP = 20
+    TCP_FTPC = 21
+    TCP_TELNET = 23
+    TCP_IMAP = 143
+    TCP_RDP = 3389
+    TCP_SSH = 22
+    TCP_HTTP2 = 8080
+    TCP_MODBUS = 502
+    TCP_MODBUSSEC = 802
+    TCP_MQTT = 1883
+    TCP_MQTTS = 8883
+    TCP_DOCKERAPI = 2375
+    TCP_DOCKERAPISSL = 2376
+    TCP_SRCP = 4303
+    TCP_COAP = 5683
+    TCP_COAPS = 5684
+    TCP_DNP2 = 19999
+    TCP_DNP = 20000
+    TCP_IEC60870 = 2404
+    UDP_SNMP = 161
+    UDP_DNS = 53
+    UDP_DHCPQ = 67
+    UDP_DHCPR = 68
+    UDP_NTP = 123
 
 
 def _get_src_dst(packet: SharkPacket) -> tuple:
@@ -124,10 +125,12 @@ def _shorthand(const_name: str) -> str:
     Returns:
         A shorthand name e.g. `MQTT`
     """
-    lowername = const_name.lower()
-    if 'mqtt' in lowername:
-        return 'MQTT'
-    return lowername.split('_')[2].upper()
+    uppername = str(const_name).upper()
+    if '-' in uppername:
+        raise ValueError(f'Unexpected: {uppername}')
+    if '_PORT_' not in uppername:
+        return uppername
+    return uppername.split('_')[2].upper()
 
 
 def _get_application(packet: SharkPacket) -> str:
@@ -139,24 +142,29 @@ def _get_application(packet: SharkPacket) -> str:
         packet: A pyshark Packet
 
     Returns:
-        A string with the application layer protocol e.g. `TCP_PORT_MQTTS`
+        A string with the application layer protocol e.g. `TCP_MQTTS`
     """
+    application = 'UNKNOWN'
     if hasattr(packet[packet.highest_layer], 'app_data_proto'):
-        return str(packet[packet.highest_layer].app_data_proto).upper()
+        application = str(packet[packet.highest_layer].app_data_proto).upper()
     else:
         (srcport, dstport) = _get_ports(packet)
         known_ports = tuple(item.value for item in ApplicationPort)
         application = str(packet.highest_layer).upper()
         if srcport in known_ports:
-            application = _shorthand(ApplicationPort(srcport).name)
+            application = ApplicationPort(srcport).name
         elif dstport in known_ports:
-            application = _shorthand(ApplicationPort(dstport).name)
-        if f'{packet.transport_layer}_PORT' not in application:
-            application = f'{packet.transport_layer}_PORT_{application}'
-        # identified workarounds for observed pyshark/tshark mismatches
-        if 'HTTP-OVER-TLS' in application:
-            application.replace('HTTP-OVER-TLS', 'HTTPS')
-        return application
+            application = ApplicationPort(dstport).name
+        elif (application == packet.transport_layer):
+            application = f'UNKNOWN_{srcport}_{dstport}'
+            if dstport < srcport:
+                application = f'UNKNOWN_{dstport}_{srcport}'
+    if f'{packet.transport_layer}' not in application:
+        application = f'{packet.transport_layer}_{application}'
+    # identified workarounds for observed pyshark/tshark app_data_proto
+    if 'HTTP-OVER-TLS' in application:
+        application = application.replace('HTTP-OVER-TLS', 'HTTPS')
+    return application
 
 
 def is_valid_ip(ip_addr: str) -> bool:
@@ -255,7 +263,7 @@ class Conversation:
         ports: A list of transport ports used e.g. [1883]
         packets: A list of all the packets summarized
         packet_count: The size of the packets list
-        byte_count: The total number of bytes in the conversation
+        bytes_total: The total number of bytes in the conversation
 
     """
     def __init__(self, packet: SharkPacket = None, log: logging.Logger = None):
@@ -267,9 +275,9 @@ class Conversation:
         self.stream_id: str = None
         self.transport: str = None
         self.ports: list = []
-        self.packets: list = []
+        self.packets: list[SimplePacket] = []
         self.packet_count: int = 0
-        self.byte_count: int = 0
+        self.bytes_total: int = 0
         if packet is not None:
             self.packet_add(packet)
     
@@ -288,8 +296,11 @@ class Conversation:
         if self.hosts is None:
             return False
         (src, dst) = _get_src_dst(packet)
-        transport = packet.transport_layer
-        stream_id = packet[transport].stream
+        try:
+            transport = packet.transport_layer
+            stream_id = packet[transport].stream
+        except AttributeError as err:
+            self._log.exception(f'{err}')
         if (src in self.hosts and dst in self.hosts and
             stream_id == self.stream_id):
             return True
@@ -347,25 +358,25 @@ class Conversation:
             self._log.error(err)
             raise ValueError(err)
         self.packet_count += 1
-        self.byte_count += int(packet.length)
+        self.bytes_total += int(packet.length)
         try:
             simple_packet = SimplePacket(packet, self.hosts)
             self.packets.append(simple_packet)
             if self.application is None:
                 self.application = simple_packet.application
             elif self.application != simple_packet.application:
-                self._log.warning(f'Expected {self.application} packet'
+                self._log.warning(f'Expected application {self.application}'
                     f' but got {simple_packet.application}')
             return True
-        except Exception as e:
-            self._log.exception(e)
-            raise e
+        except Exception as err:
+            self._log.exception(err)
+            raise err
         
     @staticmethod
     def _get_intervals_by_length(packets_by_size: dict) -> dict:
         intervals = {}
         for packet_size in packets_by_size:
-            packet_list = packets_by_size[packet_size]
+            packet_list: list[SimplePacket] = packets_by_size[packet_size]
             intervals[packet_size] = None
             if len(packet_list) == 1:
                 application = packet_list[0].application
@@ -427,11 +438,11 @@ class Conversation:
         for packet in self.packets:
             if packet.a_b:
                 if packet.size not in packets_a_b:
-                    packets_a_b[packet.size] = []
+                    packets_a_b[packet.size] = list()
                 packets_a_b[packet.size].append(packet)
             else:
                 if packet.size not in packets_b_a:
-                    packets_b_a[packet.size] = []
+                    packets_b_a[packet.size] = list()
                 packets_b_a[packet.size].append(packet)
             lengths.append(packet.size)
         return (packets_a_b, packets_b_a)
@@ -465,45 +476,57 @@ class PacketStatistics:
     
     Attributes:
         conversations (list): A list of Conversation elements for analyses.
+        packet_count (int): The total number of packets
+        bytes_total (int): The total amount of data in bytes
 
     """
     def __init__(self, log: logging.Logger = None) -> None:
         self._log = log or get_wrapping_logger()
-        self._ip_src_curr = None   # TODO: obsolete?
-        self._ip_dst_curr = None
-        self._ip_src_last = None
-        self._ip_dst_last = None
-        self._ts_last = None
-        self._packet_length_last = None
-        self.conversations = []
-        self._is_conversation = False
+        # self._ip_src_curr = None   # TODO: obsolete?
+        # self._ip_dst_curr = None
+        # self._ip_src_last = None
+        # self._ip_dst_last = None
+        # self._ts_last = None
+        self.conversations: list[Conversation] = []
+        self._packet_count = 0
+        self._bytes_total = 0
     
-    def _packet_add(self, packet: SharkPacket) -> None:
+    @property
+    def packet_count(self) -> int:
+        return self._packet_count
+    
+    @property
+    def bytes_total(self) -> int:
+        return self._bytes_total
+    
+    def packet_add(self, packet: SharkPacket) -> None:
         """Adds a packet to the statistics for analyses.
         
         Args:
             packet: A pyshark Packet object.
 
         """
+        self._packet_count += 1
         packet_type = packet.highest_layer
         packet_length = int(packet.length)
+        self._bytes_total += packet_length
         ts = round(float(packet.sniff_timestamp), 3)
         if hasattr(packet, 'arp'):
             self._process_arp(packet)
-        elif hasattr(packet, 'ip'):
+        elif hasattr(packet, 'tcp') or hasattr(packet, 'udp'):
             self._process_ip(packet)
         else:
             self._log.warning(f'Unhandled packet type {packet_type}')
             return
-        self._ip_src_last = self._ip_src_curr
-        self._ip_dst_last = self._ip_dst_curr
-        self._ts_last = ts
-        self._packet_length_last = packet_length
+        # self._ip_src_last = self._ip_src_curr
+        # self._ip_dst_last = self._ip_dst_curr
+        # self._ts_last = ts
     
     def _process_arp(self, packet: SharkPacket):
-        self._ip_src_curr = packet.arp.src_proto_ipv4
-        self._ip_dst_curr = packet.arp.dst_proto_ipv4
-        self._log.debug(f'ARP {self._ip_src_curr} --> {self._ip_dst_curr}')
+        # self._ip_src_curr = packet.arp.src_proto_ipv4
+        # self._ip_dst_curr = packet.arp.dst_proto_ipv4
+        self._log.debug(f'ARP {packet.arp.src_proto_ipv4}'
+            f'--> {packet.arp.dst_proto_ipv4} (ignored from statistics)')
 
     def _process_ip(self, packet: SharkPacket):
         in_conversation = False
@@ -518,8 +541,8 @@ class PacketStatistics:
         packet_type = packet.highest_layer
         packet_length = int(packet.length)
         ts = round(float(packet.sniff_timestamp), 3)
-        self._ip_src_curr = packet.ip.src
-        self._ip_dst_curr = packet.ip.dst
+        # self._ip_src_curr = packet.ip.src
+        # self._ip_dst_curr = packet.ip.dst
         transport = packet.transport_layer
         if transport is not None:
             srcport = packet[transport].srcport
@@ -594,11 +617,12 @@ def process_pcap(filename: str,
         'display_filter': display_filter,
         'queue': queue,
     }
-    capture_process = multiprocessing.Process(target=process_pcap,
-                                      name='packet_capture', kwargs=kwargs)
+    process = multiprocessing.Process(target=process_pcap,
+                                      name='packet_capture',
+                                      kwargs=kwargs)
     process.start()
     process.join()
-    capture_file = queue.get()
+    packet_statistics = queue.get()
     ```
     
     Args:
@@ -621,19 +645,25 @@ def process_pcap(filename: str,
     capture = pyshark.FileCapture(input_file=file,
         display_filter=display_filter, eventloop=loop)
     capture.set_debug(debug)
-    packet_count = 0
-    try:
-        for packet in capture:
-            packet_count += 1
-            packet_stats._packet_add(packet)
-    except Exception as e:
-        #TODO: better error capture e.g. appears to have been cut short use editcap
-        # https://tshark.dev/share/pcap_preparation/
-        log.error(f'Packet {packet_count} processing ERROR:\n{e}')
+    packet_number = 0
+    for packet in capture:
+        packet_number += 1
+        try:
+            packet_stats.packet_add(packet)
+        except NotImplementedError as err:
+            log.error(f'pyshark: {err}')
+        except TSharkCrashException as err:
+            log.error(f'{err}')
+            break
+        except Exception as err:
+            #TODO: better error capture e.g. appears to have been cut short use editcap
+            # https://tshark.dev/share/pcap_preparation/
+            log.exception(f'Packet {packet_number} processing ERROR:\n{err}')
+            break
+    if newloop:
+        loop.close()
     if queue is not None:
         queue.put(packet_stats)
-        if newloop:
-            loop.close()
     else:
         return packet_stats
 
@@ -678,11 +708,20 @@ def create_pcap(interface: str = 'eth1',
         'queue': queue,
     }
     capture_process = multiprocessing.Process(target=create_pcap,
-                                      name='packet_capture', kwargs=kwargs)
+                                              name='packet_capture',
+                                              kwargs=kwargs)
     capture_process.start()
     capture_process.join()
     capture_file = queue.get()
     ```
+
+    Often times the packet capture process will result in a corrupted file or
+    have duplicate packets.
+    To check for corruption run `tshark -r <capture_file>` which will have a
+    returncode 2 if corrupt, and stderr will include
+    'appears to have been cut short'.
+    To fix a corrupted file run `editcap <capture_file> <capture_file>` which
+    should have a returncode 0.
     
     Args:
         interface: The interface to capture from e.g. `eth1`
@@ -710,9 +749,9 @@ def create_pcap(interface: str = 'eth1',
         eventloop=loop)
     capture.set_debug(debug)
     capture.sniff(timeout=duration)
+    if newloop:
+        loop.close()
     if queue is not None:
         queue.put(filepath)
-        if newloop:
-            loop.close()
     else:
         return filepath

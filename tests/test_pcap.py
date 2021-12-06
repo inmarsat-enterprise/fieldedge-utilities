@@ -1,23 +1,73 @@
 import os
 import shutil
+import subprocess
 from multiprocessing import Process, Queue
 
 from fieldedge_utilities import pcap
+
+def is_corrupt(filename: str) -> bool:
+    try:
+        res = subprocess.run(['tshark', '-r', f'{filename}'], check=True,
+            capture_output=True, text=True)
+    except subprocess.CalledProcessError as err:
+        res = err.stderr
+    if 'appears to have been cut short' in res:
+        return True
+    return False
+
+def fix_corrupt(filename: str) -> bool:
+    try:
+        res = subprocess.run(['editcap', f'{filename}', f'{filename}'],
+            check=True, capture_output=True, text=True).returncode
+    except subprocess.CalledProcessError as err:
+        res = err.returncode
+    if res == 0:
+        return True
+    return False
+
+def test_create():
+    """Creates and reads a pcap file on a local interface."""
+    interface = 'en0'
+    target_directory = '../pcaps'
+    filename = pcap.create_pcap(interface=interface, duration=5,
+        target_directory=target_directory, debug=True)
+    assert(os.path.isfile(filename))
+
+def test_create_multiprocessing():
+    interface = 'en0'
+    target_directory = '../pcaps'
+    queue = Queue()
+    kwargs = {
+        'interface': interface,
+        'duration': 5,
+        'target_directory': target_directory,
+        'queue': queue,
+        'debug': True,
+    }
+    process = Process(target=pcap.create_pcap, kwargs=kwargs)
+    process.start()
+    process.join()
+    filename = queue.get()
+    assert(os.path.isfile(filename))
+    if is_corrupt(filename):
+        assert fix_corrupt(filename)
 
 def test_create_and_read_pcap():
     """Creates and reads a pcap file on a local interface."""
     interface = 'en0'
     target_directory = '../pcaps'
     filename = pcap.create_pcap(interface=interface, duration=5,
-        target_directory=target_directory)
+        target_directory=target_directory, debug=True)
     assert(os.path.isfile(filename))
+    if is_corrupt(filename):
+        assert fix_corrupt(filename)
     packet_statistics = pcap.process_pcap(filename=filename)
     assert(isinstance(packet_statistics, pcap.PacketStatistics))
     shutil.rmtree(os.path.dirname(filename))
 
 def test_packet_statistics():
     """Validates content of the PacketStatistics object."""
-    filename = '../pcaps/mqtts_sample.pcap'
+    filename = '../pcaps/samples/mqtts_sample.pcap'
     packet_stats = pcap.process_pcap(filename=filename)
     assert isinstance(packet_stats, pcap.PacketStatistics)
     for conversation in packet_stats.conversations:
@@ -51,10 +101,20 @@ def test_packet_statistics():
 
 def test_process_multiprocessing():
     """Processes a pcap separately using multiprocessing."""
-    filename = '../pcaps/samples/mqtts_sample.pcap'
+    # filename = '../pcaps/samples/mqtts_sample.pcap'
+    filename = '../pcaps/samples/capture_20211205T142537_60.pcap'
     queue = Queue()
     process = Process(target=pcap.process_pcap, args=(filename, None, queue))
     process.start()
     process.join()
     packet_stats = queue.get()
+    assert isinstance(packet_stats, pcap.PacketStatistics)
+
+def test_process():
+    """Processes a pcap."""
+    filename = '../pcaps/samples/mqtts_sample.pcap'
+    # filename = '../pcaps/samples/capture_20211205T142537_60.pcap'
+    if is_corrupt(filename):
+        assert fix_corrupt(filename)
+    packet_stats = pcap.process_pcap(filename=filename)
     assert isinstance(packet_stats, pcap.PacketStatistics)

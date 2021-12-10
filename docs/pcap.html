@@ -106,11 +106,11 @@ class ApplicationPort(Enum):
     TCP_SSH = 22
     TCP_HTTP2 = 8080
     TCP_MODBUS = 502
-    TCP_MODBUSSEC = 802
+    TCP_MODBUSS = 802
     TCP_MQTT = 1883
     TCP_MQTTS = 8883
     TCP_DOCKERAPI = 2375
-    TCP_DOCKERAPISSL = 2376
+    TCP_DOCKERAPIS = 2376
     TCP_SRCP = 4303
     TCP_COAP = 5683
     TCP_COAPS = 5684
@@ -203,6 +203,8 @@ def _get_application(packet: SharkPacket) -&gt; str:
     # identified workarounds for observed pyshark/tshark app_data_proto
     if &#39;HTTP-OVER-TLS&#39; in application:
         application = application.replace(&#39;HTTP-OVER-TLS&#39;, &#39;HTTPS&#39;)
+    if packet.highest_layer == &#39;TLS&#39; and not application.endswith(&#39;S&#39;):
+        application = f&#39;{application}S&#39;
     return application
 
 
@@ -699,6 +701,7 @@ def process_pcap(filename: str,
             # https://tshark.dev/share/pcap_preparation/
             log.exception(f&#39;Packet {packet_number} processing ERROR:\n{err}&#39;)
             break
+    capture.close()
     if newloop:
         loop.close()
     if queue is not None:
@@ -788,6 +791,7 @@ def create_pcap(interface: str = &#39;eth1&#39;,
         eventloop=loop)
     capture.set_debug(debug)
     capture.sniff(timeout=duration)
+    capture.close()
     if newloop:
         loop.close()
     if queue is not None:
@@ -804,7 +808,7 @@ def create_pcap(interface: str = &#39;eth1&#39;,
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="fieldedge_utilities.pcap.create_pcap"><code class="name flex">
-<span>def <span class="ident">create_pcap</span></span>(<span>interface: str = 'eth1', duration: int = 60, filename: str = None, target_directory: str = '$HOME', queue: <bound method BaseContext.Queue of <multiprocessing.context.DefaultContext object at 0x10a71fb00>> = None, debug: bool = False, log: logging.Logger = None) ‑> str</span>
+<span>def <span class="ident">create_pcap</span></span>(<span>interface: str = 'eth1', duration: int = 60, filename: str = None, target_directory: str = '$HOME', queue: <bound method BaseContext.Queue of <multiprocessing.context.DefaultContext object at 0x10c7e2be0>> = None, debug: bool = False, log: logging.Logger = None) ‑> str</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Creates a packet capture file of a specified interface.</p>
@@ -920,6 +924,7 @@ should have a returncode 0.</p>
         eventloop=loop)
     capture.set_debug(debug)
     capture.sniff(timeout=duration)
+    capture.close()
     if newloop:
         loop.close()
     if queue is not None:
@@ -1028,7 +1033,7 @@ should have a returncode 0.</p>
 </details>
 </dd>
 <dt id="fieldedge_utilities.pcap.process_pcap"><code class="name flex">
-<span>def <span class="ident">process_pcap</span></span>(<span>filename: str, display_filter: str = None, queue: <bound method BaseContext.Queue of <multiprocessing.context.DefaultContext object at 0x10a71fb00>> = None, debug: bool = False) ‑> <a title="fieldedge_utilities.pcap.PacketStatistics" href="#fieldedge_utilities.pcap.PacketStatistics">PacketStatistics</a></span>
+<span>def <span class="ident">process_pcap</span></span>(<span>filename: str, display_filter: str = None, queue: <bound method BaseContext.Queue of <multiprocessing.context.DefaultContext object at 0x10c7e2be0>> = None, debug: bool = False) ‑> <a title="fieldedge_utilities.pcap.PacketStatistics" href="#fieldedge_utilities.pcap.PacketStatistics">PacketStatistics</a></span>
 </code></dt>
 <dd>
 <div class="desc"><p>Processes a PCAP file to create metrics for conversations.</p>
@@ -1121,6 +1126,7 @@ packet_statistics = queue.get()
             # https://tshark.dev/share/pcap_preparation/
             log.exception(f&#39;Packet {packet_number} processing ERROR:\n{err}&#39;)
             break
+    capture.close()
     if newloop:
         loop.close()
     if queue is not None:
@@ -1158,11 +1164,11 @@ packet_statistics = queue.get()
     TCP_SSH = 22
     TCP_HTTP2 = 8080
     TCP_MODBUS = 502
-    TCP_MODBUSSEC = 802
+    TCP_MODBUSS = 802
     TCP_MQTT = 1883
     TCP_MQTTS = 8883
     TCP_DOCKERAPI = 2375
-    TCP_DOCKERAPISSL = 2376
+    TCP_DOCKERAPIS = 2376
     TCP_SRCP = 4303
     TCP_COAP = 5683
     TCP_COAPS = 5684
@@ -1205,7 +1211,7 @@ packet_statistics = queue.get()
 <dd>
 <div class="desc"></div>
 </dd>
-<dt id="fieldedge_utilities.pcap.ApplicationPort.TCP_DOCKERAPISSL"><code class="name">var <span class="ident">TCP_DOCKERAPISSL</span></code></dt>
+<dt id="fieldedge_utilities.pcap.ApplicationPort.TCP_DOCKERAPIS"><code class="name">var <span class="ident">TCP_DOCKERAPIS</span></code></dt>
 <dd>
 <div class="desc"></div>
 </dd>
@@ -1241,7 +1247,7 @@ packet_statistics = queue.get()
 <dd>
 <div class="desc"></div>
 </dd>
-<dt id="fieldedge_utilities.pcap.ApplicationPort.TCP_MODBUSSEC"><code class="name">var <span class="ident">TCP_MODBUSSEC</span></code></dt>
+<dt id="fieldedge_utilities.pcap.ApplicationPort.TCP_MODBUSS"><code class="name">var <span class="ident">TCP_MODBUSS</span></code></dt>
 <dd>
 <div class="desc"></div>
 </dd>
@@ -2268,7 +2274,7 @@ tuples with (unix_timestamp, size_bytes)</p></div>
 <li><code><a title="fieldedge_utilities.pcap.ApplicationPort.TCP_DNP2" href="#fieldedge_utilities.pcap.ApplicationPort.TCP_DNP2">TCP_DNP2</a></code></li>
 <li><code><a title="fieldedge_utilities.pcap.ApplicationPort.TCP_DNS" href="#fieldedge_utilities.pcap.ApplicationPort.TCP_DNS">TCP_DNS</a></code></li>
 <li><code><a title="fieldedge_utilities.pcap.ApplicationPort.TCP_DOCKERAPI" href="#fieldedge_utilities.pcap.ApplicationPort.TCP_DOCKERAPI">TCP_DOCKERAPI</a></code></li>
-<li><code><a title="fieldedge_utilities.pcap.ApplicationPort.TCP_DOCKERAPISSL" href="#fieldedge_utilities.pcap.ApplicationPort.TCP_DOCKERAPISSL">TCP_DOCKERAPISSL</a></code></li>
+<li><code><a title="fieldedge_utilities.pcap.ApplicationPort.TCP_DOCKERAPIS" href="#fieldedge_utilities.pcap.ApplicationPort.TCP_DOCKERAPIS">TCP_DOCKERAPIS</a></code></li>
 <li><code><a title="fieldedge_utilities.pcap.ApplicationPort.TCP_FTP" href="#fieldedge_utilities.pcap.ApplicationPort.TCP_FTP">TCP_FTP</a></code></li>
 <li><code><a title="fieldedge_utilities.pcap.ApplicationPort.TCP_FTPC" href="#fieldedge_utilities.pcap.ApplicationPort.TCP_FTPC">TCP_FTPC</a></code></li>
 <li><code><a title="fieldedge_utilities.pcap.ApplicationPort.TCP_HTTP" href="#fieldedge_utilities.pcap.ApplicationPort.TCP_HTTP">TCP_HTTP</a></code></li>
@@ -2277,7 +2283,7 @@ tuples with (unix_timestamp, size_bytes)</p></div>
 <li><code><a title="fieldedge_utilities.pcap.ApplicationPort.TCP_IEC60870" href="#fieldedge_utilities.pcap.ApplicationPort.TCP_IEC60870">TCP_IEC60870</a></code></li>
 <li><code><a title="fieldedge_utilities.pcap.ApplicationPort.TCP_IMAP" href="#fieldedge_utilities.pcap.ApplicationPort.TCP_IMAP">TCP_IMAP</a></code></li>
 <li><code><a title="fieldedge_utilities.pcap.ApplicationPort.TCP_MODBUS" href="#fieldedge_utilities.pcap.ApplicationPort.TCP_MODBUS">TCP_MODBUS</a></code></li>
-<li><code><a title="fieldedge_utilities.pcap.ApplicationPort.TCP_MODBUSSEC" href="#fieldedge_utilities.pcap.ApplicationPort.TCP_MODBUSSEC">TCP_MODBUSSEC</a></code></li>
+<li><code><a title="fieldedge_utilities.pcap.ApplicationPort.TCP_MODBUSS" href="#fieldedge_utilities.pcap.ApplicationPort.TCP_MODBUSS">TCP_MODBUSS</a></code></li>
 <li><code><a title="fieldedge_utilities.pcap.ApplicationPort.TCP_MQTT" href="#fieldedge_utilities.pcap.ApplicationPort.TCP_MQTT">TCP_MQTT</a></code></li>
 <li><code><a title="fieldedge_utilities.pcap.ApplicationPort.TCP_MQTTS" href="#fieldedge_utilities.pcap.ApplicationPort.TCP_MQTTS">TCP_MQTTS</a></code></li>
 <li><code><a title="fieldedge_utilities.pcap.ApplicationPort.TCP_RDP" href="#fieldedge_utilities.pcap.ApplicationPort.TCP_RDP">TCP_RDP</a></code></li>

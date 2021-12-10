@@ -140,7 +140,7 @@ class MqttClient:
             `MqttError` if the client_id is not valid.
 
         &#34;&#34;&#34;
-        self._host = os.getenv(&#39;MQTT_HOST&#39;) or &#39;fieldedge_broker&#39;
+        self._host = os.getenv(&#39;MQTT_HOST&#39;) or &#39;fieldedge&#39;
         self._user = os.getenv(&#39;MQTT_USER&#39;) or None
         self._pass = os.getenv(&#39;MQTT_PASS&#39;) or None
         self._log = logger or get_wrapping_logger(name=&#39;mqtt_client&#39;)
@@ -455,7 +455,7 @@ attempts.</dd>
             `MqttError` if the client_id is not valid.
 
         &#34;&#34;&#34;
-        self._host = os.getenv(&#39;MQTT_HOST&#39;) or &#39;fieldedge_broker&#39;
+        self._host = os.getenv(&#39;MQTT_HOST&#39;) or &#39;fieldedge&#39;
         self._user = os.getenv(&#39;MQTT_USER&#39;) or None
         self._pass = os.getenv(&#39;MQTT_PASS&#39;) or None
         self._log = logger or get_wrapping_logger(name=&#39;mqtt_client&#39;)

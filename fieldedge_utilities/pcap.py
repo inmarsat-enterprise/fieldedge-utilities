@@ -67,11 +67,11 @@ class ApplicationPort(Enum):
     TCP_SSH = 22
     TCP_HTTP2 = 8080
     TCP_MODBUS = 502
-    TCP_MODBUSSEC = 802
+    TCP_MODBUSS = 802
     TCP_MQTT = 1883
     TCP_MQTTS = 8883
     TCP_DOCKERAPI = 2375
-    TCP_DOCKERAPISSL = 2376
+    TCP_DOCKERAPIS = 2376
     TCP_SRCP = 4303
     TCP_COAP = 5683
     TCP_COAPS = 5684
@@ -164,6 +164,8 @@ def _get_application(packet: SharkPacket) -> str:
     # identified workarounds for observed pyshark/tshark app_data_proto
     if 'HTTP-OVER-TLS' in application:
         application = application.replace('HTTP-OVER-TLS', 'HTTPS')
+    if packet.highest_layer == 'TLS' and not application.endswith('S'):
+        application = f'{application}S'
     return application
 
 
@@ -660,6 +662,7 @@ def process_pcap(filename: str,
             # https://tshark.dev/share/pcap_preparation/
             log.exception(f'Packet {packet_number} processing ERROR:\n{err}')
             break
+    capture.close()
     if newloop:
         loop.close()
     if queue is not None:
@@ -749,6 +752,7 @@ def create_pcap(interface: str = 'eth1',
         eventloop=loop)
     capture.set_debug(debug)
     capture.sniff(timeout=duration)
+    capture.close()
     if newloop:
         loop.close()
     if queue is not None:

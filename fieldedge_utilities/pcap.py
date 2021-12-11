@@ -498,7 +498,8 @@ class PacketStatistics:
         if self._source_filename is not None:
             fileparts = str(self._source_filename.split('.pcap')[0]).split('_')
             try:
-                duration = int(fileparts[len(fileparts) - 1])
+                file_duration = int(fileparts[len(fileparts) - 1])
+                duration = max(file_duration, duration)
             except:
                 pass
         return duration

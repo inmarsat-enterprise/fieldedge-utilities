@@ -155,23 +155,6 @@ def _get_ports(packet: SharkPacket) -&gt; tuple:
     return (int(transport_layer.srcport), int(transport_layer.dstport))
 
 
-def _shorthand(const_name: str) -&gt; str:
-    &#34;&#34;&#34;Converts a long-form name from constants module to tshark protocol name.
-    
-    Args:
-        const_name: The long form name from the constants module.
-    
-    Returns:
-        A shorthand name e.g. `MQTT`
-    &#34;&#34;&#34;
-    uppername = str(const_name).upper()
-    if &#39;-&#39; in uppername:
-        raise ValueError(f&#39;Unexpected: {uppername}&#39;)
-    if &#39;_PORT_&#39; not in uppername:
-        return uppername
-    return uppername.split(&#39;_&#39;)[2].upper()
-
-
 def _get_application(packet: SharkPacket) -&gt; str:
     &#34;&#34;&#34;Returns the application layer descriptor.
     
@@ -521,16 +504,24 @@ class PacketStatistics:
         bytes_total (int): The total amount of data in bytes
 
     &#34;&#34;&#34;
-    def __init__(self, log: logging.Logger = None) -&gt; None:
+    def __init__(self,
+                 log: logging.Logger = None,
+                 source_filename: str = None,
+                 ) -&gt; None:
+        &#34;&#34;&#34;Creates a PacketStatistics object.
+        
+        Args:
+            log: An optional logging facility
+            source_filename: An optional tie to the source pcap file
+
+        &#34;&#34;&#34;
         self._log = log or get_wrapping_logger()
-        # self._ip_src_curr = None   # TODO: obsolete?
-        # self._ip_dst_curr = None
-        # self._ip_src_last = None
-        # self._ip_dst_last = None
-        # self._ts_last = None
+        self._source_filename: str = source_filename
         self.conversations: list[Conversation] = []
-        self._packet_count = 0
-        self._bytes_total = 0
+        self._packet_count: int = 0
+        self._bytes_total: int = 0
+        self._first_packet_ts: float = None
+        self._last_packet_ts: float = None
     
     @property
     def packet_count(self) -&gt; int:
@@ -539,6 +530,17 @@ class PacketStatistics:
     @property
     def bytes_total(self) -&gt; int:
         return self._bytes_total
+    
+    @property
+    def duration(self) -&gt; int:
+        duration = int(self._last_packet_ts - self._first_packet_ts)
+        if self._source_filename is not None:
+            fileparts = str(self._source_filename.split(&#39;.pcap&#39;)[0]).split(&#39;_&#39;)
+            try:
+                duration = int(fileparts[len(fileparts) - 1])
+            except:
+                pass
+        return duration
     
     def packet_add(self, packet: SharkPacket) -&gt; None:
         &#34;&#34;&#34;Adds a packet to the statistics for analyses.
@@ -552,6 +554,9 @@ class PacketStatistics:
         packet_length = int(packet.length)
         self._bytes_total += packet_length
         ts = round(float(packet.sniff_timestamp), 3)
+        if self._first_packet_ts is None:
+            self._first_packet_ts = ts
+        self._last_packet_ts = ts
         if hasattr(packet, &#39;arp&#39;):
             self._process_arp(packet)
         elif hasattr(packet, &#39;tcp&#39;) or hasattr(packet, &#39;udp&#39;):
@@ -559,15 +564,13 @@ class PacketStatistics:
         else:
             self._log.warning(f&#39;Unhandled packet type {packet_type}&#39;)
             return
-        # self._ip_src_last = self._ip_src_curr
-        # self._ip_dst_last = self._ip_dst_curr
-        # self._ts_last = ts
     
     def _process_arp(self, packet: SharkPacket):
-        # self._ip_src_curr = packet.arp.src_proto_ipv4
-        # self._ip_dst_curr = packet.arp.dst_proto_ipv4
-        self._log.debug(f&#39;ARP {packet.arp.src_proto_ipv4}&#39;
-            f&#39;--&gt; {packet.arp.dst_proto_ipv4} (ignored from statistics)&#39;)
+        arp_desc = f&#39;{packet.arp.src_proto_ipv4}--&gt;{packet.arp.dst_proto_ipv4}&#39;
+        if not _is_local_traffic(packet):
+            self._log.warning(f&#39;Non-local ARP packet {arp_desc}&#39;)
+        else:
+            self._log.debug(f&#39;Local ARP {arp_desc} (ignored from statistics)&#39;)
 
     def _process_ip(self, packet: SharkPacket):
         in_conversation = False
@@ -582,11 +585,9 @@ class PacketStatistics:
         packet_type = packet.highest_layer
         packet_length = int(packet.length)
         ts = round(float(packet.sniff_timestamp), 3)
-        # self._ip_src_curr = packet.ip.src
-        # self._ip_dst_curr = packet.ip.dst
         transport = packet.transport_layer
         if transport is not None:
-            srcport = packet[transport].srcport
+            # srcport = packet[transport].srcport   # unused
             dstport = packet[transport].dstport
             stream_id = packet[transport].stream
         isotime = datetime.utcfromtimestamp(ts).isoformat()[0:23]
@@ -677,7 +678,7 @@ def process_pcap(filename: str,
 
     &#34;&#34;&#34;
     log = get_wrapping_logger()
-    packet_stats = PacketStatistics(log=log)
+    packet_stats = PacketStatistics(log=log, source_filename=filename)
     file = clean_path(filename)
     loop = None
     newloop = False
@@ -808,7 +809,7 @@ def create_pcap(interface: str = &#39;eth1&#39;,
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="fieldedge_utilities.pcap.create_pcap"><code class="name flex">
-<span>def <span class="ident">create_pcap</span></span>(<span>interface: str = 'eth1', duration: int = 60, filename: str = None, target_directory: str = '$HOME', queue: <bound method BaseContext.Queue of <multiprocessing.context.DefaultContext object at 0x10c7e2be0>> = None, debug: bool = False, log: logging.Logger = None) ‑> str</span>
+<span>def <span class="ident">create_pcap</span></span>(<span>interface: str = 'eth1', duration: int = 60, filename: str = None, target_directory: str = '$HOME', queue: <bound method BaseContext.Queue of <multiprocessing.context.DefaultContext object at 0x10a14ca20>> = None, debug: bool = False, log: logging.Logger = None) ‑> str</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Creates a packet capture file of a specified interface.</p>
@@ -1033,7 +1034,7 @@ should have a returncode 0.</p>
 </details>
 </dd>
 <dt id="fieldedge_utilities.pcap.process_pcap"><code class="name flex">
-<span>def <span class="ident">process_pcap</span></span>(<span>filename: str, display_filter: str = None, queue: <bound method BaseContext.Queue of <multiprocessing.context.DefaultContext object at 0x10c7e2be0>> = None, debug: bool = False) ‑> <a title="fieldedge_utilities.pcap.PacketStatistics" href="#fieldedge_utilities.pcap.PacketStatistics">PacketStatistics</a></span>
+<span>def <span class="ident">process_pcap</span></span>(<span>filename: str, display_filter: str = None, queue: <bound method BaseContext.Queue of <multiprocessing.context.DefaultContext object at 0x10a14ca20>> = None, debug: bool = False) ‑> <a title="fieldedge_utilities.pcap.PacketStatistics" href="#fieldedge_utilities.pcap.PacketStatistics">PacketStatistics</a></span>
 </code></dt>
 <dd>
 <div class="desc"><p>Processes a PCAP file to create metrics for conversations.</p>
@@ -1102,7 +1103,7 @@ packet_statistics = queue.get()
 
     &#34;&#34;&#34;
     log = get_wrapping_logger()
-    packet_stats = PacketStatistics(log=log)
+    packet_stats = PacketStatistics(log=log, source_filename=filename)
     file = clean_path(filename)
     loop = None
     newloop = False
@@ -1918,7 +1919,7 @@ different transport or stream ID than the conversation.</p></div>
 </dd>
 <dt id="fieldedge_utilities.pcap.PacketStatistics"><code class="flex name class">
 <span>class <span class="ident">PacketStatistics</span></span>
-<span>(</span><span>log: logging.Logger = None)</span>
+<span>(</span><span>log: logging.Logger = None, source_filename: str = None)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Encapsulates packet-level statistics from a capture over time.</p>
@@ -1930,6 +1931,14 @@ different transport or stream ID than the conversation.</p></div>
 <dd>The total number of packets</dd>
 <dt><strong><code>bytes_total</code></strong> :&ensp;<code>int</code></dt>
 <dd>The total amount of data in bytes</dd>
+</dl>
+<p>Creates a PacketStatistics object.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>log</code></strong></dt>
+<dd>An optional logging facility</dd>
+<dt><strong><code>source_filename</code></strong></dt>
+<dd>An optional tie to the source pcap file</dd>
 </dl></div>
 <details class="source">
 <summary>
@@ -1944,16 +1953,24 @@ different transport or stream ID than the conversation.</p></div>
         bytes_total (int): The total amount of data in bytes
 
     &#34;&#34;&#34;
-    def __init__(self, log: logging.Logger = None) -&gt; None:
+    def __init__(self,
+                 log: logging.Logger = None,
+                 source_filename: str = None,
+                 ) -&gt; None:
+        &#34;&#34;&#34;Creates a PacketStatistics object.
+        
+        Args:
+            log: An optional logging facility
+            source_filename: An optional tie to the source pcap file
+
+        &#34;&#34;&#34;
         self._log = log or get_wrapping_logger()
-        # self._ip_src_curr = None   # TODO: obsolete?
-        # self._ip_dst_curr = None
-        # self._ip_src_last = None
-        # self._ip_dst_last = None
-        # self._ts_last = None
+        self._source_filename: str = source_filename
         self.conversations: list[Conversation] = []
-        self._packet_count = 0
-        self._bytes_total = 0
+        self._packet_count: int = 0
+        self._bytes_total: int = 0
+        self._first_packet_ts: float = None
+        self._last_packet_ts: float = None
     
     @property
     def packet_count(self) -&gt; int:
@@ -1962,6 +1979,17 @@ different transport or stream ID than the conversation.</p></div>
     @property
     def bytes_total(self) -&gt; int:
         return self._bytes_total
+    
+    @property
+    def duration(self) -&gt; int:
+        duration = int(self._last_packet_ts - self._first_packet_ts)
+        if self._source_filename is not None:
+            fileparts = str(self._source_filename.split(&#39;.pcap&#39;)[0]).split(&#39;_&#39;)
+            try:
+                duration = int(fileparts[len(fileparts) - 1])
+            except:
+                pass
+        return duration
     
     def packet_add(self, packet: SharkPacket) -&gt; None:
         &#34;&#34;&#34;Adds a packet to the statistics for analyses.
@@ -1975,6 +2003,9 @@ different transport or stream ID than the conversation.</p></div>
         packet_length = int(packet.length)
         self._bytes_total += packet_length
         ts = round(float(packet.sniff_timestamp), 3)
+        if self._first_packet_ts is None:
+            self._first_packet_ts = ts
+        self._last_packet_ts = ts
         if hasattr(packet, &#39;arp&#39;):
             self._process_arp(packet)
         elif hasattr(packet, &#39;tcp&#39;) or hasattr(packet, &#39;udp&#39;):
@@ -1982,15 +2013,13 @@ different transport or stream ID than the conversation.</p></div>
         else:
             self._log.warning(f&#39;Unhandled packet type {packet_type}&#39;)
             return
-        # self._ip_src_last = self._ip_src_curr
-        # self._ip_dst_last = self._ip_dst_curr
-        # self._ts_last = ts
     
     def _process_arp(self, packet: SharkPacket):
-        # self._ip_src_curr = packet.arp.src_proto_ipv4
-        # self._ip_dst_curr = packet.arp.dst_proto_ipv4
-        self._log.debug(f&#39;ARP {packet.arp.src_proto_ipv4}&#39;
-            f&#39;--&gt; {packet.arp.dst_proto_ipv4} (ignored from statistics)&#39;)
+        arp_desc = f&#39;{packet.arp.src_proto_ipv4}--&gt;{packet.arp.dst_proto_ipv4}&#39;
+        if not _is_local_traffic(packet):
+            self._log.warning(f&#39;Non-local ARP packet {arp_desc}&#39;)
+        else:
+            self._log.debug(f&#39;Local ARP {arp_desc} (ignored from statistics)&#39;)
 
     def _process_ip(self, packet: SharkPacket):
         in_conversation = False
@@ -2005,11 +2034,9 @@ different transport or stream ID than the conversation.</p></div>
         packet_type = packet.highest_layer
         packet_length = int(packet.length)
         ts = round(float(packet.sniff_timestamp), 3)
-        # self._ip_src_curr = packet.ip.src
-        # self._ip_dst_curr = packet.ip.dst
         transport = packet.transport_layer
         if transport is not None:
-            srcport = packet[transport].srcport
+            # srcport = packet[transport].srcport   # unused
             dstport = packet[transport].dstport
             stream_id = packet[transport].stream
         isotime = datetime.utcfromtimestamp(ts).isoformat()[0:23]
@@ -2063,6 +2090,25 @@ different transport or stream ID than the conversation.</p></div>
 <pre><code class="python">@property
 def bytes_total(self) -&gt; int:
     return self._bytes_total</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.pcap.PacketStatistics.duration"><code class="name">var <span class="ident">duration</span> : int</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def duration(self) -&gt; int:
+    duration = int(self._last_packet_ts - self._first_packet_ts)
+    if self._source_filename is not None:
+        fileparts = str(self._source_filename.split(&#39;.pcap&#39;)[0]).split(&#39;_&#39;)
+        try:
+            duration = int(fileparts[len(fileparts) - 1])
+        except:
+            pass
+    return duration</code></pre>
 </details>
 </dd>
 <dt id="fieldedge_utilities.pcap.PacketStatistics.packet_count"><code class="name">var <span class="ident">packet_count</span> : int</code></dt>
@@ -2167,6 +2213,9 @@ tuples with (unix_timestamp, size_bytes)</p></div>
     packet_length = int(packet.length)
     self._bytes_total += packet_length
     ts = round(float(packet.sniff_timestamp), 3)
+    if self._first_packet_ts is None:
+        self._first_packet_ts = ts
+    self._last_packet_ts = ts
     if hasattr(packet, &#39;arp&#39;):
         self._process_arp(packet)
     elif hasattr(packet, &#39;tcp&#39;) or hasattr(packet, &#39;udp&#39;):
@@ -2340,6 +2389,7 @@ tuples with (unix_timestamp, size_bytes)</p></div>
 <li><code><a title="fieldedge_utilities.pcap.PacketStatistics.analyze_conversations" href="#fieldedge_utilities.pcap.PacketStatistics.analyze_conversations">analyze_conversations</a></code></li>
 <li><code><a title="fieldedge_utilities.pcap.PacketStatistics.bytes_total" href="#fieldedge_utilities.pcap.PacketStatistics.bytes_total">bytes_total</a></code></li>
 <li><code><a title="fieldedge_utilities.pcap.PacketStatistics.data_series_application_size" href="#fieldedge_utilities.pcap.PacketStatistics.data_series_application_size">data_series_application_size</a></code></li>
+<li><code><a title="fieldedge_utilities.pcap.PacketStatistics.duration" href="#fieldedge_utilities.pcap.PacketStatistics.duration">duration</a></code></li>
 <li><code><a title="fieldedge_utilities.pcap.PacketStatistics.packet_add" href="#fieldedge_utilities.pcap.PacketStatistics.packet_add">packet_add</a></code></li>
 <li><code><a title="fieldedge_utilities.pcap.PacketStatistics.packet_count" href="#fieldedge_utilities.pcap.PacketStatistics.packet_count">packet_count</a></code></li>
 </ul>

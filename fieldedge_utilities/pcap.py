@@ -116,23 +116,6 @@ def _get_ports(packet: SharkPacket) -> tuple:
     return (int(transport_layer.srcport), int(transport_layer.dstport))
 
 
-def _shorthand(const_name: str) -> str:
-    """Converts a long-form name from constants module to tshark protocol name.
-    
-    Args:
-        const_name: The long form name from the constants module.
-    
-    Returns:
-        A shorthand name e.g. `MQTT`
-    """
-    uppername = str(const_name).upper()
-    if '-' in uppername:
-        raise ValueError(f'Unexpected: {uppername}')
-    if '_PORT_' not in uppername:
-        return uppername
-    return uppername.split('_')[2].upper()
-
-
 def _get_application(packet: SharkPacket) -> str:
     """Returns the application layer descriptor.
     
@@ -482,16 +465,24 @@ class PacketStatistics:
         bytes_total (int): The total amount of data in bytes
 
     """
-    def __init__(self, log: logging.Logger = None) -> None:
+    def __init__(self,
+                 log: logging.Logger = None,
+                 source_filename: str = None,
+                 ) -> None:
+        """Creates a PacketStatistics object.
+        
+        Args:
+            log: An optional logging facility
+            source_filename: An optional tie to the source pcap file
+
+        """
         self._log = log or get_wrapping_logger()
-        # self._ip_src_curr = None   # TODO: obsolete?
-        # self._ip_dst_curr = None
-        # self._ip_src_last = None
-        # self._ip_dst_last = None
-        # self._ts_last = None
+        self._source_filename: str = source_filename
         self.conversations: list[Conversation] = []
-        self._packet_count = 0
-        self._bytes_total = 0
+        self._packet_count: int = 0
+        self._bytes_total: int = 0
+        self._first_packet_ts: float = None
+        self._last_packet_ts: float = None
     
     @property
     def packet_count(self) -> int:
@@ -500,6 +491,17 @@ class PacketStatistics:
     @property
     def bytes_total(self) -> int:
         return self._bytes_total
+    
+    @property
+    def duration(self) -> int:
+        duration = int(self._last_packet_ts - self._first_packet_ts)
+        if self._source_filename is not None:
+            fileparts = str(self._source_filename.split('.pcap')[0]).split('_')
+            try:
+                duration = int(fileparts[len(fileparts) - 1])
+            except:
+                pass
+        return duration
     
     def packet_add(self, packet: SharkPacket) -> None:
         """Adds a packet to the statistics for analyses.
@@ -513,6 +515,9 @@ class PacketStatistics:
         packet_length = int(packet.length)
         self._bytes_total += packet_length
         ts = round(float(packet.sniff_timestamp), 3)
+        if self._first_packet_ts is None:
+            self._first_packet_ts = ts
+        self._last_packet_ts = ts
         if hasattr(packet, 'arp'):
             self._process_arp(packet)
         elif hasattr(packet, 'tcp') or hasattr(packet, 'udp'):
@@ -520,15 +525,13 @@ class PacketStatistics:
         else:
             self._log.warning(f'Unhandled packet type {packet_type}')
             return
-        # self._ip_src_last = self._ip_src_curr
-        # self._ip_dst_last = self._ip_dst_curr
-        # self._ts_last = ts
     
     def _process_arp(self, packet: SharkPacket):
-        # self._ip_src_curr = packet.arp.src_proto_ipv4
-        # self._ip_dst_curr = packet.arp.dst_proto_ipv4
-        self._log.debug(f'ARP {packet.arp.src_proto_ipv4}'
-            f'--> {packet.arp.dst_proto_ipv4} (ignored from statistics)')
+        arp_desc = f'{packet.arp.src_proto_ipv4}-->{packet.arp.dst_proto_ipv4}'
+        if not _is_local_traffic(packet):
+            self._log.warning(f'Non-local ARP packet {arp_desc}')
+        else:
+            self._log.debug(f'Local ARP {arp_desc} (ignored from statistics)')
 
     def _process_ip(self, packet: SharkPacket):
         in_conversation = False
@@ -543,11 +546,9 @@ class PacketStatistics:
         packet_type = packet.highest_layer
         packet_length = int(packet.length)
         ts = round(float(packet.sniff_timestamp), 3)
-        # self._ip_src_curr = packet.ip.src
-        # self._ip_dst_curr = packet.ip.dst
         transport = packet.transport_layer
         if transport is not None:
-            srcport = packet[transport].srcport
+            # srcport = packet[transport].srcport   # unused
             dstport = packet[transport].dstport
             stream_id = packet[transport].stream
         isotime = datetime.utcfromtimestamp(ts).isoformat()[0:23]
@@ -638,7 +639,7 @@ def process_pcap(filename: str,
 
     """
     log = get_wrapping_logger()
-    packet_stats = PacketStatistics(log=log)
+    packet_stats = PacketStatistics(log=log, source_filename=filename)
     file = clean_path(filename)
     loop = None
     newloop = False

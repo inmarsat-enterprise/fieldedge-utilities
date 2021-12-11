@@ -68,8 +68,15 @@ def test_create_and_read_pcap():
 def test_packet_statistics():
     """Validates content of the PacketStatistics object."""
     filename = '../pcaps/samples/mqtts_sample.pcap'
+    duration = 50
+    # filename = '../pcaps/samples/capture_20211210T173939_1800.pcap'
+    # duration = 1800
     packet_stats = pcap.process_pcap(filename=filename)
     assert isinstance(packet_stats, pcap.PacketStatistics)
+    assert isinstance(packet_stats.duration, int)
+    assert packet_stats.duration == duration
+    assert packet_stats.packet_count > 0
+    assert packet_stats.bytes_total > 0
     for conversation in packet_stats.conversations:
         assert isinstance(conversation, pcap.Conversation)
         for simple_packet in conversation.packets:

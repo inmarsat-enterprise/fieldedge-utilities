@@ -189,13 +189,14 @@ class MqttClient:
                 break
         except (ConnectionError, timeout, TimeoutError) as err:
             self._failed_connect_attempts += 1
-            self._log.warning(f'Unable to connect to {self._host} ({err})...'
-                f'retrying in {self.connect_retry_interval} seconds')
             if self.connect_retry_interval > 0:
+                self._log.warning(f'Unable to connect to {self._host} ({err})'
+                    f' - retrying in {self.connect_retry_interval} seconds')
                 sleep(self.connect_retry_interval)
                 self._connect()
             else:
-                raise MqttError(f'{err}')
+                self._log.warning(f'Failed to connect to {self._host}'
+                    ' but retry disabled - call method _connect to retry')
 
     def _mqtt_on_connect(self, client, userdata, flags, rc):
         self._failed_connect_attempts = 0
@@ -305,7 +306,7 @@ class MqttClient:
         if not isinstance(qos, int) or qos not in range(0, 3):
             self._log.warning(f'Invalid MQTT QoS {qos} - using QoS 1')
             qos = 1
-        self._log.info('MQTT publishing: {}: {}'.format(topic, message))
+        self._log.debug('MQTT publishing: {}: {}'.format(topic, message))
         (rc, mid) = self._mqtt.publish(topic=topic, payload=message, qos=qos)
         del mid
         if rc != MQTT_ERR_SUCCESS:

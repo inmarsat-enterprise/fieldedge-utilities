@@ -537,7 +537,8 @@ class PacketStatistics:
         if self._source_filename is not None:
             fileparts = str(self._source_filename.split(&#39;.pcap&#39;)[0]).split(&#39;_&#39;)
             try:
-                duration = int(fileparts[len(fileparts) - 1])
+                file_duration = int(fileparts[len(fileparts) - 1])
+                duration = max(file_duration, duration)
             except:
                 pass
         return duration
@@ -653,18 +654,26 @@ def process_pcap(filename: str,
 
     To run in the background use a multiprocessing.Process and Queue:
     ```
-    queue = multiprocessing.Queue()
+    import multiprocessing
+    import queue
+
+    q = multiprocessing.Queue()
     kwargs = {
         &#39;filename&#39;: filename,
         &#39;display_filter&#39;: display_filter,
-        &#39;queue&#39;: queue,
+        &#39;queue&#39;: q,
     }
     process = multiprocessing.Process(target=process_pcap,
                                       name=&#39;packet_capture&#39;,
                                       kwargs=kwargs)
     process.start()
+    while process.is_alive():
+        try:
+            while True:
+                packet_statistics = q.get(block=False)
+        except queue.Empty:
+            pass
     process.join()
-    packet_statistics = queue.get()
     ```
     
     Args:
@@ -809,7 +818,7 @@ def create_pcap(interface: str = &#39;eth1&#39;,
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="fieldedge_utilities.pcap.create_pcap"><code class="name flex">
-<span>def <span class="ident">create_pcap</span></span>(<span>interface: str = 'eth1', duration: int = 60, filename: str = None, target_directory: str = '$HOME', queue: <bound method BaseContext.Queue of <multiprocessing.context.DefaultContext object at 0x10a14ca20>> = None, debug: bool = False, log: logging.Logger = None) ‑> str</span>
+<span>def <span class="ident">create_pcap</span></span>(<span>interface: str = 'eth1', duration: int = 60, filename: str = None, target_directory: str = '$HOME', queue: <bound method BaseContext.Queue of <multiprocessing.context.DefaultContext object at 0x109f6a978>> = None, debug: bool = False, log: logging.Logger = None) ‑> str</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Creates a packet capture file of a specified interface.</p>
@@ -1034,23 +1043,31 @@ should have a returncode 0.</p>
 </details>
 </dd>
 <dt id="fieldedge_utilities.pcap.process_pcap"><code class="name flex">
-<span>def <span class="ident">process_pcap</span></span>(<span>filename: str, display_filter: str = None, queue: <bound method BaseContext.Queue of <multiprocessing.context.DefaultContext object at 0x10a14ca20>> = None, debug: bool = False) ‑> <a title="fieldedge_utilities.pcap.PacketStatistics" href="#fieldedge_utilities.pcap.PacketStatistics">PacketStatistics</a></span>
+<span>def <span class="ident">process_pcap</span></span>(<span>filename: str, display_filter: str = None, queue: <bound method BaseContext.Queue of <multiprocessing.context.DefaultContext object at 0x109f6a978>> = None, debug: bool = False) ‑> <a title="fieldedge_utilities.pcap.PacketStatistics" href="#fieldedge_utilities.pcap.PacketStatistics">PacketStatistics</a></span>
 </code></dt>
 <dd>
 <div class="desc"><p>Processes a PCAP file to create metrics for conversations.</p>
 <p>To run in the background use a multiprocessing.Process and Queue:</p>
-<pre><code>queue = multiprocessing.Queue()
+<pre><code>import multiprocessing
+import queue
+
+q = multiprocessing.Queue()
 kwargs = {
     'filename': filename,
     'display_filter': display_filter,
-    'queue': queue,
+    'queue': q,
 }
 process = multiprocessing.Process(target=process_pcap,
                                   name='packet_capture',
                                   kwargs=kwargs)
 process.start()
+while process.is_alive():
+    try:
+        while True:
+            packet_statistics = q.get(block=False)
+    except queue.Empty:
+        pass
 process.join()
-packet_statistics = queue.get()
 </code></pre>
 <h2 id="args">Args</h2>
 <dl>
@@ -1078,18 +1095,26 @@ packet_statistics = queue.get()
 
     To run in the background use a multiprocessing.Process and Queue:
     ```
-    queue = multiprocessing.Queue()
+    import multiprocessing
+    import queue
+
+    q = multiprocessing.Queue()
     kwargs = {
         &#39;filename&#39;: filename,
         &#39;display_filter&#39;: display_filter,
-        &#39;queue&#39;: queue,
+        &#39;queue&#39;: q,
     }
     process = multiprocessing.Process(target=process_pcap,
                                       name=&#39;packet_capture&#39;,
                                       kwargs=kwargs)
     process.start()
+    while process.is_alive():
+        try:
+            while True:
+                packet_statistics = q.get(block=False)
+        except queue.Empty:
+            pass
     process.join()
-    packet_statistics = queue.get()
     ```
     
     Args:
@@ -1986,7 +2011,8 @@ different transport or stream ID than the conversation.</p></div>
         if self._source_filename is not None:
             fileparts = str(self._source_filename.split(&#39;.pcap&#39;)[0]).split(&#39;_&#39;)
             try:
-                duration = int(fileparts[len(fileparts) - 1])
+                file_duration = int(fileparts[len(fileparts) - 1])
+                duration = max(file_duration, duration)
             except:
                 pass
         return duration
@@ -2105,7 +2131,8 @@ def duration(self) -&gt; int:
     if self._source_filename is not None:
         fileparts = str(self._source_filename.split(&#39;.pcap&#39;)[0]).split(&#39;_&#39;)
         try:
-            duration = int(fileparts[len(fileparts) - 1])
+            file_duration = int(fileparts[len(fileparts) - 1])
+            duration = max(file_duration, duration)
         except:
             pass
     return duration</code></pre>

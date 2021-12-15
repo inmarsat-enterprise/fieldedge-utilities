@@ -1,7 +1,9 @@
 import os
 import shutil
+import queue
 import subprocess
 from multiprocessing import Process, Queue
+from time import time
 
 from fieldedge_utilities import pcap
 
@@ -109,19 +111,29 @@ def test_packet_statistics():
 def test_process_multiprocessing():
     """Processes a pcap separately using multiprocessing."""
     # filename = '../pcaps/samples/mqtts_sample.pcap'
-    filename = '../pcaps/samples/capture_20211205T142537_60.pcap'
-    queue = Queue()
-    process = Process(target=pcap.process_pcap, args=(filename, None, queue))
+    # filename = '../pcaps/samples/capture_20211205T142537_60.pcap'
+    filename = '../pcaps/samples/capture_20211215T031635_3600.pcap'
+    q = Queue()
+    process = Process(target=pcap.process_pcap, args=(filename, None, q))
+    starttime = time()
     process.start()
+    while process.is_alive():
+        try:
+            while True:
+                packet_stats = q.get(block=False)
+        except queue.Empty:
+            pass
     process.join()
-    packet_stats = queue.get()
+    processing_time = time() - starttime
     assert isinstance(packet_stats, pcap.PacketStatistics)
 
 def test_process():
     """Processes a pcap."""
-    filename = '../pcaps/samples/mqtts_sample.pcap'
-    # filename = '../pcaps/samples/capture_20211205T142537_60.pcap'
+    # filename = '../pcaps/samples/mqtts_sample.pcap'
+    filename = '../pcaps/samples/capture_20211215T031635_3600.pcap'
     if is_corrupt(filename):
         assert fix_corrupt(filename)
+    starttime = time()
     packet_stats = pcap.process_pcap(filename=filename)
+    processing_time = time() - starttime
     assert isinstance(packet_stats, pcap.PacketStatistics)

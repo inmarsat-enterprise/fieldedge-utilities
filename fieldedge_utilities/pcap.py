@@ -615,18 +615,26 @@ def process_pcap(filename: str,
 
     To run in the background use a multiprocessing.Process and Queue:
     ```
-    queue = multiprocessing.Queue()
+    import multiprocessing
+    import queue
+
+    q = multiprocessing.Queue()
     kwargs = {
         'filename': filename,
         'display_filter': display_filter,
-        'queue': queue,
+        'queue': q,
     }
     process = multiprocessing.Process(target=process_pcap,
                                       name='packet_capture',
                                       kwargs=kwargs)
     process.start()
+    while process.is_alive():
+        try:
+            while True:
+                packet_statistics = q.get(block=False)
+        except queue.Empty:
+            pass
     process.join()
-    packet_statistics = queue.get()
     ```
     
     Args:

@@ -571,9 +571,11 @@ class PacketStatistics:
         for conversation in self.conversations:
             app = conversation.application
             if app in multi_series:
-                prev = int(app.split('-')[1]) if '-' in app else 1
-                app = f'{app}-{prev + 1}'
-            multi_series[app] = conversation.data_series_packet_size()
+                multi_series[app] = (multi_series[app] +
+                    conversation.data_series_packet_size())
+            else:
+                multi_series[app] = conversation.data_series_packet_size()
+            multi_series[app].sort(key=lambda tup: tup[0])
         return multi_series
 
     def analyze_conversations(self) -> list:

@@ -126,6 +126,9 @@ def test_process_multiprocessing():
     process.join()
     processing_time = time() - starttime
     assert isinstance(packet_stats, pcap.PacketStatistics)
+    data_dict = packet_stats.data_series_application_size()
+    assert isinstance(data_dict, dict)
+
 
 def test_process():
     """Processes a pcap."""

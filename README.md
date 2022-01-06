@@ -5,10 +5,10 @@ satellite communications technology.
 
 This library available on **PyPI** provides:
 
-* A common **`logger`** format and wrapping file facility
+* A common **`logger`** format and wrapping file facility.
 * A simplified **`mqtt`** client that automatically connects
-(to a `fieldedge-broker`)
-* Helper functions for managing files and **`path`** on different OS
-* Tools for **`pcap`** packet capture and analysis
+(to a `fieldedge-broker`).
+* Helper functions for managing files and **`path`** on different OS.
+* An interface for **`hostpipe`** service interacting via a logfile.
 
 [Docmentation](https://inmarsat-enterprise.github.io/fieldedge-utilities/)

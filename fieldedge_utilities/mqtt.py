@@ -80,7 +80,9 @@ class MqttClient:
                  on_connect: Callable = None,
                  on_disconnect: Callable = None,
                  logger: Logger = None,
-                 connect_retry_interval: int = 5):
+                 connect_retry_interval: int = 5,
+                 auto_connect: bool = True,
+                 ):
         """Initializes a managed MQTT client.
         
         Args:
@@ -96,6 +98,7 @@ class MqttClient:
             logger (Logger): (optional) Logger
             connect_retry_interval (int): Seconds between broker reconnect
                 attempts.
+            auto_connect (bool): Automatically attempts to connect when created.
 
         Raises:
             `MqttError` if the client_id is not valid.
@@ -119,13 +122,15 @@ class MqttClient:
         self.is_connected = False
         self._subscriptions = {}
         self.connect_retry_interval = connect_retry_interval
+        self.auto_connect = auto_connect
         self._failed_connect_attempts = 0
         if subscribe_default:
             if not isinstance(subscribe_default, list):
                 subscribe_default = [subscribe_default]
             for sub in subscribe_default:
                 self.subscribe(sub)
-        self._connect()
+        if self.auto_connect:
+            self.connect()
     
     @property
     def client_id(self):
@@ -165,7 +170,8 @@ class MqttClient:
         self._mqtt.loop_stop()
         self._mqtt.disconnect()
     
-    def _connect(self):
+    def connect(self):
+        """Attempts to establish a connection to the broker and re-subscribe."""
         try:
             self._log.debug('Attempting MQTT broker connection to {} as {}'
                 .format(self._host, self._client_id))
@@ -193,10 +199,16 @@ class MqttClient:
                 self._log.warning(f'Unable to connect to {self._host} ({err})'
                     f' - retrying in {self.connect_retry_interval} seconds')
                 sleep(self.connect_retry_interval)
-                self._connect()
+                self.connect()
             else:
                 self._log.warning(f'Failed to connect to {self._host}'
-                    ' but retry disabled - call method _connect to retry')
+                    ' but retry disabled - call method connect to retry')
+
+    def disconnect(self):
+        """Attempts to disconnect from the broker."""
+        self._mqtt.user_data_set('terminate')
+        self._mqtt.loop_stop()
+        self._mqtt.disconnect()
 
     def _mqtt_on_connect(self, client, userdata, flags, rc):
         self._failed_connect_attempts = 0
@@ -269,7 +281,8 @@ class MqttClient:
             # get new unique ID to avoid bouncing connection
             self.client_id = self.client_id
             self.is_connected = False
-            self._connect()
+            if self.auto_connect:
+                self.connect()
 
     def _mqtt_on_subscribe(self, client, userdata, mid, granted_qos):
         self._log.debug('MQTT subscription message id: {}'.format(mid))

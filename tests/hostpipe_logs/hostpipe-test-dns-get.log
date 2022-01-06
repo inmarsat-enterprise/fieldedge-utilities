@@ -1,0 +1,2 @@
+2021-11-19T23:23:57Z,[INFO],command=grep -nr "cache-size=" /etc/dnsmasq.conf
+2021-11-19T23:23:57Z,[INFO],result=26:cache-size=150

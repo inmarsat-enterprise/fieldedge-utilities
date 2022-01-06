@@ -11,8 +11,21 @@ message_received = ''
 
 
 def on_message(topic, payload):
+    """Called during test of (subscribed) message received."""
     global message_received
     message_received = f'{topic}: {payload}'
+
+
+def test_no_connection():
+    log = logger.get_wrapping_logger(log_level=DEBUG)
+    os.environ['MQTT_HOST'] = 'deadhost'
+    try:
+        mqttc = mqtt.MqttClient(client_id='test_client',
+                                logger=log,
+                                connect_retry_interval=0)
+        assert not mqttc.is_connected
+    except:
+        assert False
 
 
 def test_basic_pubsub(capsys):

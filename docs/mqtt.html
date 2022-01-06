@@ -119,7 +119,9 @@ class MqttClient:
                  on_connect: Callable = None,
                  on_disconnect: Callable = None,
                  logger: Logger = None,
-                 connect_retry_interval: int = 5):
+                 connect_retry_interval: int = 5,
+                 auto_connect: bool = True,
+                 ):
         &#34;&#34;&#34;Initializes a managed MQTT client.
         
         Args:
@@ -135,6 +137,7 @@ class MqttClient:
             logger (Logger): (optional) Logger
             connect_retry_interval (int): Seconds between broker reconnect
                 attempts.
+            auto_connect (bool): Automatically attempts to connect when created.
 
         Raises:
             `MqttError` if the client_id is not valid.
@@ -158,13 +161,15 @@ class MqttClient:
         self.is_connected = False
         self._subscriptions = {}
         self.connect_retry_interval = connect_retry_interval
+        self.auto_connect = auto_connect
         self._failed_connect_attempts = 0
         if subscribe_default:
             if not isinstance(subscribe_default, list):
                 subscribe_default = [subscribe_default]
             for sub in subscribe_default:
                 self.subscribe(sub)
-        self._connect()
+        if self.auto_connect:
+            self.connect()
     
     @property
     def client_id(self):
@@ -204,7 +209,8 @@ class MqttClient:
         self._mqtt.loop_stop()
         self._mqtt.disconnect()
     
-    def _connect(self):
+    def connect(self):
+        &#34;&#34;&#34;Attempts to establish a connection to the broker and re-subscribe.&#34;&#34;&#34;
         try:
             self._log.debug(&#39;Attempting MQTT broker connection to {} as {}&#39;
                 .format(self._host, self._client_id))
@@ -232,10 +238,16 @@ class MqttClient:
                 self._log.warning(f&#39;Unable to connect to {self._host} ({err})&#39;
                     f&#39; - retrying in {self.connect_retry_interval} seconds&#39;)
                 sleep(self.connect_retry_interval)
-                self._connect()
+                self.connect()
             else:
                 self._log.warning(f&#39;Failed to connect to {self._host}&#39;
-                    &#39; but retry disabled - call method _connect to retry&#39;)
+                    &#39; but retry disabled - call method connect to retry&#39;)
+
+    def disconnect(self):
+        &#34;&#34;&#34;Attempts to disconnect from the broker.&#34;&#34;&#34;
+        self._mqtt.user_data_set(&#39;terminate&#39;)
+        self._mqtt.loop_stop()
+        self._mqtt.disconnect()
 
     def _mqtt_on_connect(self, client, userdata, flags, rc):
         self._failed_connect_attempts = 0
@@ -308,7 +320,8 @@ class MqttClient:
             # get new unique ID to avoid bouncing connection
             self.client_id = self.client_id
             self.is_connected = False
-            self._connect()
+            if self.auto_connect:
+                self.connect()
 
     def _mqtt_on_subscribe(self, client, userdata, mid, granted_qos):
         self._log.debug(&#39;MQTT subscription message id: {}&#39;.format(mid))
@@ -364,7 +377,7 @@ class MqttClient:
 <dl>
 <dt id="fieldedge_utilities.mqtt.MqttClient"><code class="flex name class">
 <span>class <span class="ident">MqttClient</span></span>
-<span>(</span><span>client_id: str, on_message: Callable[..., ForwardRef('tuple[str, object]')] = None, subscribe_default: Union[str, ForwardRef('list[str]')] = None, on_connect: Callable = None, on_disconnect: Callable = None, logger: logging.Logger = None, connect_retry_interval: int = 5)</span>
+<span>(</span><span>client_id: str, on_message: Callable[..., ForwardRef('tuple[str, object]')] = None, subscribe_default: Union[str, ForwardRef('list[str]')] = None, on_connect: Callable = None, on_disconnect: Callable = None, logger: logging.Logger = None, connect_retry_interval: int = 5, auto_connect: bool = True)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>A customized MQTT client.</p>
@@ -407,6 +420,8 @@ from the broker.</dd>
 <dt><strong><code>connect_retry_interval</code></strong> :&ensp;<code>int</code></dt>
 <dd>Seconds between broker reconnect
 attempts.</dd>
+<dt><strong><code>auto_connect</code></strong> :&ensp;<code>bool</code></dt>
+<dd>Automatically attempts to connect when created.</dd>
 </dl>
 <h2 id="raises">Raises</h2>
 <p><code><a title="fieldedge_utilities.mqtt.MqttError" href="#fieldedge_utilities.mqtt.MqttError">MqttError</a></code> if the client_id is not valid.</p></div>
@@ -435,7 +450,9 @@ attempts.</dd>
                  on_connect: Callable = None,
                  on_disconnect: Callable = None,
                  logger: Logger = None,
-                 connect_retry_interval: int = 5):
+                 connect_retry_interval: int = 5,
+                 auto_connect: bool = True,
+                 ):
         &#34;&#34;&#34;Initializes a managed MQTT client.
         
         Args:
@@ -451,6 +468,7 @@ attempts.</dd>
             logger (Logger): (optional) Logger
             connect_retry_interval (int): Seconds between broker reconnect
                 attempts.
+            auto_connect (bool): Automatically attempts to connect when created.
 
         Raises:
             `MqttError` if the client_id is not valid.
@@ -474,13 +492,15 @@ attempts.</dd>
         self.is_connected = False
         self._subscriptions = {}
         self.connect_retry_interval = connect_retry_interval
+        self.auto_connect = auto_connect
         self._failed_connect_attempts = 0
         if subscribe_default:
             if not isinstance(subscribe_default, list):
                 subscribe_default = [subscribe_default]
             for sub in subscribe_default:
                 self.subscribe(sub)
-        self._connect()
+        if self.auto_connect:
+            self.connect()
     
     @property
     def client_id(self):
@@ -520,7 +540,8 @@ attempts.</dd>
         self._mqtt.loop_stop()
         self._mqtt.disconnect()
     
-    def _connect(self):
+    def connect(self):
+        &#34;&#34;&#34;Attempts to establish a connection to the broker and re-subscribe.&#34;&#34;&#34;
         try:
             self._log.debug(&#39;Attempting MQTT broker connection to {} as {}&#39;
                 .format(self._host, self._client_id))
@@ -548,10 +569,16 @@ attempts.</dd>
                 self._log.warning(f&#39;Unable to connect to {self._host} ({err})&#39;
                     f&#39; - retrying in {self.connect_retry_interval} seconds&#39;)
                 sleep(self.connect_retry_interval)
-                self._connect()
+                self.connect()
             else:
                 self._log.warning(f&#39;Failed to connect to {self._host}&#39;
-                    &#39; but retry disabled - call method _connect to retry&#39;)
+                    &#39; but retry disabled - call method connect to retry&#39;)
+
+    def disconnect(self):
+        &#34;&#34;&#34;Attempts to disconnect from the broker.&#34;&#34;&#34;
+        self._mqtt.user_data_set(&#39;terminate&#39;)
+        self._mqtt.loop_stop()
+        self._mqtt.disconnect()
 
     def _mqtt_on_connect(self, client, userdata, flags, rc):
         self._failed_connect_attempts = 0
@@ -624,7 +651,8 @@ attempts.</dd>
             # get new unique ID to avoid bouncing connection
             self.client_id = self.client_id
             self.is_connected = False
-            self._connect()
+            if self.auto_connect:
+                self.connect()
 
     def _mqtt_on_subscribe(self, client, userdata, mid, granted_qos):
         self._log.debug(&#39;MQTT subscription message id: {}&#39;.format(mid))
@@ -717,6 +745,66 @@ def subscriptions(self) -&gt; dict:
 </dl>
 <h3>Methods</h3>
 <dl>
+<dt id="fieldedge_utilities.mqtt.MqttClient.connect"><code class="name flex">
+<span>def <span class="ident">connect</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Attempts to establish a connection to the broker and re-subscribe.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def connect(self):
+    &#34;&#34;&#34;Attempts to establish a connection to the broker and re-subscribe.&#34;&#34;&#34;
+    try:
+        self._log.debug(&#39;Attempting MQTT broker connection to {} as {}&#39;
+            .format(self._host, self._client_id))
+        self._mqtt.reinitialise(client_id=self.client_id)
+        self._mqtt.user_data_set(None)
+        self._mqtt.on_connect = self._mqtt_on_connect
+        self._mqtt.on_disconnect = self._mqtt_on_disconnect
+        self._mqtt.on_subscribe = self._mqtt_on_subscribe
+        self._mqtt.on_message = self._mqtt_on_message
+        if self._user and self._pass:
+            self._mqtt.username_pw_set(username=self._user,
+                                       password=self._pass)
+        self._mqtt.connect(self._host)
+        threads_before = enumerate_threads()
+        self._mqtt.loop_start()
+        threads_after = enumerate_threads()
+        for thread in threads_after:
+            if thread in threads_before:
+                continue
+            thread.name = &#39;MqttThread&#39;
+            break
+    except (ConnectionError, timeout, TimeoutError) as err:
+        self._failed_connect_attempts += 1
+        if self.connect_retry_interval &gt; 0:
+            self._log.warning(f&#39;Unable to connect to {self._host} ({err})&#39;
+                f&#39; - retrying in {self.connect_retry_interval} seconds&#39;)
+            sleep(self.connect_retry_interval)
+            self.connect()
+        else:
+            self._log.warning(f&#39;Failed to connect to {self._host}&#39;
+                &#39; but retry disabled - call method connect to retry&#39;)</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttClient.disconnect"><code class="name flex">
+<span>def <span class="ident">disconnect</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Attempts to disconnect from the broker.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def disconnect(self):
+    &#34;&#34;&#34;Attempts to disconnect from the broker.&#34;&#34;&#34;
+    self._mqtt.user_data_set(&#39;terminate&#39;)
+    self._mqtt.loop_stop()
+    self._mqtt.disconnect()</code></pre>
+</details>
+</dd>
 <dt id="fieldedge_utilities.mqtt.MqttClient.publish"><code class="name flex">
 <span>def <span class="ident">publish</span></span>(<span>self, topic: str, message: str, qos: int = 1)</span>
 </code></dt>
@@ -861,6 +949,8 @@ def subscriptions(self) -&gt; dict:
 <h4><code><a title="fieldedge_utilities.mqtt.MqttClient" href="#fieldedge_utilities.mqtt.MqttClient">MqttClient</a></code></h4>
 <ul class="">
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.client_id" href="#fieldedge_utilities.mqtt.MqttClient.client_id">client_id</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttClient.connect" href="#fieldedge_utilities.mqtt.MqttClient.connect">connect</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttClient.disconnect" href="#fieldedge_utilities.mqtt.MqttClient.disconnect">disconnect</a></code></li>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.failed_connection_attempts" href="#fieldedge_utilities.mqtt.MqttClient.failed_connection_attempts">failed_connection_attempts</a></code></li>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.publish" href="#fieldedge_utilities.mqtt.MqttClient.publish">publish</a></code></li>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.subscribe" href="#fieldedge_utilities.mqtt.MqttClient.subscribe">subscribe</a></code></li>

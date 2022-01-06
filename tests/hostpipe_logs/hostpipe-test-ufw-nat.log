@@ -1,0 +1,2 @@
+2021-11-19T23:23:57Z,[INFO],command=grep -nr "A POSTROUTING" /etc/ufw/before.rules
+2021-11-19T23:23:57Z,[INFO],result=15:-A POSTROUTING -s 192.168.254.0/24 -o eth0 -j MASQUERADE

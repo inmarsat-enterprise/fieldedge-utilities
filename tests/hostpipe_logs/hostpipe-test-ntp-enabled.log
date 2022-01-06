@@ -1,0 +1,2 @@
+2021-11-19T23:23:57Z,[INFO],command=systemctl status chrony
+2021-11-19T23:23:57Z,[INFO],result=● chrony.service - chrony, an NTP client/server

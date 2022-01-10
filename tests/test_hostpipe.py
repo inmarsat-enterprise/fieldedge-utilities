@@ -139,6 +139,7 @@ def test_host_command_shutdown():
 
 def test_host_command_ip_addr_show():
     command = 'ip addr show'
+    command = 'ip a show | egrep \' eth| en| wlan\' | awk \'{$1=$1};1\''
     pipelog = f'{LOGDIR}/hostpipe-test-ipaddrshow.log'
     res = hostpipe.host_command(command, pipelog=pipelog, test_mode=True)
     assert any(x in res.lower() for x in ['eth', 'en', 'wlan'])
@@ -163,6 +164,7 @@ def test_host_command_dns_cache():
 
 def test_host_command_ntp_cache():
     command = 'systemctl status chrony'
+    command = 'systemctl | grep chrony | awk \'{$1=$1};1\''
     pipelog = f'{LOGDIR}/hostpipe.log'
     res = hostpipe.host_command(command, pipelog=pipelog, test_mode=True)
     command = 'grep -nr \"pool pool.ntp.org\" /etc/chrony/chrony.conf'

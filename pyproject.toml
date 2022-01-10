@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "fieldedge-utilities"
-version = "0.6.0"
+version = "0.6.2"
 description = "Utilities package for the FieldEdge project."
 authors = ["geoffbrucepayne <geoff.bruce-payne@inmarsat.com>"]
 license = "Apache2.0"
@@ -12,7 +12,6 @@ keywords = ["Inmarsat", "FieldEdge"]
 python = "^3.7"
 paho-mqtt = "^1.6.1"
 python-dotenv = "^0.19.1"
-pyshark = "^0.4.3"
 pyserial = "^3.5"
 
 [tool.poetry.dev-dependencies]

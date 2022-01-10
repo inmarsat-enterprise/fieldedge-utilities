@@ -24,22 +24,21 @@ def clean_path(pathname: str) -> str:
         pathname = pathname.replace('$HOME', str(Path.home()))
     elif pathname.startswith('~/'):
         pathname = pathname.replace('~', str(Path.home()))
-    elif pathname.startswith('../'):
-        mod_path = Path(__file__).parent
-        src_path = (mod_path / pathname).resolve()
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-        pathname = os.path.join(dir_path, src_path)
-    return pathname
+    if os.path.isdir(os.path.dirname(pathname)):
+        return os.path.realpath(pathname)
+    else:
+        raise ValueError(f'Directory {os.path.dirname(pathname)} not found')
 
 
 def get_caller_name(depth: int = 2,
                     mod: bool = True,
                     cls: bool =False,
                     mth: bool = False) -> str:
-    """Returns the name of the calling function.
+    """Returns the name of the calling module/class/function.
 
     Args:
-        depth: Starting depth of stack inspection.
+        depth: Starting depth of stack inspection. Default 2 refers to the
+            prior entry in the stack relative to this function.
         mod: Include module name.
         cls: Include class name.
         mth: Include method name.
@@ -65,5 +64,3 @@ def get_caller_name(depth: int = 2,
             name.append(codename)
     del parent_frame, stack
     return '.'.join(name)
-
-

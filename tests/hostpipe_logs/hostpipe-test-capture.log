@@ -1,5 +1,5 @@
 2021-12-15T12:09:48Z,[INFO],command=sudo runuser -u pi -- nohup bash /home/pi/fieldedge/capture/capture.sh -t 60 -i eth1 | sed -e "s/^/$(date -u +%Y-%m-%dT%H:%M:%SZ),[INFO],result=/" &>> /home/pi/fieldedge/logs/hostpipe.log &
-2021-12-15T12:09:49Z,[INFO],command=some random command
+2021-12-15T12:09:49Z,[INFO],command=some random command NOTE must be a different timestamp than above
 2021-12-15T12:09:49Z,[INFO],result=random response line 1
 2021-12-15T12:09:49Z,[INFO],result=random response line 2
 2021-12-15T12:09:48Z,[INFO],result=Starting wireshark capture on eth1 for 60 seconds.

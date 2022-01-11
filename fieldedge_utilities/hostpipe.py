@@ -37,6 +37,9 @@ def host_command(command: str,
     
     Returns:
         A string with the command response, or empty if no response received.
+    
+    Raises:
+        FileNotFoundError if the hostpipe log cannot be found.
 
     """
     command = _apply_preamble(command)
@@ -50,6 +53,8 @@ def host_command(command: str,
         return f'{command} sent'
     if pipelog is None:
         pipelog = './logs/hostpipe.log'
+    if not os.path.isfile(pipelog):
+        raise FileNotFoundError(f'Could not find file {pipelog}')
     response_str = host_get_response(command, pipelog=pipelog, timeout=timeout,
         log=log, test_mode=test_mode).strip()
     deleted_count = _maintain_pipelog(pipelog)
@@ -91,18 +96,22 @@ def host_get_response(command: str,
     Returns:
         A string concatenating all the response lines following the command.
 
+    Raises:
+        FileNotFoundError if the hostpipe log cannot be found.
+
     """
-    if isinstance(log, Logger):
-        log.debug(f'Searching hostpipe.log for {command}')
     calltime = time()
     command = _apply_preamble(command)
-    if pipelog is None or pipelog == '' or not(os.path.isfile(pipelog)):
+    if pipelog is None:
         pipelog = './logs/hostpipe.log'
     if not os.path.isfile(pipelog):
         raise FileNotFoundError(f'Could not find file {pipelog}')
+    if isinstance(log, Logger):
+        log.debug(f'Searching {pipelog} for {command}')
     response = []
     filepass = 0
     while len(response) == 0:
+        # test_mode assumes manual step through will usually violate timeout
         if not test_mode and time() > calltime + timeout:
             if isinstance(log, Logger):
                 log.warning(f'Response to {command} timed out'
@@ -110,13 +119,13 @@ def host_get_response(command: str,
             break
         filepass += 1
         if isinstance(log, Logger):
-            log.debug(f'hostpipe.log read iteration {filepass}')
+            log.debug(f'{pipelog} read iteration {filepass}')
         lines = open(pipelog, 'r').readlines()
         for line in reversed(lines):
             if ',command=' in line:
                 logged_command = line.split(',command=')[1].strip()
                 if isinstance(log, Logger):
-                    log.debug(f'Found command {logged_command} in hostpipe.log')
+                    log.debug(f'Found command {logged_command} in {pipelog}')
                 if logged_command != command:
                     # wrong command/response so dump parsed lines so far
                     cts = line[:len(TIMESTAMP_FMT)]
@@ -126,7 +135,7 @@ def host_get_response(command: str,
                         if rts == cts:
                             to_remove.append(resline)
                     if isinstance(log, Logger):
-                        log.debug(f'{logged_command} != {command}'
+                        log.debug(f'Mismatch: {logged_command} != {command}'
                             f' -> dropping {len(to_remove)} response lines')
                     response = [l for l in response if l not in to_remove]
                 else:

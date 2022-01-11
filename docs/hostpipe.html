@@ -66,6 +66,9 @@ def host_command(command: str,
     
     Returns:
         A string with the command response, or empty if no response received.
+    
+    Raises:
+        FileNotFoundError if the hostpipe log cannot be found.
 
     &#34;&#34;&#34;
     command = _apply_preamble(command)
@@ -79,6 +82,8 @@ def host_command(command: str,
         return f&#39;{command} sent&#39;
     if pipelog is None:
         pipelog = &#39;./logs/hostpipe.log&#39;
+    if not os.path.isfile(pipelog):
+        raise FileNotFoundError(f&#39;Could not find file {pipelog}&#39;)
     response_str = host_get_response(command, pipelog=pipelog, timeout=timeout,
         log=log, test_mode=test_mode).strip()
     deleted_count = _maintain_pipelog(pipelog)
@@ -120,18 +125,22 @@ def host_get_response(command: str,
     Returns:
         A string concatenating all the response lines following the command.
 
+    Raises:
+        FileNotFoundError if the hostpipe log cannot be found.
+
     &#34;&#34;&#34;
-    if isinstance(log, Logger):
-        log.debug(f&#39;Searching hostpipe.log for {command}&#39;)
     calltime = time()
     command = _apply_preamble(command)
-    if pipelog is None or pipelog == &#39;&#39; or not(os.path.isfile(pipelog)):
+    if pipelog is None:
         pipelog = &#39;./logs/hostpipe.log&#39;
     if not os.path.isfile(pipelog):
         raise FileNotFoundError(f&#39;Could not find file {pipelog}&#39;)
+    if isinstance(log, Logger):
+        log.debug(f&#39;Searching {pipelog} for {command}&#39;)
     response = []
     filepass = 0
     while len(response) == 0:
+        # test_mode assumes manual step through will usually violate timeout
         if not test_mode and time() &gt; calltime + timeout:
             if isinstance(log, Logger):
                 log.warning(f&#39;Response to {command} timed out&#39;
@@ -139,13 +148,13 @@ def host_get_response(command: str,
             break
         filepass += 1
         if isinstance(log, Logger):
-            log.debug(f&#39;hostpipe.log read iteration {filepass}&#39;)
+            log.debug(f&#39;{pipelog} read iteration {filepass}&#39;)
         lines = open(pipelog, &#39;r&#39;).readlines()
         for line in reversed(lines):
             if &#39;,command=&#39; in line:
                 logged_command = line.split(&#39;,command=&#39;)[1].strip()
                 if isinstance(log, Logger):
-                    log.debug(f&#39;Found command {logged_command} in hostpipe.log&#39;)
+                    log.debug(f&#39;Found command {logged_command} in {pipelog}&#39;)
                 if logged_command != command:
                     # wrong command/response so dump parsed lines so far
                     cts = line[:len(TIMESTAMP_FMT)]
@@ -155,7 +164,7 @@ def host_get_response(command: str,
                         if rts == cts:
                             to_remove.append(resline)
                     if isinstance(log, Logger):
-                        log.debug(f&#39;{logged_command} != {command}&#39;
+                        log.debug(f&#39;Mismatch: {logged_command} != {command}&#39;
                             f&#39; -&gt; dropping {len(to_remove)} response lines&#39;)
                     response = [l for l in response if l not in to_remove]
                 else:
@@ -240,7 +249,9 @@ and the calling function must handle an empty string response.</p>
 <dd>Boolean to mock responses.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
-<p>A string with the command response, or empty if no response received.</p></div>
+<p>A string with the command response, or empty if no response received.</p>
+<h2 id="raises">Raises</h2>
+<p>FileNotFoundError if the hostpipe log cannot be found.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -269,6 +280,9 @@ and the calling function must handle an empty string response.</p>
     
     Returns:
         A string with the command response, or empty if no response received.
+    
+    Raises:
+        FileNotFoundError if the hostpipe log cannot be found.
 
     &#34;&#34;&#34;
     command = _apply_preamble(command)
@@ -282,6 +296,8 @@ and the calling function must handle an empty string response.</p>
         return f&#39;{command} sent&#39;
     if pipelog is None:
         pipelog = &#39;./logs/hostpipe.log&#39;
+    if not os.path.isfile(pipelog):
+        raise FileNotFoundError(f&#39;Could not find file {pipelog}&#39;)
     response_str = host_get_response(command, pipelog=pipelog, timeout=timeout,
         log=log, test_mode=test_mode).strip()
     deleted_count = _maintain_pipelog(pipelog)
@@ -313,7 +329,9 @@ and the calling function must handle an empty string response.</p>
 <dd>Optional logging facility</dd>
 </dl>
 <h2 id="returns">Returns</h2>
-<p>A string concatenating all the response lines following the command.</p></div>
+<p>A string concatenating all the response lines following the command.</p>
+<h2 id="raises">Raises</h2>
+<p>FileNotFoundError if the hostpipe log cannot be found.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -334,18 +352,22 @@ and the calling function must handle an empty string response.</p>
     Returns:
         A string concatenating all the response lines following the command.
 
+    Raises:
+        FileNotFoundError if the hostpipe log cannot be found.
+
     &#34;&#34;&#34;
-    if isinstance(log, Logger):
-        log.debug(f&#39;Searching hostpipe.log for {command}&#39;)
     calltime = time()
     command = _apply_preamble(command)
-    if pipelog is None or pipelog == &#39;&#39; or not(os.path.isfile(pipelog)):
+    if pipelog is None:
         pipelog = &#39;./logs/hostpipe.log&#39;
     if not os.path.isfile(pipelog):
         raise FileNotFoundError(f&#39;Could not find file {pipelog}&#39;)
+    if isinstance(log, Logger):
+        log.debug(f&#39;Searching {pipelog} for {command}&#39;)
     response = []
     filepass = 0
     while len(response) == 0:
+        # test_mode assumes manual step through will usually violate timeout
         if not test_mode and time() &gt; calltime + timeout:
             if isinstance(log, Logger):
                 log.warning(f&#39;Response to {command} timed out&#39;
@@ -353,13 +375,13 @@ and the calling function must handle an empty string response.</p>
             break
         filepass += 1
         if isinstance(log, Logger):
-            log.debug(f&#39;hostpipe.log read iteration {filepass}&#39;)
+            log.debug(f&#39;{pipelog} read iteration {filepass}&#39;)
         lines = open(pipelog, &#39;r&#39;).readlines()
         for line in reversed(lines):
             if &#39;,command=&#39; in line:
                 logged_command = line.split(&#39;,command=&#39;)[1].strip()
                 if isinstance(log, Logger):
-                    log.debug(f&#39;Found command {logged_command} in hostpipe.log&#39;)
+                    log.debug(f&#39;Found command {logged_command} in {pipelog}&#39;)
                 if logged_command != command:
                     # wrong command/response so dump parsed lines so far
                     cts = line[:len(TIMESTAMP_FMT)]
@@ -369,7 +391,7 @@ and the calling function must handle an empty string response.</p>
                         if rts == cts:
                             to_remove.append(resline)
                     if isinstance(log, Logger):
-                        log.debug(f&#39;{logged_command} != {command}&#39;
+                        log.debug(f&#39;Mismatch: {logged_command} != {command}&#39;
                             f&#39; -&gt; dropping {len(to_remove)} response lines&#39;)
                     response = [l for l in response if l not in to_remove]
                 else:

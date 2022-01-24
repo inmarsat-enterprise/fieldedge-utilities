@@ -1,0 +1,29 @@
+2022-01-24T21:07:12.000Z,[INFO],command=grep -nr "cache-size=" /etc/dnsmasq.conf
+2022-01-24T21:07:12.000Z,[INFO],result=32:cache-size=0
+2022-01-24T21:07:13.000Z,[INFO],command=systemctl | grep chrony
+2022-01-24T21:07:13.000Z,[INFO],result=  chrony.service                                                                                                                loaded active running   chrony, an NTP client/server
+2022-01-24T21:07:14.000Z,[INFO],command=grep -nr "pool " /etc/chrony/chrony.conf
+2022-01-24T21:07:14.000Z,[INFO],result=8:pool 2.debian.pool.ntp.org iburst
+2022-01-24T21:07:15.000Z,[INFO],command=sudo runuser -u pi -- bash /home/pi/fieldedge/bgan_simulator/bgan_simulator.sh status
+2022-01-24T21:07:15.000Z,[INFO],result=BGAN Simulator Disabled
+2022-01-24T21:07:55.000Z,[INFO],command=sudo ufw status verbose
+2022-01-24T21:07:56.000Z,[INFO],result=Status: active
+2022-01-24T21:07:56.000Z,[INFO],result=Logging: on (low)
+2022-01-24T21:07:56.000Z,[INFO],result=Default: deny (incoming), allow (outgoing), allow (routed)
+2022-01-24T21:07:56.000Z,[INFO],result=New profiles: skip
+2022-01-24T21:07:56.000Z,[INFO],result=
+2022-01-24T21:07:56.000Z,[INFO],result=To                         Action      From
+2022-01-24T21:07:56.000Z,[INFO],result=--                         ------      ----
+2022-01-24T21:07:56.000Z,[INFO],result=22/tcp                     ALLOW IN    Anywhere
+2022-01-24T21:07:56.000Z,[INFO],result=22/tcp (v6)                ALLOW IN    Anywhere (v6)
+2022-01-24T21:07:56.000Z,[INFO],result=
+2022-01-24T21:07:56.000Z,[INFO],command=ip a show | egrep " eth| en| wlan"
+2022-01-24T21:07:56.000Z,[INFO],result=2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP group default qlen 1000
+2022-01-24T21:07:56.000Z,[INFO],result=    inet 192.168.1.129/24 brd 192.168.1.255 scope global dynamic noprefixroute eth0
+2022-01-24T21:07:56.000Z,[INFO],result=3: eth1: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc pfifo_fast state DOWN group default qlen 1000
+2022-01-24T21:07:56.000Z,[INFO],result=4: eth2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP group default qlen 1000
+2022-01-24T21:07:56.000Z,[INFO],result=    inet 192.168.128.102/24 brd 255.255.255.255 scope global dynamic noprefixroute eth2
+2022-01-24T21:07:56.000Z,[INFO],result=5: wlan0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP group default qlen 1000
+2022-01-24T21:07:56.000Z,[INFO],result=    inet 192.168.253.1/24 brd 192.168.253.255 scope global noprefixroute wlan0
+2022-01-24T21:07:57.000Z,[INFO],command=grep -nr "A POSTROUTING" /etc/ufw/before.rules
+2022-01-24T21:07:57.000Z,[INFO],result=18:-A POSTROUTING -s 192.168.254.0/24 -o eth0 -j MASQUERADE

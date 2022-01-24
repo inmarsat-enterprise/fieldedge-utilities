@@ -1,2 +1,2 @@
-2021-11-19T23:23:57Z,[INFO],command=sudo runuser -u pi -- bash /home/pi/fieldedge/bgan_simulator/bgan_simulator.sh disable
-2021-11-19T23:23:57Z,[INFO],result=Disabling BGAN Emulator
+2021-11-19T23:23:57.000Z,[INFO],command=sudo runuser -u pi -- bash /home/pi/fieldedge/bgan_simulator/bgan_simulator.sh disable
+2021-11-19T23:23:57.000Z,[INFO],result=Disabling BGAN Emulator

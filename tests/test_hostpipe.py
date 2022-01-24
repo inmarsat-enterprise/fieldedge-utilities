@@ -32,14 +32,14 @@ def _mock_host_command(command: str, log: Logger = None) -> str:
     elif 'bgan_simulator.sh' in command:
         if 'status' in command:
             if MOCK_BGAN_SIM and mock_bgan_sim_state:
-                pipelog = f'{LOGDIR}/hostpipe-test-bgan-sim-enabled.log'
+                pipelog = f'{LOGDIR}/hostpipe-test-bgan-simulator-enabled.log'
             else:
-                pipelog = f'{LOGDIR}/hostpipe-test-bgan-sim-disabled.log'
+                pipelog = f'{LOGDIR}/hostpipe-test-bgan-simulator-disabled.log'
         elif 'enable' in command:
-            pipelog = f'{LOGDIR}/hostpipe-test-bgan-sim-enable.log'
+            pipelog = f'{LOGDIR}/hostpipe-test-bgan-simulator-enable.log'
             mock_bgan_sim_state = True
         else:
-            pipelog = f'{LOGDIR}/hostpipe-test-bgan-sim-disable.log'
+            pipelog = f'{LOGDIR}/hostpipe-test-bgan-simulator-disable.log'
             mock_bgan_sim_state = False
     elif 'capture.sh' in command:
         pipelog = f'{LOGDIR}/hostpipe-test-capture.log'
@@ -105,7 +105,7 @@ def _mock_host_response(pipelog: str,
 
 def test_host_command_bgan_simulator():
     command = 'bash $HOME/fieldedge/bgan_simulator/bgan_simulator.sh status'
-    pipelog = _mock_host_command(command)
+    pipelog = f'{LOGDIR}/hostpipe-test-bgan-simulator-enabled.log'
     res = hostpipe.host_command(command, pipelog=pipelog, test_mode=True)
     assert isinstance(res, str)
     assert any(x in res.lower() for x in ['delay', 'enabled'])
@@ -161,14 +161,16 @@ def test_host_command_dns_cache():
     pipelog = f'{LOGDIR}/hostpipe-test-dns-get.log'
     res = hostpipe.host_command(command, pipelog=pipelog, test_mode=True)
     assert 'cache-size=' in res
+    assert int(res.split('=')[1].strip()) == 150
 
 def test_host_command_ntp_cache():
-    command = 'systemctl status chrony'
-    command = 'systemctl | grep chrony | awk \'{$1=$1};1\''
-    pipelog = f'{LOGDIR}/hostpipe.log'
+    command = 'systemctl | grep chrony | tr -s [:blank:]'
+    # command = 'systemctl | grep chrony'
+    pipelog = f'{LOGDIR}/hostpipe-test-ntp-installed.log'
     res = hostpipe.host_command(command, pipelog=pipelog, test_mode=True)
+    assert 'active' in res.lower()
     command = 'grep -nr \"pool pool.ntp.org\" /etc/chrony/chrony.conf'
-    pipelog = ''
+    pipelog = f'{LOGDIR}/hostpipe-test-ntp-get.log'
     res = hostpipe.host_command(command, pipelog=pipelog, test_mode=True)
     assert 'minpoll' in res
 
@@ -177,3 +179,9 @@ def test__maintain_pipelog():
     test_size = os.path.getsize(pipelog) - 1
     lines_deleted = hostpipe._maintain_pipelog(pipelog, test_size, True)
     assert lines_deleted == 14
+
+def test_tooclose():
+    command = 'grep -nr \"cache-size=\" /etc/dnsmasq.conf'
+    pipelog = f'{LOGDIR}/hostpipe-test-dns-tooclose.log'
+    res = hostpipe.host_command(command, pipelog=pipelog, test_mode=True)
+    assert int(res.split('=')[1].strip()) == 0

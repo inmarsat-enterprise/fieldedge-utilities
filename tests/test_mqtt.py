@@ -3,6 +3,7 @@ from logging import DEBUG
 import os
 from time import sleep
 
+import pytest
 from fieldedge_utilities import logger, mqtt
 
 TEST_TOPIC = 'fieldedge/test'
@@ -17,15 +18,12 @@ def on_message(topic, payload):
 
 
 def test_no_connection():
-    log = logger.get_wrapping_logger(log_level=DEBUG)
-    os.environ['MQTT_HOST'] = 'deadhost'
-    try:
+    with pytest.raises(Exception, match='not known'):
+        log = logger.get_wrapping_logger(log_level=DEBUG)
+        os.environ['MQTT_HOST'] = 'deadhost'
         mqttc = mqtt.MqttClient(client_id='test_client',
                                 logger=log,
                                 connect_retry_interval=0)
-        assert not mqttc.is_connected
-    except:
-        assert False
 
 
 def test_basic_pubsub(capsys):

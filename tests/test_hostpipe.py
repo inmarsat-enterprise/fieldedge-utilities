@@ -189,3 +189,8 @@ def test_tooclose():
         pipelog = f'{LOGDIR}/hostpipe-test-dns-tooclose.log'
         res = hostpipe.host_command(command, pipelog=pipelog, test_mode=True)
         cache_size = int(res.split('=')[1].strip())
+
+def test_escaped_command():
+    command1 = 'ip a show | egrep " eth| en| wlan"'
+    esc1 = hostpipe._escaped_command(command1)
+    assert esc1 == 'ip a show | egrep \\\\\\" eth| en| wlan\\\\\\"'

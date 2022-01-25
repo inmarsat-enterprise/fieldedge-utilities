@@ -48,7 +48,8 @@ def host_command(command: str,
     if not test_mode:
         if isinstance(log, Logger):
             log.debug(f'Sending {command} to hostpipe via shell')
-        subprocess.run(f'echo \"{command}\" > ./hostpipe/pipe', shell=True)
+        subprocess.run(f'echo "{_escaped_command(command)}" > ./hostpipe/pipe',
+                       shell=True)
     elif isinstance(log, Logger):
         log.info(f'test_mode received command: {command}')
     if noresponse:
@@ -85,6 +86,16 @@ def _apply_preamble(command: str) -> str:
             preamble = ''
         command = f'{preamble}{command.replace("$HOME", "/home/pi")}'
     return command
+
+
+def _escaped_command(command: str) -> str:
+    escaped_command = ''
+    for c in command:
+        if c == '"':
+            escaped_command += r'\\\"'
+        else:
+            escaped_command += c
+    return escaped_command
 
 
 def _get_line_ts(line: str) -> float:

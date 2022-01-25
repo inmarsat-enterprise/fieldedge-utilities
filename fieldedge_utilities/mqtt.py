@@ -13,11 +13,9 @@ Typically the `fieldedge-broker` will be a **Mosquitto** service running locally
 in a **Docker** container listening on port 1883 for authenticated connections.
 
 """
+import json
 import os
 from atexit import register as on_exit
-from json import JSONDecodeError
-from json import dumps as json_dumpstr
-from json import loads as json_loadstr
 from logging import DEBUG, Logger
 from socket import timeout   #: for Python < 3.10 compatibility vs TimeoutError
 from threading import enumerate as enumerate_threads
@@ -296,8 +294,8 @@ class MqttClient:
     def _mqtt_on_message(self, client, userdata, message):
         payload = message.payload.decode()
         try:
-            payload = json_loadstr(payload)
-        except JSONDecodeError as e:
+            payload = json.loads(payload)
+        except json.JSONDecodeError as e:
             self._log.debug(f'MQTT message payload non-JSON ({e})')
         self._log.debug(f'MQTT received message "{payload}"'
             f'on topic "{message.topic}" with QoS {message.qos}')
@@ -305,17 +303,19 @@ class MqttClient:
             self._log.debug(f'MQTT client userdata: {userdata}')
         self.on_message(message.topic, payload)
 
-    def publish(self, topic: str, message: str, qos: int = 1):
+    def publish(self, topic: str, message: 'str|dict', qos: int = 1):
         """Publishes a message to a MQTT topic.
+
+        If the message is a dictionary, 
         
         Args:
             topic (str): The MQTT topic
-            message (str): The message to publish
+            message (str|dict): The message to publish
             qos (int): The MQTT Quality of Service (0, 1 or 2)
 
         """
         if not isinstance(message, str):
-            message = json_dumpstr(message)
+            message = json.dumps(message, skipkeys=True)
         if not isinstance(qos, int) or qos not in range(0, 3):
             self._log.warning(f'Invalid MQTT QoS {qos} - using QoS 1')
             qos = 1

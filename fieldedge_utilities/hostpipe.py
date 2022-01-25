@@ -5,7 +5,8 @@ from datetime import datetime
 from logging import DEBUG, Logger
 from time import sleep, time
 
-TIMESTAMP_FMT = 'YYYY-mm-ddTHH:MM:SSZ'
+TIMESTAMP_FMT = 'YYYY-mm-ddTHH:MM:SS.SSSZ'
+# TIMESTAMP_FMT = os.getenv('HOSTPIPE_TIMESTAMP_FMT', 'YYYY-mm-ddTHH:MM:SS.SSSZ')
 COMMAND_PREFIX = f'{TIMESTAMP_FMT},[INFO],command='
 RESPONSE_PREFIX = f'{TIMESTAMP_FMT},[INFO],result='
 
@@ -43,10 +44,11 @@ def host_command(command: str,
 
     """
     command = _apply_preamble(command)
+    command_time = time()
     if not test_mode:
         if isinstance(log, Logger):
             log.debug(f'Sending {command} to hostpipe via shell')
-        subprocess.run(f'echo \'{command}\' > ./hostpipe/pipe', shell=True)
+        subprocess.run(f'echo \"{command}\" > ./hostpipe/pipe', shell=True)
     elif isinstance(log, Logger):
         log.info(f'test_mode received command: {command}')
     if noresponse:
@@ -55,8 +57,13 @@ def host_command(command: str,
         pipelog = './logs/hostpipe.log'
     if not os.path.isfile(pipelog):
         raise FileNotFoundError(f'Could not find file {pipelog}')
-    response_str = host_get_response(command, pipelog=pipelog, timeout=timeout,
-        log=log, test_mode=test_mode).strip()
+    response_str = host_get_response(command,
+                                     command_time=command_time,
+                                     pipelog=pipelog,
+                                     timeout=timeout,
+                                     log=log,
+                                     test_mode=test_mode,
+                                     ).strip()
     deleted_count = _maintain_pipelog(pipelog)
     if isinstance(log, Logger) and deleted_count > 0:
         log.info(f'Removed {deleted_count} oldest lines from {pipelog}')
@@ -80,7 +87,14 @@ def _apply_preamble(command: str) -> str:
     return command
 
 
+def _get_line_ts(line: str) -> float:
+    iso_time = line[:len(TIMESTAMP_FMT)]
+    utc_dt = datetime.strptime(iso_time, '%Y-%m-%dT%H:%M:%S.%fZ')
+    return (utc_dt - datetime(1970, 1, 1)).total_seconds()
+
+
 def host_get_response(command: str,
+                      command_time: float = None,
                       pipelog: str = None,
                       timeout: float = DEFAULT_TIMEOUT,
                       log: Logger = None,
@@ -122,10 +136,18 @@ def host_get_response(command: str,
             log.debug(f'{pipelog} read iteration {filepass}')
         lines = open(pipelog, 'r').readlines()
         for line in reversed(lines):
+            if (not test_mode and
+                command_time is not None and
+                _get_line_ts(line) < command_time):
+                # older command, skip this pass
+                sleep(0.1)
+                break
             if ',command=' in line:
                 logged_command = line.split(',command=')[1].strip()
                 if isinstance(log, Logger):
-                    log.debug(f'Found command {logged_command} in {pipelog}')
+                    log.debug(f'Found command {logged_command} in {pipelog}'
+                        f'({line[:len(TIMESTAMP_FMT)]})'
+                        f' with {len(response)} response lines')
                 if logged_command != command:
                     # wrong command/response so dump parsed lines so far
                     cts = line[:len(TIMESTAMP_FMT)]

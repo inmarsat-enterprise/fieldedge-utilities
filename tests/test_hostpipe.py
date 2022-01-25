@@ -1,8 +1,11 @@
 import os
 from datetime import datetime
 from logging import Logger
+
+import pytest
 from fieldedge_utilities import hostpipe
-from fieldedge_utilities.hostpipe import TIMESTAMP_FMT, COMMAND_PREFIX, RESPONSE_PREFIX
+from fieldedge_utilities.hostpipe import (COMMAND_PREFIX, RESPONSE_PREFIX,
+                                          TIMESTAMP_FMT)
 
 LOGDIR = './tests/hostpipe_logs'
 
@@ -129,8 +132,8 @@ def test_host_command_manual_tshark():
     res = hostpipe.host_get_response(command, pipelog=pipelog, test_mode=True)
     assert 'completed wireshark' in res.lower()
 
-def test_host_command_tshark_corrupt():
-    pass
+# def test_host_command_tshark_corrupt():
+#     pass
 
 def test_host_command_shutdown():
     command = 'sudo shutdown -P 1'
@@ -181,7 +184,8 @@ def test__maintain_pipelog():
     assert lines_deleted == 14
 
 def test_tooclose():
-    command = 'grep -nr \"cache-size=\" /etc/dnsmasq.conf'
-    pipelog = f'{LOGDIR}/hostpipe-test-dns-tooclose.log'
-    res = hostpipe.host_command(command, pipelog=pipelog, test_mode=True)
-    assert int(res.split('=')[1].strip()) == 0
+    with pytest.raises(Exception):
+        command = 'grep -nr \"cache-size=\" /etc/dnsmasq.conf'
+        pipelog = f'{LOGDIR}/hostpipe-test-dns-tooclose.log'
+        res = hostpipe.host_command(command, pipelog=pipelog, test_mode=True)
+        cache_size = int(res.split('=')[1].strip())

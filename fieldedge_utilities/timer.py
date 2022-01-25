@@ -35,8 +35,8 @@ class RepeatingTimer(threading.Thread):
                  max_drift: int = None,
                  auto_start: bool = False,
                  defer: bool = True,
-                 debug: bool = False,
                  daemon: bool = True,
+                 verbose_debug: bool = False,
                  ):
         """Sets up a RepeatingTimer thread.
 
@@ -44,14 +44,16 @@ class RepeatingTimer(threading.Thread):
             seconds: Interval for timer repeat.
             target: The function to execute each timer expiry.
             args: Positional arguments required by the target.
+            kwargs: Optional keyword arguments to pass into the target.
             name: Optional thread name.
             logger: Optional external logger to use.
+            log_level: The logging level to use if no logger is specified.
             sleep_chunk: Tick seconds between expiry checks.
             max_drift: Number of seconds clock drift to tolerate.
             auto_start: Starts the thread and timer when created.
             defer: Set if first target waits for timer expiry.
+            daemon: Set if thread is a daemon (default)
             verbose_debug: verbose logging of tick count
-            kwargs: Optional keyword arguments to pass into the target.
 
         Raises:
             ValueError if seconds is not an integer.
@@ -73,7 +75,7 @@ class RepeatingTimer(threading.Thread):
         self.kwargs = kwargs
         self.sleep_chunk = sleep_chunk
         self._defer = defer
-        self._debug = debug
+        self._debug = verbose_debug
         self._terminate_event = threading.Event()
         self._start_event = threading.Event()
         self._reset_event = threading.Event()
@@ -85,7 +87,7 @@ class RepeatingTimer(threading.Thread):
             self.start_timer()
 
     @property
-    def sleep_chunk(self):
+    def sleep_chunk(self) -> float:
         return self._sleep_chunk
 
     @sleep_chunk.setter
@@ -93,6 +95,10 @@ class RepeatingTimer(threading.Thread):
         if 1 % value != 0:
             raise ValueError('1 must be a multiple of sleep_chunk')
         self._sleep_chunk = value
+
+    @property
+    def is_running(self) -> bool:
+        return self._start_event.is_set()
 
     def _resync(self, max_drift: int = None) -> int:
         """Used to adjust the next countdown to account for drift.

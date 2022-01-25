@@ -63,8 +63,8 @@ class RepeatingTimer(threading.Thread):
                  max_drift: int = None,
                  auto_start: bool = False,
                  defer: bool = True,
-                 debug: bool = False,
                  daemon: bool = True,
+                 verbose_debug: bool = False,
                  ):
         &#34;&#34;&#34;Sets up a RepeatingTimer thread.
 
@@ -72,14 +72,16 @@ class RepeatingTimer(threading.Thread):
             seconds: Interval for timer repeat.
             target: The function to execute each timer expiry.
             args: Positional arguments required by the target.
+            kwargs: Optional keyword arguments to pass into the target.
             name: Optional thread name.
             logger: Optional external logger to use.
+            log_level: The logging level to use if no logger is specified.
             sleep_chunk: Tick seconds between expiry checks.
             max_drift: Number of seconds clock drift to tolerate.
             auto_start: Starts the thread and timer when created.
             defer: Set if first target waits for timer expiry.
+            daemon: Set if thread is a daemon (default)
             verbose_debug: verbose logging of tick count
-            kwargs: Optional keyword arguments to pass into the target.
 
         Raises:
             ValueError if seconds is not an integer.
@@ -101,7 +103,7 @@ class RepeatingTimer(threading.Thread):
         self.kwargs = kwargs
         self.sleep_chunk = sleep_chunk
         self._defer = defer
-        self._debug = debug
+        self._debug = verbose_debug
         self._terminate_event = threading.Event()
         self._start_event = threading.Event()
         self._reset_event = threading.Event()
@@ -113,7 +115,7 @@ class RepeatingTimer(threading.Thread):
             self.start_timer()
 
     @property
-    def sleep_chunk(self):
+    def sleep_chunk(self) -&gt; float:
         return self._sleep_chunk
 
     @sleep_chunk.setter
@@ -121,6 +123,10 @@ class RepeatingTimer(threading.Thread):
         if 1 % value != 0:
             raise ValueError(&#39;1 must be a multiple of sleep_chunk&#39;)
         self._sleep_chunk = value
+
+    @property
+    def is_running(self) -&gt; bool:
+        return self._start_event.is_set()
 
     def _resync(self, max_drift: int = None) -&gt; int:
         &#34;&#34;&#34;Used to adjust the next countdown to account for drift.
@@ -247,7 +253,7 @@ class RepeatingTimer(threading.Thread):
 <dl>
 <dt id="fieldedge_utilities.timer.RepeatingTimer"><code class="flex name class">
 <span>class <span class="ident">RepeatingTimer</span></span>
-<span>(</span><span>seconds: int, target: Callable, args: Tuple[] = (), kwargs: dict = {}, name: str = None, logger: logging.Logger = None, log_level: int = 20, sleep_chunk: float = 0.25, max_drift: int = None, auto_start: bool = False, defer: bool = True, debug: bool = False, daemon: bool = True)</span>
+<span>(</span><span>seconds: int, target: Callable, args: Tuple[] = (), kwargs: dict = {}, name: str = None, logger: logging.Logger = None, log_level: int = 20, sleep_chunk: float = 0.25, max_drift: int = None, auto_start: bool = False, defer: bool = True, daemon: bool = True, verbose_debug: bool = False)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>A repeating thread to call a function, can be stopped/restarted/changed.</p>
@@ -276,10 +282,14 @@ the user doesn't need to explicitly start() then start_timer().</p>
 <dd>The function to execute each timer expiry.</dd>
 <dt><strong><code>args</code></strong></dt>
 <dd>Positional arguments required by the target.</dd>
+<dt><strong><code>kwargs</code></strong></dt>
+<dd>Optional keyword arguments to pass into the target.</dd>
 <dt><strong><code>name</code></strong></dt>
 <dd>Optional thread name.</dd>
 <dt><strong><code>logger</code></strong></dt>
 <dd>Optional external logger to use.</dd>
+<dt><strong><code>log_level</code></strong></dt>
+<dd>The logging level to use if no logger is specified.</dd>
 <dt><strong><code>sleep_chunk</code></strong></dt>
 <dd>Tick seconds between expiry checks.</dd>
 <dt><strong><code>max_drift</code></strong></dt>
@@ -288,10 +298,10 @@ the user doesn't need to explicitly start() then start_timer().</p>
 <dd>Starts the thread and timer when created.</dd>
 <dt><strong><code>defer</code></strong></dt>
 <dd>Set if first target waits for timer expiry.</dd>
+<dt><strong><code>daemon</code></strong></dt>
+<dd>Set if thread is a daemon (default)</dd>
 <dt><strong><code>verbose_debug</code></strong></dt>
 <dd>verbose logging of tick count</dd>
-<dt><strong><code>kwargs</code></strong></dt>
-<dd>Optional keyword arguments to pass into the target.</dd>
 </dl>
 <h2 id="raises">Raises</h2>
 <p>ValueError if seconds is not an integer.</p></div>
@@ -328,8 +338,8 @@ the user doesn't need to explicitly start() then start_timer().</p>
                  max_drift: int = None,
                  auto_start: bool = False,
                  defer: bool = True,
-                 debug: bool = False,
                  daemon: bool = True,
+                 verbose_debug: bool = False,
                  ):
         &#34;&#34;&#34;Sets up a RepeatingTimer thread.
 
@@ -337,14 +347,16 @@ the user doesn't need to explicitly start() then start_timer().</p>
             seconds: Interval for timer repeat.
             target: The function to execute each timer expiry.
             args: Positional arguments required by the target.
+            kwargs: Optional keyword arguments to pass into the target.
             name: Optional thread name.
             logger: Optional external logger to use.
+            log_level: The logging level to use if no logger is specified.
             sleep_chunk: Tick seconds between expiry checks.
             max_drift: Number of seconds clock drift to tolerate.
             auto_start: Starts the thread and timer when created.
             defer: Set if first target waits for timer expiry.
+            daemon: Set if thread is a daemon (default)
             verbose_debug: verbose logging of tick count
-            kwargs: Optional keyword arguments to pass into the target.
 
         Raises:
             ValueError if seconds is not an integer.
@@ -366,7 +378,7 @@ the user doesn't need to explicitly start() then start_timer().</p>
         self.kwargs = kwargs
         self.sleep_chunk = sleep_chunk
         self._defer = defer
-        self._debug = debug
+        self._debug = verbose_debug
         self._terminate_event = threading.Event()
         self._start_event = threading.Event()
         self._reset_event = threading.Event()
@@ -378,7 +390,7 @@ the user doesn't need to explicitly start() then start_timer().</p>
             self.start_timer()
 
     @property
-    def sleep_chunk(self):
+    def sleep_chunk(self) -&gt; float:
         return self._sleep_chunk
 
     @sleep_chunk.setter
@@ -386,6 +398,10 @@ the user doesn't need to explicitly start() then start_timer().</p>
         if 1 % value != 0:
             raise ValueError(&#39;1 must be a multiple of sleep_chunk&#39;)
         self._sleep_chunk = value
+
+    @property
+    def is_running(self) -&gt; bool:
+        return self._start_event.is_set()
 
     def _resync(self, max_drift: int = None) -&gt; int:
         &#34;&#34;&#34;Used to adjust the next countdown to account for drift.
@@ -506,7 +522,7 @@ the user doesn't need to explicitly start() then start_timer().</p>
 </ul>
 <h3>Instance variables</h3>
 <dl>
-<dt id="fieldedge_utilities.timer.RepeatingTimer.sleep_chunk"><code class="name">var <span class="ident">sleep_chunk</span></code></dt>
+<dt id="fieldedge_utilities.timer.RepeatingTimer.is_running"><code class="name">var <span class="ident">is_running</span> : bool</code></dt>
 <dd>
 <div class="desc"></div>
 <details class="source">
@@ -514,7 +530,19 @@ the user doesn't need to explicitly start() then start_timer().</p>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@property
-def sleep_chunk(self):
+def is_running(self) -&gt; bool:
+    return self._start_event.is_set()</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.timer.RepeatingTimer.sleep_chunk"><code class="name">var <span class="ident">sleep_chunk</span> : float</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def sleep_chunk(self) -&gt; float:
     return self._sleep_chunk</code></pre>
 </details>
 </dd>
@@ -736,6 +764,7 @@ exception.</p></div>
 <h4><code><a title="fieldedge_utilities.timer.RepeatingTimer" href="#fieldedge_utilities.timer.RepeatingTimer">RepeatingTimer</a></code></h4>
 <ul class="two-column">
 <li><code><a title="fieldedge_utilities.timer.RepeatingTimer.change_interval" href="#fieldedge_utilities.timer.RepeatingTimer.change_interval">change_interval</a></code></li>
+<li><code><a title="fieldedge_utilities.timer.RepeatingTimer.is_running" href="#fieldedge_utilities.timer.RepeatingTimer.is_running">is_running</a></code></li>
 <li><code><a title="fieldedge_utilities.timer.RepeatingTimer.join" href="#fieldedge_utilities.timer.RepeatingTimer.join">join</a></code></li>
 <li><code><a title="fieldedge_utilities.timer.RepeatingTimer.restart_timer" href="#fieldedge_utilities.timer.RepeatingTimer.restart_timer">restart_timer</a></code></li>
 <li><code><a title="fieldedge_utilities.timer.RepeatingTimer.run" href="#fieldedge_utilities.timer.RepeatingTimer.run">run</a></code></li>

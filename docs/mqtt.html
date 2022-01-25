@@ -52,11 +52,9 @@ Typically the `fieldedge-broker` will be a **Mosquitto** service running locally
 in a **Docker** container listening on port 1883 for authenticated connections.
 
 &#34;&#34;&#34;
+import json
 import os
 from atexit import register as on_exit
-from json import JSONDecodeError
-from json import dumps as json_dumpstr
-from json import loads as json_loadstr
 from logging import DEBUG, Logger
 from socket import timeout   #: for Python &lt; 3.10 compatibility vs TimeoutError
 from threading import enumerate as enumerate_threads
@@ -335,8 +333,8 @@ class MqttClient:
     def _mqtt_on_message(self, client, userdata, message):
         payload = message.payload.decode()
         try:
-            payload = json_loadstr(payload)
-        except JSONDecodeError as e:
+            payload = json.loads(payload)
+        except json.JSONDecodeError as e:
             self._log.debug(f&#39;MQTT message payload non-JSON ({e})&#39;)
         self._log.debug(f&#39;MQTT received message &#34;{payload}&#34;&#39;
             f&#39;on topic &#34;{message.topic}&#34; with QoS {message.qos}&#39;)
@@ -344,17 +342,19 @@ class MqttClient:
             self._log.debug(f&#39;MQTT client userdata: {userdata}&#39;)
         self.on_message(message.topic, payload)
 
-    def publish(self, topic: str, message: str, qos: int = 1):
+    def publish(self, topic: str, message: &#39;str|dict&#39;, qos: int = 1):
         &#34;&#34;&#34;Publishes a message to a MQTT topic.
+
+        If the message is a dictionary, 
         
         Args:
             topic (str): The MQTT topic
-            message (str): The message to publish
+            message (str|dict): The message to publish
             qos (int): The MQTT Quality of Service (0, 1 or 2)
 
         &#34;&#34;&#34;
         if not isinstance(message, str):
-            message = json_dumpstr(message)
+            message = json.dumps(message, skipkeys=True)
         if not isinstance(qos, int) or qos not in range(0, 3):
             self._log.warning(f&#39;Invalid MQTT QoS {qos} - using QoS 1&#39;)
             qos = 1
@@ -666,8 +666,8 @@ attempts.</dd>
     def _mqtt_on_message(self, client, userdata, message):
         payload = message.payload.decode()
         try:
-            payload = json_loadstr(payload)
-        except JSONDecodeError as e:
+            payload = json.loads(payload)
+        except json.JSONDecodeError as e:
             self._log.debug(f&#39;MQTT message payload non-JSON ({e})&#39;)
         self._log.debug(f&#39;MQTT received message &#34;{payload}&#34;&#39;
             f&#39;on topic &#34;{message.topic}&#34; with QoS {message.qos}&#39;)
@@ -675,17 +675,19 @@ attempts.</dd>
             self._log.debug(f&#39;MQTT client userdata: {userdata}&#39;)
         self.on_message(message.topic, payload)
 
-    def publish(self, topic: str, message: str, qos: int = 1):
+    def publish(self, topic: str, message: &#39;str|dict&#39;, qos: int = 1):
         &#34;&#34;&#34;Publishes a message to a MQTT topic.
+
+        If the message is a dictionary, 
         
         Args:
             topic (str): The MQTT topic
-            message (str): The message to publish
+            message (str|dict): The message to publish
             qos (int): The MQTT Quality of Service (0, 1 or 2)
 
         &#34;&#34;&#34;
         if not isinstance(message, str):
-            message = json_dumpstr(message)
+            message = json.dumps(message, skipkeys=True)
         if not isinstance(qos, int) or qos not in range(0, 3):
             self._log.warning(f&#39;Invalid MQTT QoS {qos} - using QoS 1&#39;)
             qos = 1
@@ -806,16 +808,16 @@ def subscriptions(self) -&gt; dict:
 </details>
 </dd>
 <dt id="fieldedge_utilities.mqtt.MqttClient.publish"><code class="name flex">
-<span>def <span class="ident">publish</span></span>(<span>self, topic: str, message: str, qos: int = 1)</span>
+<span>def <span class="ident">publish</span></span>(<span>self, topic: str, message: str|dict, qos: int = 1)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Publishes a message to a MQTT topic.</p>
+<p>If the message is a dictionary, </p>
 <h2 id="args">Args</h2>
 <dl>
 <dt><strong><code>topic</code></strong> :&ensp;<code>str</code></dt>
 <dd>The MQTT topic</dd>
-<dt><strong><code>message</code></strong> :&ensp;<code>str</code></dt>
-<dd>The message to publish</dd>
+<dt>message (str|dict): The message to publish</dt>
 <dt><strong><code>qos</code></strong> :&ensp;<code>int</code></dt>
 <dd>The MQTT Quality of Service (0, 1 or 2)</dd>
 </dl></div>
@@ -823,17 +825,19 @@ def subscriptions(self) -&gt; dict:
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def publish(self, topic: str, message: str, qos: int = 1):
+<pre><code class="python">def publish(self, topic: str, message: &#39;str|dict&#39;, qos: int = 1):
     &#34;&#34;&#34;Publishes a message to a MQTT topic.
+
+    If the message is a dictionary, 
     
     Args:
         topic (str): The MQTT topic
-        message (str): The message to publish
+        message (str|dict): The message to publish
         qos (int): The MQTT Quality of Service (0, 1 or 2)
 
     &#34;&#34;&#34;
     if not isinstance(message, str):
-        message = json_dumpstr(message)
+        message = json.dumps(message, skipkeys=True)
     if not isinstance(qos, int) or qos not in range(0, 3):
         self._log.warning(f&#39;Invalid MQTT QoS {qos} - using QoS 1&#39;)
         qos = 1

@@ -18,7 +18,7 @@ def test_stdout(capsys):
     assert len(datetime) == 24
     assert level == '[INFO]'
     assert thread == '(MainThread)'
-    assert 'test_log.test_stdout:' in module_function_line
+    assert 'test_logger.test_stdout:' in module_function_line
     assert message == TEST_STR + '\n'
 
 
@@ -31,7 +31,7 @@ def test_stdout_json(capsys):
     assert len(json_dict['datetime']) == 24
     assert json_dict['level'] == 'INFO'
     assert json_dict['thread'] == 'MainThread'
-    assert json_dict['module'] == 'test_log'
+    assert json_dict['module'] == 'test_logger'
     assert json_dict['function'] == 'test_stdout_json'
     assert isinstance(json_dict['line'], int)
     assert json_dict['message'] == TEST_STR
@@ -68,6 +68,6 @@ def test_exception_singleline(capsys):
 
 
 def test_invalid_file_path(capsys):
-    with pytest.raises(FileNotFoundError, match='Invalid logfile path'):
+    with pytest.raises(ValueError, match='Directory /bad/path not found'):
         log = logger.get_wrapping_logger(name='test',
                                          filename='/bad/path/test.log')

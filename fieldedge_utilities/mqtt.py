@@ -142,7 +142,7 @@ class MqttClient:
                 id = id.split('_')[0]
         except (ValueError, IndexError):
             pass   #: new id will be made unique
-        self._client_id = '{}_{}'.format(id, str(int(time())))
+        self._client_id = f'{id}_{int(time())}'
 
     @property
     def subscriptions(self) -> dict:
@@ -162,7 +162,7 @@ class MqttClient:
     def _cleanup(self, *args):
         # TODO: logging raises an error since the log file was closed
         # for arg in args:
-        #     self._log.debug('mqtt cleanup called with arg = {}'.format(arg))
+        #     self._log.debug(f'mqtt cleanup called with arg = {arg}')
         # self._log.debug('Terminating MQTT connection')
         self._mqtt.user_data_set('terminate')
         self._mqtt.loop_stop()
@@ -171,8 +171,8 @@ class MqttClient:
     def connect(self):
         """Attempts to establish a connection to the broker and re-subscribe."""
         try:
-            self._log.debug('Attempting MQTT broker connection to {} as {}'
-                .format(self._host, self._client_id))
+            self._log.debug('Attempting MQTT broker connection'
+                            f' to {self._host} as {self._client_id}')
             self._mqtt.reinitialise(client_id=self.client_id)
             self._mqtt.user_data_set(None)
             self._mqtt.on_connect = self._mqtt_on_connect
@@ -210,10 +210,8 @@ class MqttClient:
 
     def _mqtt_on_connect(self, client, userdata, flags, rc):
         self._failed_connect_attempts = 0
-        self._log.debug('MQTT broker connection result code: {} ({})'
-            .format(rc, _get_mqtt_result(rc)))
         if rc == 0:
-            self._log.info('MQTT connection to {}'.format(self._host))
+            self._log.debug(f'Established MQTT connection to {self._host}')
             if not self.is_connected:
                 for sub in self.subscriptions:
                     self._mqtt_subscribe(sub, self.subscriptions[sub]['qos'])
@@ -221,23 +219,22 @@ class MqttClient:
             if self.on_connect:
                 self.on_connect(client, userdata, flags, rc)
         else:
-            self._log.error('MQTT connection result code {}'.format(rc))
+            self._log.error(f'MQTT broker connection result code: {rc}'
+                            f' ({_get_mqtt_result(rc)})')
     
     def _mqtt_subscribe(self, topic: str, qos: int = 0):
-        self._log.debug('{} subscribing to {}'.format(self._client_id, topic))
+        self._log.debug(f'{self._client_id} subscribing to {topic} (qos={qos})')
         (result, mid) = self._mqtt.subscribe(topic=topic, qos=2)
         if result == MQTT_ERR_SUCCESS:
             self._subscriptions[topic]['mid'] = mid
         else:
-            self._log.error('MQTT Error {} subscribing to {}'.format(
-                result, topic))
+            self._log.error(f'MQTT Error {result} subscribing to {topic}')
 
     def _mqtt_unsubscribe(self, topic: str):
-        self._log.debug('{} unsubscribing to {}'.format(self._client_id, topic))
+        self._log.debug(f'{self._client_id} unsubscribing to {topic}')
         (result, mid) = self._mqtt.unsubscribe(topic)
         if result != MQTT_ERR_SUCCESS:
-            self._log.error('MQTT Error {} unsubscribing to {}'.format(
-                result, topic))
+            self._log.error(f'MQTT Error {result} unsubscribing to {topic}')
 
     def subscribe(self, topic: str, qos: int = 0) -> None:
         """Adds a subscription.
@@ -249,7 +246,7 @@ class MqttClient:
             qos (int): The MQTT qos 0..2
 
         """
-        self._log.debug('Adding subscription {} qos={}'.format(topic, qos))
+        self._log.debug(f'Adding subscription {topic} (qos={qos})')
         self._subscriptions[topic] = {'qos': qos, 'mid': 0}
         if self.is_connected:
             self._mqtt_subscribe(topic, qos)
@@ -263,7 +260,7 @@ class MqttClient:
             topic (str): The MQTT topic to unsubscribe
 
         """
-        self._log.debug('Removing subscription {}'.format(topic))
+        self._log.debug(f'Removing subscription {topic}')
         if topic in self._subscriptions:
             del self._subscriptions[topic]
         if self.is_connected:
@@ -273,8 +270,8 @@ class MqttClient:
         if self.on_disconnect:
             self.on_disconnect(client, userdata, rc)
         if userdata != 'terminate':
-            self._log.warning('MQTT broker disconnected: result code {} ({})'
-                .format(rc, _get_mqtt_result(rc)))
+            self._log.warning('MQTT broker disconnected'
+                              f' - result code {rc} ({_get_mqtt_result(rc)})')
             self._mqtt.loop_stop()
             # get new unique ID to avoid bouncing connection
             self.client_id = self.client_id
@@ -283,13 +280,14 @@ class MqttClient:
                 self.connect()
 
     def _mqtt_on_subscribe(self, client, userdata, mid, granted_qos):
-        self._log.debug('MQTT subscription message id: {}'.format(mid))
+        self._log.debug(f'MQTT subscription message id: {mid}')
         for sub in self.subscriptions:
             if mid != self.subscriptions[sub]['mid']:
-                self._log.error('Subscription failed message id={} expected {}'
-                    .format(mid, self.subscriptions[sub]['mid']))
+                self._log.error('Subscription failed'
+                                f' message id={mid}'
+                                f' expected {self.subscriptions[sub]["mid"]}')
             else:
-                self._log.info('Subscription to {} successful'.format(sub))
+                self._log.info(f'Subscription to {sub} successful')
 
     def _mqtt_on_message(self, client, userdata, message):
         payload = message.payload.decode()
@@ -319,9 +317,10 @@ class MqttClient:
         if not isinstance(qos, int) or qos not in range(0, 3):
             self._log.warning(f'Invalid MQTT QoS {qos} - using QoS 1')
             qos = 1
-        self._log.debug('MQTT publishing: {}: {}'.format(topic, message))
+        self._log.debug(f'MQTT publishing: {topic}: {message}')
         (rc, mid) = self._mqtt.publish(topic=topic, payload=message, qos=qos)
         del mid
         if rc != MQTT_ERR_SUCCESS:
-            self._log.error('Publishing error {}'.format(rc))
-            # raise MqttError('Publishing error {}'.format(rc))
+            errmsg = f'Publishing error {rc} ({_get_mqtt_result(rc)})'
+            self._log.error(errmsg)
+            # raise MqttError(errmsg)

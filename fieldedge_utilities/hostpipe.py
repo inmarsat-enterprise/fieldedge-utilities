@@ -99,7 +99,9 @@ def _escaped_command(command: str) -> str:
 
 
 def _get_line_ts(line: str) -> float:
-    iso_time = line[:len(TIMESTAMP_FMT)]
+    iso_time = line.split(',')[0]
+    if '.' not in iso_time:
+        iso_time = iso_time.replace('Z', '.000Z')
     utc_dt = datetime.strptime(iso_time, '%Y-%m-%dT%H:%M:%S.%fZ')
     return (utc_dt - datetime(1970, 1, 1)).total_seconds()
 
@@ -157,14 +159,14 @@ def host_get_response(command: str,
                 logged_command = line.split(',command=')[1].strip()
                 if isinstance(log, Logger):
                     log.debug(f'Found command {logged_command} in {pipelog}'
-                        f'({line[:len(TIMESTAMP_FMT)]})'
+                        f'({_get_line_ts(line)})'
                         f' with {len(response)} response lines')
                 if logged_command != command:
                     # wrong command/response so dump parsed lines so far
-                    cts = line[:len(TIMESTAMP_FMT)]
+                    cts = _get_line_ts(line)
                     to_remove = []
                     for resline in response:
-                        rts = resline[:len(TIMESTAMP_FMT)]
+                        rts = _get_line_ts(resline)
                         if rts == cts:
                             to_remove.append(resline)
                     if isinstance(log, Logger):

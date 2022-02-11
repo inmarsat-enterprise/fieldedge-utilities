@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
 <meta name="generator" content="pdoc 0.10.0" />
 <title>fieldedge_utilities.hostpipe API documentation</title>
-<meta name="description" content="Operations for interacting with the hostpipe service." />
+<meta name="description" content="Operations for interacting with the hostpipe service …" />
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
 <link rel="stylesheet preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/github.min.css" crossorigin>
@@ -23,19 +23,34 @@
 </header>
 <section id="section-intro">
 <p>Operations for interacting with the hostpipe service.</p>
+<p>References environment variables:</p>
+<ul>
+<li><code>HOST_USER</code> (default: fieldedge)</li>
+<li><code>TIMESTAMP_FMT</code> str (default: YYYY-mm-ddTHH:MM:SS.NNNZ)</li>
+<li><code>DEFAULT_TIMEOUT</code> float (default: 0.25)</li>
+<li><code>MAX_FILE_SIZE</code> int MegaBytes (default 2)</li>
+</ul>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">&#34;&#34;&#34;Operations for interacting with the hostpipe service.&#34;&#34;&#34;
+<pre><code class="python">&#34;&#34;&#34;Operations for interacting with the hostpipe service.
+
+References environment variables:
+
+* `HOST_USER` (default: fieldedge)
+* `TIMESTAMP_FMT` str (default: YYYY-mm-ddTHH:MM:SS.NNNZ)
+* `DEFAULT_TIMEOUT` float (default: 0.25)
+* `MAX_FILE_SIZE` int MegaBytes (default 2)
+&#34;&#34;&#34;
 import os
 import subprocess
 from datetime import datetime
 from logging import DEBUG, Logger
 from time import sleep, time
 
-TIMESTAMP_FMT = &#39;YYYY-mm-ddTHH:MM:SS.SSSZ&#39;
-# TIMESTAMP_FMT = os.getenv(&#39;HOSTPIPE_TIMESTAMP_FMT&#39;, &#39;YYYY-mm-ddTHH:MM:SS.SSSZ&#39;)
+HOST_USER = os.getenv(&#39;HOST_USER&#39;, &#39;fieldedge&#39;)
+TIMESTAMP_FMT = os.getenv(&#39;HOSTPIPE_TS_FMT&#39;, &#39;YYYY-mm-ddTHH:MM:SS.SSSZ&#39;)
 COMMAND_PREFIX = f&#39;{TIMESTAMP_FMT},[INFO],command=&#39;
 RESPONSE_PREFIX = f&#39;{TIMESTAMP_FMT},[INFO],result=&#39;
 
@@ -110,10 +125,11 @@ def host_command(command: str,
 
 def _apply_preamble(command: str) -&gt; str:
     if &#39;$HOME&#39; in command:
-        preamble = &#39;sudo runuser -u pi -- &#39;
+        replacement = f&#39;/home/{HOST_USER}&#39;
+        preamble = f&#39;sudo runuser -u {HOST_USER} -- &#39;
         if preamble in command:
             preamble = &#39;&#39;
-        command = f&#39;{preamble}{command.replace(&#34;$HOME&#34;, &#34;/home/pi&#34;)}&#39;
+        command = f&#39;{preamble}{command.replace(&#34;$HOME&#34;, replacement)}&#39;
     return command
 
 
@@ -128,7 +144,9 @@ def _escaped_command(command: str) -&gt; str:
 
 
 def _get_line_ts(line: str) -&gt; float:
-    iso_time = line[:len(TIMESTAMP_FMT)]
+    iso_time = line.split(&#39;,&#39;)[0]
+    if &#39;.&#39; not in iso_time:
+        iso_time = iso_time.replace(&#39;Z&#39;, &#39;.000Z&#39;)
     utc_dt = datetime.strptime(iso_time, &#39;%Y-%m-%dT%H:%M:%S.%fZ&#39;)
     return (utc_dt - datetime(1970, 1, 1)).total_seconds()
 
@@ -186,14 +204,14 @@ def host_get_response(command: str,
                 logged_command = line.split(&#39;,command=&#39;)[1].strip()
                 if isinstance(log, Logger):
                     log.debug(f&#39;Found command {logged_command} in {pipelog}&#39;
-                        f&#39;({line[:len(TIMESTAMP_FMT)]})&#39;
+                        f&#39;({_get_line_ts(line)})&#39;
                         f&#39; with {len(response)} response lines&#39;)
                 if logged_command != command:
                     # wrong command/response so dump parsed lines so far
-                    cts = line[:len(TIMESTAMP_FMT)]
+                    cts = _get_line_ts(line)
                     to_remove = []
                     for resline in response:
-                        rts = resline[:len(TIMESTAMP_FMT)]
+                        rts = _get_line_ts(resline)
                         if rts == cts:
                             to_remove.append(resline)
                     if isinstance(log, Logger):
@@ -429,14 +447,14 @@ and the calling function must handle an empty string response.</p>
                 logged_command = line.split(&#39;,command=&#39;)[1].strip()
                 if isinstance(log, Logger):
                     log.debug(f&#39;Found command {logged_command} in {pipelog}&#39;
-                        f&#39;({line[:len(TIMESTAMP_FMT)]})&#39;
+                        f&#39;({_get_line_ts(line)})&#39;
                         f&#39; with {len(response)} response lines&#39;)
                 if logged_command != command:
                     # wrong command/response so dump parsed lines so far
-                    cts = line[:len(TIMESTAMP_FMT)]
+                    cts = _get_line_ts(line)
                     to_remove = []
                     for resline in response:
-                        rts = resline[:len(TIMESTAMP_FMT)]
+                        rts = _get_line_ts(resline)
                         if rts == cts:
                             to_remove.append(resline)
                     if isinstance(log, Logger):

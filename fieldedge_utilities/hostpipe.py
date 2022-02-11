@@ -1,12 +1,20 @@
-"""Operations for interacting with the hostpipe service."""
+"""Operations for interacting with the hostpipe service.
+
+References environment variables:
+
+* `HOST_USER` (default: fieldedge)
+* `TIMESTAMP_FMT` str (default: YYYY-mm-ddTHH:MM:SS.NNNZ)
+* `DEFAULT_TIMEOUT` float (default: 0.25)
+* `MAX_FILE_SIZE` int MegaBytes (default 2)
+"""
 import os
 import subprocess
 from datetime import datetime
 from logging import DEBUG, Logger
 from time import sleep, time
 
-TIMESTAMP_FMT = 'YYYY-mm-ddTHH:MM:SS.SSSZ'
-# TIMESTAMP_FMT = os.getenv('HOSTPIPE_TIMESTAMP_FMT', 'YYYY-mm-ddTHH:MM:SS.SSSZ')
+HOST_USER = os.getenv('HOST_USER', 'fieldedge')
+TIMESTAMP_FMT = os.getenv('HOSTPIPE_TS_FMT', 'YYYY-mm-ddTHH:MM:SS.SSSZ')
 COMMAND_PREFIX = f'{TIMESTAMP_FMT},[INFO],command='
 RESPONSE_PREFIX = f'{TIMESTAMP_FMT},[INFO],result='
 
@@ -81,10 +89,11 @@ def host_command(command: str,
 
 def _apply_preamble(command: str) -> str:
     if '$HOME' in command:
-        preamble = 'sudo runuser -u pi -- '
+        replacement = f'/home/{HOST_USER}'
+        preamble = f'sudo runuser -u {HOST_USER} -- '
         if preamble in command:
             preamble = ''
-        command = f'{preamble}{command.replace("$HOME", "/home/pi")}'
+        command = f'{preamble}{command.replace("$HOME", replacement)}'
     return command
 
 

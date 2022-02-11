@@ -27,7 +27,7 @@
 for use with a local broker on an edge device e.g. Raspberry Pi.</p>
 <p>Reads broker configuration from a local <code>.env</code> file or environment variables:</p>
 <ul>
-<li><code>MQTT_HOST</code> the IP address or hostname of the broker (e.g. 127.0.0.1)</li>
+<li><code>MQTT_HOST</code> the IP address or hostname or container of the broker</li>
 <li><code>MQTT_USER</code> the authentication username for the broker</li>
 <li><code>MQTT_PASS</code> the authentication password for the broker</li>
 </ul>
@@ -44,7 +44,7 @@ for use with a local broker on an edge device e.g. Raspberry Pi.
 
 Reads broker configuration from a local `.env` file or environment variables:
 
-* `MQTT_HOST` the IP address or hostname of the broker (e.g. 127.0.0.1)
+* `MQTT_HOST` the IP address or hostname or container of the broker
 * `MQTT_USER` the authentication username for the broker
 * `MQTT_PASS` the authentication password for the broker
 
@@ -119,6 +119,7 @@ class MqttClient:
                  logger: Logger = None,
                  connect_retry_interval: int = 5,
                  auto_connect: bool = True,
+                 port: int = 1883,
                  ):
         &#34;&#34;&#34;Initializes a managed MQTT client.
         
@@ -136,6 +137,7 @@ class MqttClient:
             connect_retry_interval (int): Seconds between broker reconnect
                 attempts.
             auto_connect (bool): Automatically attempts to connect when created.
+            port (int): The MQTT port the broker is listening on.
 
         Raises:
             `MqttError` if the client_id is not valid.
@@ -144,6 +146,7 @@ class MqttClient:
         self._host = os.getenv(&#39;MQTT_HOST&#39;) or &#39;fieldedge-broker&#39;
         self._user = os.getenv(&#39;MQTT_USER&#39;) or None
         self._pass = os.getenv(&#39;MQTT_PASS&#39;) or None
+        self._port = port
         self._log = logger or get_wrapping_logger(name=&#39;mqtt_client&#39;)
         if not isinstance(client_id, str) or client_id == &#39;&#39;:
             self._log.error(&#39;Invalid client_id&#39;)
@@ -221,7 +224,7 @@ class MqttClient:
             if self._user and self._pass:
                 self._mqtt.username_pw_set(username=self._user,
                                            password=self._pass)
-            self._mqtt.connect(self._host)
+            self._mqtt.connect(self._host, port=self._port)
             threads_before = enumerate_threads()
             self._mqtt.loop_start()
             threads_after = enumerate_threads()
@@ -376,7 +379,7 @@ class MqttClient:
 <dl>
 <dt id="fieldedge_utilities.mqtt.MqttClient"><code class="flex name class">
 <span>class <span class="ident">MqttClient</span></span>
-<span>(</span><span>client_id: str, on_message: Callable[..., ForwardRef('tuple[str, object]')] = None, subscribe_default: Union[str, ForwardRef('list[str]')] = None, on_connect: Callable = None, on_disconnect: Callable = None, logger: logging.Logger = None, connect_retry_interval: int = 5, auto_connect: bool = True)</span>
+<span>(</span><span>client_id: str, on_message: Callable[..., ForwardRef('tuple[str, object]')] = None, subscribe_default: Union[str, ForwardRef('list[str]')] = None, on_connect: Callable = None, on_disconnect: Callable = None, logger: logging.Logger = None, connect_retry_interval: int = 5, auto_connect: bool = True, port: int = 1883)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>A customized MQTT client.</p>
@@ -421,6 +424,8 @@ from the broker.</dd>
 attempts.</dd>
 <dt><strong><code>auto_connect</code></strong> :&ensp;<code>bool</code></dt>
 <dd>Automatically attempts to connect when created.</dd>
+<dt><strong><code>port</code></strong> :&ensp;<code>int</code></dt>
+<dd>The MQTT port the broker is listening on.</dd>
 </dl>
 <h2 id="raises">Raises</h2>
 <p><code><a title="fieldedge_utilities.mqtt.MqttError" href="#fieldedge_utilities.mqtt.MqttError">MqttError</a></code> if the client_id is not valid.</p></div>
@@ -451,6 +456,7 @@ attempts.</dd>
                  logger: Logger = None,
                  connect_retry_interval: int = 5,
                  auto_connect: bool = True,
+                 port: int = 1883,
                  ):
         &#34;&#34;&#34;Initializes a managed MQTT client.
         
@@ -468,6 +474,7 @@ attempts.</dd>
             connect_retry_interval (int): Seconds between broker reconnect
                 attempts.
             auto_connect (bool): Automatically attempts to connect when created.
+            port (int): The MQTT port the broker is listening on.
 
         Raises:
             `MqttError` if the client_id is not valid.
@@ -476,6 +483,7 @@ attempts.</dd>
         self._host = os.getenv(&#39;MQTT_HOST&#39;) or &#39;fieldedge-broker&#39;
         self._user = os.getenv(&#39;MQTT_USER&#39;) or None
         self._pass = os.getenv(&#39;MQTT_PASS&#39;) or None
+        self._port = port
         self._log = logger or get_wrapping_logger(name=&#39;mqtt_client&#39;)
         if not isinstance(client_id, str) or client_id == &#39;&#39;:
             self._log.error(&#39;Invalid client_id&#39;)
@@ -553,7 +561,7 @@ attempts.</dd>
             if self._user and self._pass:
                 self._mqtt.username_pw_set(username=self._user,
                                            password=self._pass)
-            self._mqtt.connect(self._host)
+            self._mqtt.connect(self._host, port=self._port)
             threads_before = enumerate_threads()
             self._mqtt.loop_start()
             threads_after = enumerate_threads()
@@ -768,7 +776,7 @@ def subscriptions(self) -&gt; dict:
         if self._user and self._pass:
             self._mqtt.username_pw_set(username=self._user,
                                        password=self._pass)
-        self._mqtt.connect(self._host)
+        self._mqtt.connect(self._host, port=self._port)
         threads_before = enumerate_threads()
         self._mqtt.loop_start()
         threads_after = enumerate_threads()

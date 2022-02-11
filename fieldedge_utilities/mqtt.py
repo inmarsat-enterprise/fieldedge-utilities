@@ -5,7 +5,7 @@ for use with a local broker on an edge device e.g. Raspberry Pi.
 
 Reads broker configuration from a local `.env` file or environment variables:
 
-* `MQTT_HOST` the IP address or hostname of the broker (e.g. 127.0.0.1)
+* `MQTT_HOST` the IP address or hostname or container of the broker
 * `MQTT_USER` the authentication username for the broker
 * `MQTT_PASS` the authentication password for the broker
 
@@ -80,6 +80,7 @@ class MqttClient:
                  logger: Logger = None,
                  connect_retry_interval: int = 5,
                  auto_connect: bool = True,
+                 port: int = 1883,
                  ):
         """Initializes a managed MQTT client.
         
@@ -97,6 +98,7 @@ class MqttClient:
             connect_retry_interval (int): Seconds between broker reconnect
                 attempts.
             auto_connect (bool): Automatically attempts to connect when created.
+            port (int): The MQTT port the broker is listening on.
 
         Raises:
             `MqttError` if the client_id is not valid.
@@ -105,6 +107,7 @@ class MqttClient:
         self._host = os.getenv('MQTT_HOST') or 'fieldedge-broker'
         self._user = os.getenv('MQTT_USER') or None
         self._pass = os.getenv('MQTT_PASS') or None
+        self._port = port
         self._log = logger or get_wrapping_logger(name='mqtt_client')
         if not isinstance(client_id, str) or client_id == '':
             self._log.error('Invalid client_id')
@@ -182,7 +185,7 @@ class MqttClient:
             if self._user and self._pass:
                 self._mqtt.username_pw_set(username=self._user,
                                            password=self._pass)
-            self._mqtt.connect(self._host)
+            self._mqtt.connect(self._host, port=self._port)
             threads_before = enumerate_threads()
             self._mqtt.loop_start()
             threads_after = enumerate_threads()

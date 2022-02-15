@@ -1,11 +1,2 @@
-2021-11-19T23:23:57.000Z,[INFO],command=sudo runuser -u pi -- bash /home/pi/fieldedge/bgan_simulator/bgan_simulator.sh status
-2021-11-19T23:23:57.000Z,[INFO],result=BGAN Emulator Status:
-2021-11-19T23:23:57.000Z,[INFO],result=qdisc pfifo_fast 0: root refcnt 2 bands 3 priomap 1 2 2 2 1 2 0 0 1 1 1 1 1 1 1 1
-2021-11-19T23:23:57.000Z,[INFO],result=qdisc mq 0: root
-2021-11-19T23:23:57.000Z,[INFO],result=qdisc pfifo_fast 0: parent :5 bands 3 priomap 1 2 2 2 1 2 0 0 1 1 1 1 1 1 1 1
-2021-11-19T23:23:57.000Z,[INFO],result=qdisc pfifo_fast 0: parent :4 bands 3 priomap 1 2 2 2 1 2 0 0 1 1 1 1 1 1 1 1
-2021-11-19T23:23:57.000Z,[INFO],result=qdisc pfifo_fast 0: parent :3 bands 3 priomap 1 2 2 2 1 2 0 0 1 1 1 1 1 1 1 1
-2021-11-19T23:23:57.000Z,[INFO],result=qdisc pfifo_fast 0: parent :2 bands 3 priomap 1 2 2 2 1 2 0 0 1 1 1 1 1 1 1 1
-2021-11-19T23:23:57.000Z,[INFO],result=qdisc pfifo_fast 0: parent :1 bands 3 priomap 1 2 2 2 1 2 0 0 1 1 1 1 1 1 1 1
-2021-11-20T23:23:57.000Z,[INFO],command=sudo runuser -u pi -- bash /home/pi/fieldedge/bgan_simulator/bgan_simulator.sh status
-2021-11-20T23:23:57.000Z,[INFO],result=BGAN Simulator Disabled
+2021-11-19T23:23:57.000Z,[INFO],command=runuser -u fieldedge -- bash /home/fieldedge/fieldedge/bgan-simulator/mimicbgan.sh status
+2021-11-19T23:23:57.000Z,[INFO],result=BGAN Simulator Disabled on WAN=eth0 and LAN=eth1

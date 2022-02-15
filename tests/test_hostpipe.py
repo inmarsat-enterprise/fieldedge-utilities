@@ -7,6 +7,7 @@ from fieldedge_utilities import hostpipe
 from fieldedge_utilities.hostpipe import (COMMAND_PREFIX, RESPONSE_PREFIX,
                                           TIMESTAMP_FMT)
 
+TESTAPPDIR = '/home/fieldedge/fieldedge'
 LOGDIR = './tests/hostpipe_logs'
 
 MOCK_BGAN_SIM = str(os.getenv('MOCK_BGAN_SIM')).lower() == 'true'
@@ -107,7 +108,7 @@ def _mock_host_response(pipelog: str,
     logfile.close()
 
 def test_host_command_bgan_simulator():
-    command = 'bash $HOME/fieldedge/bgan_simulator/bgan_simulator.sh status'
+    command = f'bash {TESTAPPDIR}/bgan-simulator/mimicbgan.sh status'
     pipelog = f'{LOGDIR}/hostpipe-test-bgan-simulator-enabled.log'
     res = hostpipe.host_command(command, pipelog=pipelog, test_mode=True)
     assert isinstance(res, str)
@@ -117,23 +118,20 @@ def test_host_command_bgan_simulator():
     assert isinstance(res, str)
     assert not any(x in res.lower() for x in ['delay', 'enabled'])
     pipelog = f'{LOGDIR}/hostpipe-test-bgan-simulator-enable.log'
-    command = 'bash $HOME/fieldedge/bgan_simulator/bgan_simulator.sh enable'
+    command = f'bash {TESTAPPDIR}/bgan-simulator/mimicbgan.sh enable'
     res = hostpipe.host_command(command, pipelog=pipelog, test_mode=True)
     assert 'abl' in res
 
 def test_host_command_manual_tshark():
-    command = (f'nohup bash $HOME/fieldedge/capture/capture.sh'
+    command = (f'nohup bash {TESTAPPDIR}/capture/capture.sh'
         f' -t 60 -i eth1'
         ' | sed -e "s/^/$(date -u +%Y-%m-%dT%H:%M:%SZ),[INFO],result=/"'
-        ' &>> $HOME/fieldedge/logs/hostpipe.log &')
+        f' &>> {TESTAPPDIR}/logs/hostpipe.log &')
     pipelog = f'{LOGDIR}/hostpipe-test-capture.log'
     res = hostpipe.host_command(command, noresponse=True, test_mode=True)
     # some timer thread expires in real world
     res = hostpipe.host_get_response(command, pipelog=pipelog, test_mode=True)
     assert 'completed wireshark' in res.lower()
-
-# def test_host_command_tshark_corrupt():
-#     pass
 
 def test_host_command_shutdown():
     command = 'sudo shutdown -P 1'
@@ -141,8 +139,7 @@ def test_host_command_shutdown():
     assert res == f'{command} sent'
 
 def test_host_command_ip_addr_show():
-    command = 'ip addr show'
-    command = 'ip a show | egrep \' eth| en| wlan\' | awk \'{$1=$1};1\''
+    command = 'ip a show | egrep \" eth| en| wlan\"'
     pipelog = f'{LOGDIR}/hostpipe-test-ipaddrshow.log'
     res = hostpipe.host_command(command, pipelog=pipelog, test_mode=True)
     assert any(x in res.lower() for x in ['eth', 'en', 'wlan'])

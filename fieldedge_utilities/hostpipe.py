@@ -1,4 +1,11 @@
-"""Operations for interacting with the hostpipe service.
+"""Operations for interacting with the hostpipe service from a Docker container.
+
+Since commands passed in this way will be run as root, they are preambled by
+`runuser -u {user} --` unless they begin with `sudo` in which case `sudo` will
+be removed and the command run directly as root.
+
+It assumes the architecture runs from a directory structure where the hostpipe
+fifo is called ./hostpipe/pipe relative to the main app launch directory.
 
 References environment variables:
 
@@ -6,14 +13,19 @@ References environment variables:
 * `TIMESTAMP_FMT` str (default: YYYY-mm-ddTHH:MM:SS.NNNZ)
 * `DEFAULT_TIMEOUT` float (default: 0.25)
 * `MAX_FILE_SIZE` int MegaBytes (default 2)
+
 """
 import os
-import subprocess
 from datetime import datetime
 from logging import DEBUG, Logger
+from subprocess import TimeoutExpired, run
 from time import sleep, time
 
+from fieldedge_utilities.logger import get_wrapping_logger
+
+APP_ENV = os.getenv('APP_ENV', 'docker')
 HOST_USER = os.getenv('HOST_USER', 'fieldedge')
+PIPEPATH = os.getenv('HOSTPIPE_PATH', './hostpipe/pipe')
 TIMESTAMP_FMT = os.getenv('HOSTPIPE_TS_FMT', 'YYYY-mm-ddTHH:MM:SS.SSSZ')
 COMMAND_PREFIX = f'{TIMESTAMP_FMT},[INFO],command='
 RESPONSE_PREFIX = f'{TIMESTAMP_FMT},[INFO],result='
@@ -48,17 +60,24 @@ def host_command(command: str,
         A string with the command response, or empty if no response received.
     
     Raises:
+        TimeoutError if hostpipe does not respond within timeout.
         FileNotFoundError if the hostpipe log cannot be found.
 
     """
-    command = _apply_preamble(command)
+    log = log or get_wrapping_logger()
+    modcommand = _apply_preamble(command)
     command_time = time()
     if not test_mode:
-        if isinstance(log, Logger):
-            log.debug(f'Sending {command} to hostpipe via shell')
-        subprocess.run(f'echo "{_escaped_command(command)}" > ./hostpipe/pipe',
-                       shell=True)
-    elif isinstance(log, Logger):
+        log.debug(f'Sending {modcommand} to hostpipe via shell')
+        try:
+            run(f'echo "{_escaped_command(modcommand)}" > {PIPEPATH} &',
+                shell=True,
+                timeout=timeout)
+        except TimeoutExpired:
+            err = f'Command {command} timed out waiting for hostpipe'
+            log.error(err)
+            raise TimeoutError(err)
+    else:
         log.info(f'test_mode received command: {command}')
     if noresponse:
         return f'{command} sent'
@@ -74,9 +93,9 @@ def host_command(command: str,
                                      test_mode=test_mode,
                                      ).strip()
     deleted_count = _maintain_pipelog(pipelog)
-    if isinstance(log, Logger) and deleted_count > 0:
+    if deleted_count > 0:
         log.info(f'Removed {deleted_count} oldest lines from {pipelog}')
-    if isinstance(log, Logger) and log.getEffectiveLevel() == DEBUG:
+    if log.getEffectiveLevel() == DEBUG:
         if response_str == '':
             abv_response = '<no response>'
         elif len(response_str) < 25:
@@ -89,12 +108,15 @@ def host_command(command: str,
 
 def _apply_preamble(command: str) -> str:
     if '$HOME' in command:
-        replacement = f'/home/{HOST_USER}'
-        preamble = f'sudo runuser -u {HOST_USER} -- '
-        if preamble in command:
-            preamble = ''
-        command = f'{preamble}{command.replace("$HOME", replacement)}'
-    return command
+        command = command.replace('$HOME', f'/home/{HOST_USER}')
+    if APP_ENV.lower() != 'docker':
+        return command
+    preamble = ''
+    if command.startswith('sudo '):
+        command = command.replace('sudo ', '')
+    elif 'runuser' not in command:
+        preamble = f'runuser -u {HOST_USER} -- '
+    return f'{preamble}{command}'
 
 
 def _escaped_command(command: str) -> str:
@@ -136,26 +158,24 @@ def host_get_response(command: str,
         FileNotFoundError if the hostpipe log cannot be found.
 
     """
+    log = log or get_wrapping_logger()
     calltime = time()
-    command = _apply_preamble(command)
+    modcommand = _apply_preamble(command)
     if pipelog is None:
         pipelog = './logs/hostpipe.log'
     if not os.path.isfile(pipelog):
         raise FileNotFoundError(f'Could not find file {pipelog}')
-    if isinstance(log, Logger):
-        log.debug(f'Searching {pipelog} for {command}')
+    log.debug(f'Searching {pipelog} for {modcommand}')
     response = []
     filepass = 0
     while len(response) == 0:
         # test_mode assumes manual step through will usually violate timeout
         if not test_mode and time() > calltime + timeout:
-            if isinstance(log, Logger):
-                log.warning(f'Response to {command} timed out'
-                    f' after {timeout} seconds')
+            log.warning(f'Response to {command} timed out'
+                        f' after {timeout} seconds')
             break
         filepass += 1
-        if isinstance(log, Logger):
-            log.debug(f'{pipelog} read iteration {filepass}')
+        log.debug(f'{pipelog} read iteration {filepass}')
         lines = open(pipelog, 'r').readlines()
         for line in reversed(lines):
             if (not test_mode and
@@ -166,11 +186,10 @@ def host_get_response(command: str,
                 break
             if ',command=' in line:
                 logged_command = line.split(',command=')[1].strip()
-                if isinstance(log, Logger):
-                    log.debug(f'Found command {logged_command} in {pipelog}'
-                        f'({_get_line_ts(line)})'
-                        f' with {len(response)} response lines')
-                if logged_command != command:
+                log.debug(f'Found command {logged_command} in {pipelog}'
+                          f'({_get_line_ts(line)})'
+                          f' with {len(response)} response lines')
+                if logged_command != modcommand:
                     # wrong command/response so dump parsed lines so far
                     cts = _get_line_ts(line)
                     to_remove = []
@@ -178,15 +197,13 @@ def host_get_response(command: str,
                         rts = _get_line_ts(resline)
                         if rts == cts:
                             to_remove.append(resline)
-                    if isinstance(log, Logger):
-                        log.debug(f'Mismatch: {logged_command} != {command}'
-                            f' -> dropping {len(to_remove)} response lines')
+                    log.debug(f'Mismatch: {logged_command} != {modcommand}'
+                              f' -> dropping {len(to_remove)} response lines')
                     response = [l for l in response if l not in to_remove]
                 else:
                     # we reached the original command so can stop parsing response
-                    if isinstance(log, Logger):
-                        log.debug(f'Found target {command}'
-                            f' with {len(response)} response lines')
+                    log.debug(f'Found target {modcommand}'
+                              f' with {len(response)} response lines')
                     response = [l[len(RESPONSE_PREFIX):] for l in response]
                     break
             elif ',result=' in line:

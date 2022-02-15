@@ -1,8 +1,2 @@
-2021-11-19T23:23:57.000Z,[INFO],command=sudo runuser -u pi -- bash /home/pi/fieldedge/bgan_simulator/bgan_simulator.sh status
-2021-11-19T23:23:57.000Z,[INFO],result=BGAN Emulator Status:
-2021-11-19T23:23:57.000Z,[INFO],result=qdisc tbf 1: root refcnt 2 rate 384Kbit burst 1599b lat 29.2ms
-2021-11-19T23:23:57.000Z,[INFO],result=qdisc netem 10: parent 1:1 limit 1000 delay 275s  275s 25%
-2021-11-19T23:23:57.000Z,[INFO],result=qdisc tbf 1: root refcnt 6 rate 384Kbit burst 1599b lat 29.2ms
-2021-11-19T23:23:57.000Z,[INFO],result=qdisc netem 10: parent 1:1 limit 1000 delay 275s  275s 25%
-2021-11-20T23:23:57.000Z,[INFO],command=sudo runuser -u pi -- bash /home/pi/fieldedge/bgan_simulator/bgan_simulator.sh status
-2021-11-20T23:23:57.000Z,[INFO],result=BGAN Simulator Enabled
+2021-11-19T23:23:57.000Z,[INFO],command=runuser -u fieldedge -- bash /home/fieldedge/fieldedge/bgan-simulator/mimicbgan.sh status
+2021-11-19T23:23:57.000Z,[INFO],result=BGAN Simulator Enabled on WAN=eth0 and LAN=eth1

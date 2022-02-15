@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
 <meta name="generator" content="pdoc 0.10.0" />
 <title>fieldedge_utilities.hostpipe API documentation</title>
-<meta name="description" content="Operations for interacting with the hostpipe service …" />
+<meta name="description" content="Operations for interacting with the hostpipe service from a Docker container …" />
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
 <link rel="stylesheet preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/github.min.css" crossorigin>
@@ -22,7 +22,12 @@
 <h1 class="title">Module <code>fieldedge_utilities.hostpipe</code></h1>
 </header>
 <section id="section-intro">
-<p>Operations for interacting with the hostpipe service.</p>
+<p>Operations for interacting with the hostpipe service from a Docker container.</p>
+<p>Since commands passed in this way will be run as root, they are preambled by
+<code>runuser -u {user} --</code> unless they begin with <code>sudo</code> in which case <code>sudo</code> will
+be removed and the command run directly as root.</p>
+<p>It assumes the architecture runs from a directory structure where the hostpipe
+fifo is called ./hostpipe/pipe relative to the main app launch directory.</p>
 <p>References environment variables:</p>
 <ul>
 <li><code>HOST_USER</code> (default: fieldedge)</li>
@@ -34,7 +39,14 @@
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">&#34;&#34;&#34;Operations for interacting with the hostpipe service.
+<pre><code class="python">&#34;&#34;&#34;Operations for interacting with the hostpipe service from a Docker container.
+
+Since commands passed in this way will be run as root, they are preambled by
+`runuser -u {user} --` unless they begin with `sudo` in which case `sudo` will
+be removed and the command run directly as root.
+
+It assumes the architecture runs from a directory structure where the hostpipe
+fifo is called ./hostpipe/pipe relative to the main app launch directory.
 
 References environment variables:
 
@@ -42,14 +54,19 @@ References environment variables:
 * `TIMESTAMP_FMT` str (default: YYYY-mm-ddTHH:MM:SS.NNNZ)
 * `DEFAULT_TIMEOUT` float (default: 0.25)
 * `MAX_FILE_SIZE` int MegaBytes (default 2)
+
 &#34;&#34;&#34;
 import os
-import subprocess
 from datetime import datetime
 from logging import DEBUG, Logger
+from subprocess import TimeoutExpired, run
 from time import sleep, time
 
+from fieldedge_utilities.logger import get_wrapping_logger
+
+APP_ENV = os.getenv(&#39;APP_ENV&#39;, &#39;docker&#39;)
 HOST_USER = os.getenv(&#39;HOST_USER&#39;, &#39;fieldedge&#39;)
+PIPEPATH = os.getenv(&#39;HOSTPIPE_PATH&#39;, &#39;./hostpipe/pipe&#39;)
 TIMESTAMP_FMT = os.getenv(&#39;HOSTPIPE_TS_FMT&#39;, &#39;YYYY-mm-ddTHH:MM:SS.SSSZ&#39;)
 COMMAND_PREFIX = f&#39;{TIMESTAMP_FMT},[INFO],command=&#39;
 RESPONSE_PREFIX = f&#39;{TIMESTAMP_FMT},[INFO],result=&#39;
@@ -84,17 +101,24 @@ def host_command(command: str,
         A string with the command response, or empty if no response received.
     
     Raises:
+        TimeoutError if hostpipe does not respond within timeout.
         FileNotFoundError if the hostpipe log cannot be found.
 
     &#34;&#34;&#34;
-    command = _apply_preamble(command)
+    log = log or get_wrapping_logger()
+    modcommand = _apply_preamble(command)
     command_time = time()
     if not test_mode:
-        if isinstance(log, Logger):
-            log.debug(f&#39;Sending {command} to hostpipe via shell&#39;)
-        subprocess.run(f&#39;echo &#34;{_escaped_command(command)}&#34; &gt; ./hostpipe/pipe&#39;,
-                       shell=True)
-    elif isinstance(log, Logger):
+        log.debug(f&#39;Sending {modcommand} to hostpipe via shell&#39;)
+        try:
+            run(f&#39;echo &#34;{_escaped_command(modcommand)}&#34; &gt; {PIPEPATH} &amp;&#39;,
+                shell=True,
+                timeout=timeout)
+        except TimeoutExpired:
+            err = f&#39;Command {command} timed out waiting for hostpipe&#39;
+            log.error(err)
+            raise TimeoutError(err)
+    else:
         log.info(f&#39;test_mode received command: {command}&#39;)
     if noresponse:
         return f&#39;{command} sent&#39;
@@ -110,9 +134,9 @@ def host_command(command: str,
                                      test_mode=test_mode,
                                      ).strip()
     deleted_count = _maintain_pipelog(pipelog)
-    if isinstance(log, Logger) and deleted_count &gt; 0:
+    if deleted_count &gt; 0:
         log.info(f&#39;Removed {deleted_count} oldest lines from {pipelog}&#39;)
-    if isinstance(log, Logger) and log.getEffectiveLevel() == DEBUG:
+    if log.getEffectiveLevel() == DEBUG:
         if response_str == &#39;&#39;:
             abv_response = &#39;&lt;no response&gt;&#39;
         elif len(response_str) &lt; 25:
@@ -125,12 +149,15 @@ def host_command(command: str,
 
 def _apply_preamble(command: str) -&gt; str:
     if &#39;$HOME&#39; in command:
-        replacement = f&#39;/home/{HOST_USER}&#39;
-        preamble = f&#39;sudo runuser -u {HOST_USER} -- &#39;
-        if preamble in command:
-            preamble = &#39;&#39;
-        command = f&#39;{preamble}{command.replace(&#34;$HOME&#34;, replacement)}&#39;
-    return command
+        command = command.replace(&#39;$HOME&#39;, f&#39;/home/{HOST_USER}&#39;)
+    if APP_ENV.lower() != &#39;docker&#39;:
+        return command
+    preamble = &#39;&#39;
+    if command.startswith(&#39;sudo &#39;):
+        command = command.replace(&#39;sudo &#39;, &#39;&#39;)
+    elif &#39;runuser&#39; not in command:
+        preamble = f&#39;runuser -u {HOST_USER} -- &#39;
+    return f&#39;{preamble}{command}&#39;
 
 
 def _escaped_command(command: str) -&gt; str:
@@ -172,26 +199,24 @@ def host_get_response(command: str,
         FileNotFoundError if the hostpipe log cannot be found.
 
     &#34;&#34;&#34;
+    log = log or get_wrapping_logger()
     calltime = time()
-    command = _apply_preamble(command)
+    modcommand = _apply_preamble(command)
     if pipelog is None:
         pipelog = &#39;./logs/hostpipe.log&#39;
     if not os.path.isfile(pipelog):
         raise FileNotFoundError(f&#39;Could not find file {pipelog}&#39;)
-    if isinstance(log, Logger):
-        log.debug(f&#39;Searching {pipelog} for {command}&#39;)
+    log.debug(f&#39;Searching {pipelog} for {modcommand}&#39;)
     response = []
     filepass = 0
     while len(response) == 0:
         # test_mode assumes manual step through will usually violate timeout
         if not test_mode and time() &gt; calltime + timeout:
-            if isinstance(log, Logger):
-                log.warning(f&#39;Response to {command} timed out&#39;
-                    f&#39; after {timeout} seconds&#39;)
+            log.warning(f&#39;Response to {command} timed out&#39;
+                        f&#39; after {timeout} seconds&#39;)
             break
         filepass += 1
-        if isinstance(log, Logger):
-            log.debug(f&#39;{pipelog} read iteration {filepass}&#39;)
+        log.debug(f&#39;{pipelog} read iteration {filepass}&#39;)
         lines = open(pipelog, &#39;r&#39;).readlines()
         for line in reversed(lines):
             if (not test_mode and
@@ -202,11 +227,10 @@ def host_get_response(command: str,
                 break
             if &#39;,command=&#39; in line:
                 logged_command = line.split(&#39;,command=&#39;)[1].strip()
-                if isinstance(log, Logger):
-                    log.debug(f&#39;Found command {logged_command} in {pipelog}&#39;
-                        f&#39;({_get_line_ts(line)})&#39;
-                        f&#39; with {len(response)} response lines&#39;)
-                if logged_command != command:
+                log.debug(f&#39;Found command {logged_command} in {pipelog}&#39;
+                          f&#39;({_get_line_ts(line)})&#39;
+                          f&#39; with {len(response)} response lines&#39;)
+                if logged_command != modcommand:
                     # wrong command/response so dump parsed lines so far
                     cts = _get_line_ts(line)
                     to_remove = []
@@ -214,15 +238,13 @@ def host_get_response(command: str,
                         rts = _get_line_ts(resline)
                         if rts == cts:
                             to_remove.append(resline)
-                    if isinstance(log, Logger):
-                        log.debug(f&#39;Mismatch: {logged_command} != {command}&#39;
-                            f&#39; -&gt; dropping {len(to_remove)} response lines&#39;)
+                    log.debug(f&#39;Mismatch: {logged_command} != {modcommand}&#39;
+                              f&#39; -&gt; dropping {len(to_remove)} response lines&#39;)
                     response = [l for l in response if l not in to_remove]
                 else:
                     # we reached the original command so can stop parsing response
-                    if isinstance(log, Logger):
-                        log.debug(f&#39;Found target {command}&#39;
-                            f&#39; with {len(response)} response lines&#39;)
+                    log.debug(f&#39;Found target {modcommand}&#39;
+                              f&#39; with {len(response)} response lines&#39;)
                     response = [l[len(RESPONSE_PREFIX):] for l in response]
                     break
             elif &#39;,result=&#39; in line:
@@ -302,7 +324,8 @@ and the calling function must handle an empty string response.</p>
 <h2 id="returns">Returns</h2>
 <p>A string with the command response, or empty if no response received.</p>
 <h2 id="raises">Raises</h2>
-<p>FileNotFoundError if the hostpipe log cannot be found.</p></div>
+<p>TimeoutError if hostpipe does not respond within timeout.
+FileNotFoundError if the hostpipe log cannot be found.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -333,17 +356,24 @@ and the calling function must handle an empty string response.</p>
         A string with the command response, or empty if no response received.
     
     Raises:
+        TimeoutError if hostpipe does not respond within timeout.
         FileNotFoundError if the hostpipe log cannot be found.
 
     &#34;&#34;&#34;
-    command = _apply_preamble(command)
+    log = log or get_wrapping_logger()
+    modcommand = _apply_preamble(command)
     command_time = time()
     if not test_mode:
-        if isinstance(log, Logger):
-            log.debug(f&#39;Sending {command} to hostpipe via shell&#39;)
-        subprocess.run(f&#39;echo &#34;{_escaped_command(command)}&#34; &gt; ./hostpipe/pipe&#39;,
-                       shell=True)
-    elif isinstance(log, Logger):
+        log.debug(f&#39;Sending {modcommand} to hostpipe via shell&#39;)
+        try:
+            run(f&#39;echo &#34;{_escaped_command(modcommand)}&#34; &gt; {PIPEPATH} &amp;&#39;,
+                shell=True,
+                timeout=timeout)
+        except TimeoutExpired:
+            err = f&#39;Command {command} timed out waiting for hostpipe&#39;
+            log.error(err)
+            raise TimeoutError(err)
+    else:
         log.info(f&#39;test_mode received command: {command}&#39;)
     if noresponse:
         return f&#39;{command} sent&#39;
@@ -359,9 +389,9 @@ and the calling function must handle an empty string response.</p>
                                      test_mode=test_mode,
                                      ).strip()
     deleted_count = _maintain_pipelog(pipelog)
-    if isinstance(log, Logger) and deleted_count &gt; 0:
+    if deleted_count &gt; 0:
         log.info(f&#39;Removed {deleted_count} oldest lines from {pipelog}&#39;)
-    if isinstance(log, Logger) and log.getEffectiveLevel() == DEBUG:
+    if log.getEffectiveLevel() == DEBUG:
         if response_str == &#39;&#39;:
             abv_response = &#39;&lt;no response&gt;&#39;
         elif len(response_str) &lt; 25:
@@ -415,26 +445,24 @@ and the calling function must handle an empty string response.</p>
         FileNotFoundError if the hostpipe log cannot be found.
 
     &#34;&#34;&#34;
+    log = log or get_wrapping_logger()
     calltime = time()
-    command = _apply_preamble(command)
+    modcommand = _apply_preamble(command)
     if pipelog is None:
         pipelog = &#39;./logs/hostpipe.log&#39;
     if not os.path.isfile(pipelog):
         raise FileNotFoundError(f&#39;Could not find file {pipelog}&#39;)
-    if isinstance(log, Logger):
-        log.debug(f&#39;Searching {pipelog} for {command}&#39;)
+    log.debug(f&#39;Searching {pipelog} for {modcommand}&#39;)
     response = []
     filepass = 0
     while len(response) == 0:
         # test_mode assumes manual step through will usually violate timeout
         if not test_mode and time() &gt; calltime + timeout:
-            if isinstance(log, Logger):
-                log.warning(f&#39;Response to {command} timed out&#39;
-                    f&#39; after {timeout} seconds&#39;)
+            log.warning(f&#39;Response to {command} timed out&#39;
+                        f&#39; after {timeout} seconds&#39;)
             break
         filepass += 1
-        if isinstance(log, Logger):
-            log.debug(f&#39;{pipelog} read iteration {filepass}&#39;)
+        log.debug(f&#39;{pipelog} read iteration {filepass}&#39;)
         lines = open(pipelog, &#39;r&#39;).readlines()
         for line in reversed(lines):
             if (not test_mode and
@@ -445,11 +473,10 @@ and the calling function must handle an empty string response.</p>
                 break
             if &#39;,command=&#39; in line:
                 logged_command = line.split(&#39;,command=&#39;)[1].strip()
-                if isinstance(log, Logger):
-                    log.debug(f&#39;Found command {logged_command} in {pipelog}&#39;
-                        f&#39;({_get_line_ts(line)})&#39;
-                        f&#39; with {len(response)} response lines&#39;)
-                if logged_command != command:
+                log.debug(f&#39;Found command {logged_command} in {pipelog}&#39;
+                          f&#39;({_get_line_ts(line)})&#39;
+                          f&#39; with {len(response)} response lines&#39;)
+                if logged_command != modcommand:
                     # wrong command/response so dump parsed lines so far
                     cts = _get_line_ts(line)
                     to_remove = []
@@ -457,15 +484,13 @@ and the calling function must handle an empty string response.</p>
                         rts = _get_line_ts(resline)
                         if rts == cts:
                             to_remove.append(resline)
-                    if isinstance(log, Logger):
-                        log.debug(f&#39;Mismatch: {logged_command} != {command}&#39;
-                            f&#39; -&gt; dropping {len(to_remove)} response lines&#39;)
+                    log.debug(f&#39;Mismatch: {logged_command} != {modcommand}&#39;
+                              f&#39; -&gt; dropping {len(to_remove)} response lines&#39;)
                     response = [l for l in response if l not in to_remove]
                 else:
                     # we reached the original command so can stop parsing response
-                    if isinstance(log, Logger):
-                        log.debug(f&#39;Found target {command}&#39;
-                            f&#39; with {len(response)} response lines&#39;)
+                    log.debug(f&#39;Found target {modcommand}&#39;
+                              f&#39; with {len(response)} response lines&#39;)
                     response = [l[len(RESPONSE_PREFIX):] for l in response]
                     break
             elif &#39;,result=&#39; in line:

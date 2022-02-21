@@ -1,0 +1,75 @@
+"""Tools for querying IP interface properties of the system.
+"""
+import ifaddr
+import ipaddress
+import json
+import os
+
+VALID_PREFIXES = json.loads(os.getenv('INTERFACE_VALID_PREFIXES',
+                                      '["eth","wlan"]'))
+
+
+def get_interfaces(valid_prefixes: 'list[str]' = VALID_PREFIXES,
+                   target: str = None,
+                   ) -> dict:
+    """Returns a dictionary of IP interfaces with IP addresses.
+    
+    Args:
+        valid_prefixes: A list of prefixes to include in the search e.g. `eth`
+        target: (optional) A specific interface to check for its IP address
+
+    Returns:
+        { "interface_name": "ip_address" }
+    
+    """
+    interfaces = {}
+    adapters = ifaddr.get_adapters()
+    for adapter in adapters:
+        if not any(adapter.name.startswith(x) for x in valid_prefixes):
+            continue
+        for ip in adapter.ips:
+            if '.' in ip.ip:
+                interfaces[adapter.name] = ip.ip
+                break
+        if target is not None and adapter.name == target:
+            break
+    return interfaces
+
+
+def is_address_in_subnet(ip_address: str, subnet: str) -> bool:
+    """Returns True if the IP address is part of the IP subnetwork.
+    
+    Args:
+        ip_address: Address e.g. 192.168.1.101
+        subnet: Subnet e.g. 192.168.0.0/16
+    
+    Returns:
+        True if the IP address is within the subnet range.
+
+    """
+    subnet = ipaddress.ip_network(subnet)
+    ip_address = ipaddress.ip_address(ip_address)
+    if ip_address in subnet:
+        return True
+    return False
+
+
+def is_valid_ip(ip_address: str, ipv4_only: bool = True) -> bool:
+    """Returns True if the value is a valid IP address.
+    
+    Args:
+        ip_address: A candidate IP address
+        ipv4_only: If True enforces that the address must be IPv4
+    
+    Returns:
+        True if it is a valid IP address.
+
+    """
+    try:
+        ip_address = ipaddress.ip_address(ip_address)
+        if ipv4_only:
+            return ip_address.version == 4
+        return True
+    except ValueError:
+        return False
+    

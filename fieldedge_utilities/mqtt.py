@@ -81,6 +81,9 @@ class MqttClient:
                  connect_retry_interval: int = 5,
                  auto_connect: bool = True,
                  port: int = 1883,
+                 keepalive: int = 60,
+                 bind_address: str = '',
+                 certfile: str = None,
                  ):
         """Initializes a managed MQTT client.
         
@@ -99,6 +102,10 @@ class MqttClient:
                 attempts.
             auto_connect (bool): Automatically attempts to connect when created.
             port (int): The MQTT port the broker is listening on.
+            keepalive (int): The socket timeout and/or keepalive ping interval
+                in seconds.
+            bind_address (str): (optional) A local bind address
+            certfile (str): If using TLS, the path of the certificate
 
         Raises:
             `MqttError` if the client_id is not valid.
@@ -108,6 +115,9 @@ class MqttClient:
         self._user = os.getenv('MQTT_USER') or None
         self._pass = os.getenv('MQTT_PASS') or None
         self._port = port
+        self._keepalive = keepalive
+        self._bind_address = bind_address
+        self._certfile = certfile
         self._log = logger or get_wrapping_logger(name='mqtt_client')
         if not isinstance(client_id, str) or client_id == '':
             self._log.error('Invalid client_id')
@@ -185,7 +195,13 @@ class MqttClient:
             if self._user and self._pass:
                 self._mqtt.username_pw_set(username=self._user,
                                            password=self._pass)
-            self._mqtt.connect(self._host, port=self._port)
+            if self._port == 8883:
+                self._mqtt.tls_set(self._certfile)
+                self._mqtt.tls_insecure_set(True)
+            self._mqtt.connect(self._host,
+                               port=self._port,
+                               keepalive=self._keepalive,
+                               bind_address=self._bind_address)
             threads_before = enumerate_threads()
             self._mqtt.loop_start()
             threads_after = enumerate_threads()

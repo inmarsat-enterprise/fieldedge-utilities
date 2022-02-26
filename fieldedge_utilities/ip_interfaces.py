@@ -11,25 +11,31 @@ VALID_PREFIXES = json.loads(os.getenv('INTERFACE_VALID_PREFIXES',
 
 def get_interfaces(valid_prefixes: 'list[str]' = VALID_PREFIXES,
                    target: str = None,
+                   include_subnet: bool = False,
                    ) -> dict:
     """Returns a dictionary of IP interfaces with IP addresses.
     
     Args:
         valid_prefixes: A list of prefixes to include in the search e.g. `eth`
         target: (optional) A specific interface to check for its IP address
+        include_subnet: (optional) If true will append the subnet e.g. /16
 
     Returns:
-        { "interface_name": "ip_address" }
+        A dictionary e.g. { "eth0": "192.168.1.100" }
     
     """
     interfaces = {}
     adapters = ifaddr.get_adapters()
     for adapter in adapters:
-        if not any(adapter.name.startswith(x) for x in valid_prefixes):
+        if (valid_prefixes is not None and
+            not any(adapter.name.startswith(x) for x in valid_prefixes)):
             continue
         for ip in adapter.ips:
             if '.' in ip.ip:
-                interfaces[adapter.name] = ip.ip
+                base_ip = ip.ip
+                if include_subnet:
+                    base_ip += f'/{ip.network_prefix}'
+                interfaces[adapter.name] = base_ip
                 break
         if target is not None and adapter.name == target:
             break
@@ -47,7 +53,7 @@ def is_address_in_subnet(ip_address: str, subnet: str) -> bool:
         True if the IP address is within the subnet range.
 
     """
-    subnet = ipaddress.ip_network(subnet)
+    subnet = ipaddress.ip_network(subnet, strict=False)
     ip_address = ipaddress.ip_address(ip_address)
     if ip_address in subnet:
         return True

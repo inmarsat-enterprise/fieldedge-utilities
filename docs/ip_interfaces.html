@@ -40,25 +40,31 @@ VALID_PREFIXES = json.loads(os.getenv(&#39;INTERFACE_VALID_PREFIXES&#39;,
 
 def get_interfaces(valid_prefixes: &#39;list[str]&#39; = VALID_PREFIXES,
                    target: str = None,
+                   include_subnet: bool = False,
                    ) -&gt; dict:
     &#34;&#34;&#34;Returns a dictionary of IP interfaces with IP addresses.
     
     Args:
         valid_prefixes: A list of prefixes to include in the search e.g. `eth`
         target: (optional) A specific interface to check for its IP address
+        include_subnet: (optional) If true will append the subnet e.g. /16
 
     Returns:
-        { &#34;interface_name&#34;: &#34;ip_address&#34; }
+        A dictionary e.g. { &#34;eth0&#34;: &#34;192.168.1.100&#34; }
     
     &#34;&#34;&#34;
     interfaces = {}
     adapters = ifaddr.get_adapters()
     for adapter in adapters:
-        if not any(adapter.name.startswith(x) for x in valid_prefixes):
+        if (valid_prefixes is not None and
+            not any(adapter.name.startswith(x) for x in valid_prefixes)):
             continue
         for ip in adapter.ips:
             if &#39;.&#39; in ip.ip:
-                interfaces[adapter.name] = ip.ip
+                base_ip = ip.ip
+                if include_subnet:
+                    base_ip += f&#39;/{ip.network_prefix}&#39;
+                interfaces[adapter.name] = base_ip
                 break
         if target is not None and adapter.name == target:
             break
@@ -76,7 +82,7 @@ def is_address_in_subnet(ip_address: str, subnet: str) -&gt; bool:
         True if the IP address is within the subnet range.
 
     &#34;&#34;&#34;
-    subnet = ipaddress.ip_network(subnet)
+    subnet = ipaddress.ip_network(subnet, strict=False)
     ip_address = ipaddress.ip_address(ip_address)
     if ip_address in subnet:
         return True
@@ -112,7 +118,7 @@ def is_valid_ip(ip_address: str, ipv4_only: bool = True) -&gt; bool:
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="fieldedge_utilities.ip_interfaces.get_interfaces"><code class="name flex">
-<span>def <span class="ident">get_interfaces</span></span>(<span>valid_prefixes: list[str] = ['eth', 'wlan'], target: str = None) ‑> dict</span>
+<span>def <span class="ident">get_interfaces</span></span>(<span>valid_prefixes: list[str] = ['eth', 'wlan'], target: str = None, include_subnet: bool = False) ‑> dict</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Returns a dictionary of IP interfaces with IP addresses.</p>
@@ -122,34 +128,42 @@ def is_valid_ip(ip_address: str, ipv4_only: bool = True) -&gt; bool:
 <dd>A list of prefixes to include in the search e.g. <code>eth</code></dd>
 <dt><strong><code>target</code></strong></dt>
 <dd>(optional) A specific interface to check for its IP address</dd>
+<dt><strong><code>include_subnet</code></strong></dt>
+<dd>(optional) If true will append the subnet e.g. /16</dd>
 </dl>
 <h2 id="returns">Returns</h2>
-<p>{ "interface_name": "ip_address" }</p></div>
+<p>A dictionary e.g. { "eth0": "192.168.1.100" }</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_interfaces(valid_prefixes: &#39;list[str]&#39; = VALID_PREFIXES,
                    target: str = None,
+                   include_subnet: bool = False,
                    ) -&gt; dict:
     &#34;&#34;&#34;Returns a dictionary of IP interfaces with IP addresses.
     
     Args:
         valid_prefixes: A list of prefixes to include in the search e.g. `eth`
         target: (optional) A specific interface to check for its IP address
+        include_subnet: (optional) If true will append the subnet e.g. /16
 
     Returns:
-        { &#34;interface_name&#34;: &#34;ip_address&#34; }
+        A dictionary e.g. { &#34;eth0&#34;: &#34;192.168.1.100&#34; }
     
     &#34;&#34;&#34;
     interfaces = {}
     adapters = ifaddr.get_adapters()
     for adapter in adapters:
-        if not any(adapter.name.startswith(x) for x in valid_prefixes):
+        if (valid_prefixes is not None and
+            not any(adapter.name.startswith(x) for x in valid_prefixes)):
             continue
         for ip in adapter.ips:
             if &#39;.&#39; in ip.ip:
-                interfaces[adapter.name] = ip.ip
+                base_ip = ip.ip
+                if include_subnet:
+                    base_ip += f&#39;/{ip.network_prefix}&#39;
+                interfaces[adapter.name] = base_ip
                 break
         if target is not None and adapter.name == target:
             break
@@ -185,7 +199,7 @@ def is_valid_ip(ip_address: str, ipv4_only: bool = True) -&gt; bool:
         True if the IP address is within the subnet range.
 
     &#34;&#34;&#34;
-    subnet = ipaddress.ip_network(subnet)
+    subnet = ipaddress.ip_network(subnet, strict=False)
     ip_address = ipaddress.ip_address(ip_address)
     if ip_address in subnet:
         return True

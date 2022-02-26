@@ -120,6 +120,9 @@ class MqttClient:
                  connect_retry_interval: int = 5,
                  auto_connect: bool = True,
                  port: int = 1883,
+                 keepalive: int = 60,
+                 bind_address: str = &#39;&#39;,
+                 certfile: str = None,
                  ):
         &#34;&#34;&#34;Initializes a managed MQTT client.
         
@@ -138,6 +141,10 @@ class MqttClient:
                 attempts.
             auto_connect (bool): Automatically attempts to connect when created.
             port (int): The MQTT port the broker is listening on.
+            keepalive (int): The socket timeout and/or keepalive ping interval
+                in seconds.
+            bind_address (str): (optional) A local bind address
+            certfile (str): If using TLS, the path of the certificate
 
         Raises:
             `MqttError` if the client_id is not valid.
@@ -147,6 +154,9 @@ class MqttClient:
         self._user = os.getenv(&#39;MQTT_USER&#39;) or None
         self._pass = os.getenv(&#39;MQTT_PASS&#39;) or None
         self._port = port
+        self._keepalive = keepalive
+        self._bind_address = bind_address
+        self._certfile = certfile
         self._log = logger or get_wrapping_logger(name=&#39;mqtt_client&#39;)
         if not isinstance(client_id, str) or client_id == &#39;&#39;:
             self._log.error(&#39;Invalid client_id&#39;)
@@ -224,7 +234,13 @@ class MqttClient:
             if self._user and self._pass:
                 self._mqtt.username_pw_set(username=self._user,
                                            password=self._pass)
-            self._mqtt.connect(self._host, port=self._port)
+            if self._port == 8883:
+                self._mqtt.tls_set(self._certfile)
+                self._mqtt.tls_insecure_set(True)
+            self._mqtt.connect(self._host,
+                               port=self._port,
+                               keepalive=self._keepalive,
+                               bind_address=self._bind_address)
             threads_before = enumerate_threads()
             self._mqtt.loop_start()
             threads_after = enumerate_threads()
@@ -379,7 +395,7 @@ class MqttClient:
 <dl>
 <dt id="fieldedge_utilities.mqtt.MqttClient"><code class="flex name class">
 <span>class <span class="ident">MqttClient</span></span>
-<span>(</span><span>client_id: str, on_message: Callable[..., ForwardRef('tuple[str, object]')] = None, subscribe_default: Union[str, ForwardRef('list[str]')] = None, on_connect: Callable = None, on_disconnect: Callable = None, logger: logging.Logger = None, connect_retry_interval: int = 5, auto_connect: bool = True, port: int = 1883)</span>
+<span>(</span><span>client_id: str, on_message: Callable[..., ForwardRef('tuple[str, object]')] = None, subscribe_default: Union[str, ForwardRef('list[str]')] = None, on_connect: Callable = None, on_disconnect: Callable = None, logger: logging.Logger = None, connect_retry_interval: int = 5, auto_connect: bool = True, port: int = 1883, keepalive: int = 60, bind_address: str = '', certfile: str = None)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>A customized MQTT client.</p>
@@ -426,6 +442,13 @@ attempts.</dd>
 <dd>Automatically attempts to connect when created.</dd>
 <dt><strong><code>port</code></strong> :&ensp;<code>int</code></dt>
 <dd>The MQTT port the broker is listening on.</dd>
+<dt><strong><code>keepalive</code></strong> :&ensp;<code>int</code></dt>
+<dd>The socket timeout and/or keepalive ping interval
+in seconds.</dd>
+<dt><strong><code>bind_address</code></strong> :&ensp;<code>str</code></dt>
+<dd>(optional) A local bind address</dd>
+<dt><strong><code>certfile</code></strong> :&ensp;<code>str</code></dt>
+<dd>If using TLS, the path of the certificate</dd>
 </dl>
 <h2 id="raises">Raises</h2>
 <p><code><a title="fieldedge_utilities.mqtt.MqttError" href="#fieldedge_utilities.mqtt.MqttError">MqttError</a></code> if the client_id is not valid.</p></div>
@@ -457,6 +480,9 @@ attempts.</dd>
                  connect_retry_interval: int = 5,
                  auto_connect: bool = True,
                  port: int = 1883,
+                 keepalive: int = 60,
+                 bind_address: str = &#39;&#39;,
+                 certfile: str = None,
                  ):
         &#34;&#34;&#34;Initializes a managed MQTT client.
         
@@ -475,6 +501,10 @@ attempts.</dd>
                 attempts.
             auto_connect (bool): Automatically attempts to connect when created.
             port (int): The MQTT port the broker is listening on.
+            keepalive (int): The socket timeout and/or keepalive ping interval
+                in seconds.
+            bind_address (str): (optional) A local bind address
+            certfile (str): If using TLS, the path of the certificate
 
         Raises:
             `MqttError` if the client_id is not valid.
@@ -484,6 +514,9 @@ attempts.</dd>
         self._user = os.getenv(&#39;MQTT_USER&#39;) or None
         self._pass = os.getenv(&#39;MQTT_PASS&#39;) or None
         self._port = port
+        self._keepalive = keepalive
+        self._bind_address = bind_address
+        self._certfile = certfile
         self._log = logger or get_wrapping_logger(name=&#39;mqtt_client&#39;)
         if not isinstance(client_id, str) or client_id == &#39;&#39;:
             self._log.error(&#39;Invalid client_id&#39;)
@@ -561,7 +594,13 @@ attempts.</dd>
             if self._user and self._pass:
                 self._mqtt.username_pw_set(username=self._user,
                                            password=self._pass)
-            self._mqtt.connect(self._host, port=self._port)
+            if self._port == 8883:
+                self._mqtt.tls_set(self._certfile)
+                self._mqtt.tls_insecure_set(True)
+            self._mqtt.connect(self._host,
+                               port=self._port,
+                               keepalive=self._keepalive,
+                               bind_address=self._bind_address)
             threads_before = enumerate_threads()
             self._mqtt.loop_start()
             threads_after = enumerate_threads()
@@ -776,7 +815,13 @@ def subscriptions(self) -&gt; dict:
         if self._user and self._pass:
             self._mqtt.username_pw_set(username=self._user,
                                        password=self._pass)
-        self._mqtt.connect(self._host, port=self._port)
+        if self._port == 8883:
+            self._mqtt.tls_set(self._certfile)
+            self._mqtt.tls_insecure_set(True)
+        self._mqtt.connect(self._host,
+                           port=self._port,
+                           keepalive=self._keepalive,
+                           bind_address=self._bind_address)
         threads_before = enumerate_threads()
         self._mqtt.loop_start()
         threads_after = enumerate_threads()

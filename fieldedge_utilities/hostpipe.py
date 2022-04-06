@@ -25,13 +25,15 @@ from fieldedge_utilities.logger import get_wrapping_logger
 
 APP_ENV = os.getenv('APP_ENV', 'docker')
 HOST_USER = os.getenv('HOST_USER', 'fieldedge')
-PIPEPATH = os.getenv('HOSTPIPE_PATH', './hostpipe/pipe')
+HOSTPIPE_PATH = os.getenv('HOSTPIPE_PATH', './hostpipe/pipe')
+HOSTPIPE_LOG = os.getenv('HOSTPIPE_LOG', './logs/hostpipe.log')
 TIMESTAMP_FMT = os.getenv('HOSTPIPE_TS_FMT', 'YYYY-mm-ddTHH:MM:SS.SSSZ')
 COMMAND_PREFIX = f'{TIMESTAMP_FMT},[INFO],command='
 RESPONSE_PREFIX = f'{TIMESTAMP_FMT},[INFO],result='
 
 DEFAULT_TIMEOUT = float(os.getenv('HOSTPIPE_TIMEOUT', 0.25))
 MAX_FILE_SIZE = int(os.getenv('HOSTPIPE_LOGFILE_SIZE', 2)) * 1024 * 1024
+HOSTPIPE_LOG_ITERATION_MAX = int(os.getenv('HOSTPIPE_LOG_ITERATION_MAX', 15))
 
 
 def host_command(command: str,
@@ -51,7 +53,7 @@ def host_command(command: str,
     Args:
         command: The command to be executed on the host.
         noresponse: Flag if set don't look for a response.
-        timeout: The time in seconds to wait for a response.
+        timeout: The time in seconds to wait for a response (default 0.25).
         log: An optional logger for debug purposes.
         pipelog: Override default hostpipe.log, typically used with test_mode.
         test_mode: Boolean to mock responses.
@@ -70,7 +72,7 @@ def host_command(command: str,
     if not test_mode:
         log.debug(f'Sending {modcommand} to hostpipe via shell')
         try:
-            run(f'echo "{_escaped_command(modcommand)}" > {PIPEPATH} &',
+            run(f'echo "{_escaped_command(modcommand)}" > {HOSTPIPE_PATH} &',
                 shell=True,
                 timeout=timeout)
         except TimeoutExpired:
@@ -81,8 +83,7 @@ def host_command(command: str,
         log.info(f'test_mode received command: {command}')
     if noresponse:
         return f'{command} sent'
-    if pipelog is None:
-        pipelog = './logs/hostpipe.log'
+    pipelog = pipelog or HOSTPIPE_LOG
     if not os.path.isfile(pipelog):
         raise FileNotFoundError(f'Could not find file {pipelog}')
     response_str = host_get_response(command,
@@ -175,6 +176,10 @@ def host_get_response(command: str,
                         f' after {timeout} seconds')
             break
         filepass += 1
+        if filepass > HOSTPIPE_LOG_ITERATION_MAX:
+            log.warning(f'Exceeded max={HOSTPIPE_LOG_ITERATION_MAX}'
+                        ' iterations on hostpipe log')
+            break
         log.debug(f'{pipelog} read iteration {filepass}')
         lines = open(pipelog, 'r').readlines()
         for line in reversed(lines):

@@ -78,4 +78,3 @@ def is_valid_ip(ip_address: str, ipv4_only: bool = True) -> bool:
         return True
     except ValueError:
         return False
-    

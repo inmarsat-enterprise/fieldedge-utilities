@@ -191,3 +191,12 @@ def test_escaped_command():
     command1 = 'ip a show | egrep " eth| en| wlan"'
     esc1 = hostpipe._escaped_command(command1)
     assert esc1 == 'ip a show | egrep \\\\\\" eth| en| wlan\\\\\\"'
+
+def test_max_iteration(capsys):
+    pipelog = f'{LOGDIR}/hostpipe-test-dns-get.log'
+    res = hostpipe.host_command('arbitrary', pipelog=pipelog, test_mode=True)
+    captured = capsys.readouterr()
+    assert not res
+    for log in captured:
+        if 'WARNING' in log:
+            assert 'max=' in log

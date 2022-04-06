@@ -66,13 +66,15 @@ from fieldedge_utilities.logger import get_wrapping_logger
 
 APP_ENV = os.getenv(&#39;APP_ENV&#39;, &#39;docker&#39;)
 HOST_USER = os.getenv(&#39;HOST_USER&#39;, &#39;fieldedge&#39;)
-PIPEPATH = os.getenv(&#39;HOSTPIPE_PATH&#39;, &#39;./hostpipe/pipe&#39;)
+HOSTPIPE_PATH = os.getenv(&#39;HOSTPIPE_PATH&#39;, &#39;./hostpipe/pipe&#39;)
+HOSTPIPE_LOG = os.getenv(&#39;HOSTPIPE_LOG&#39;, &#39;./logs/hostpipe.log&#39;)
 TIMESTAMP_FMT = os.getenv(&#39;HOSTPIPE_TS_FMT&#39;, &#39;YYYY-mm-ddTHH:MM:SS.SSSZ&#39;)
 COMMAND_PREFIX = f&#39;{TIMESTAMP_FMT},[INFO],command=&#39;
 RESPONSE_PREFIX = f&#39;{TIMESTAMP_FMT},[INFO],result=&#39;
 
 DEFAULT_TIMEOUT = float(os.getenv(&#39;HOSTPIPE_TIMEOUT&#39;, 0.25))
 MAX_FILE_SIZE = int(os.getenv(&#39;HOSTPIPE_LOGFILE_SIZE&#39;, 2)) * 1024 * 1024
+HOSTPIPE_LOG_ITERATION_MAX = int(os.getenv(&#39;HOSTPIPE_LOG_ITERATION_MAX&#39;, 15))
 
 
 def host_command(command: str,
@@ -92,7 +94,7 @@ def host_command(command: str,
     Args:
         command: The command to be executed on the host.
         noresponse: Flag if set don&#39;t look for a response.
-        timeout: The time in seconds to wait for a response.
+        timeout: The time in seconds to wait for a response (default 0.25).
         log: An optional logger for debug purposes.
         pipelog: Override default hostpipe.log, typically used with test_mode.
         test_mode: Boolean to mock responses.
@@ -111,7 +113,7 @@ def host_command(command: str,
     if not test_mode:
         log.debug(f&#39;Sending {modcommand} to hostpipe via shell&#39;)
         try:
-            run(f&#39;echo &#34;{_escaped_command(modcommand)}&#34; &gt; {PIPEPATH} &amp;&#39;,
+            run(f&#39;echo &#34;{_escaped_command(modcommand)}&#34; &gt; {HOSTPIPE_PATH} &amp;&#39;,
                 shell=True,
                 timeout=timeout)
         except TimeoutExpired:
@@ -122,8 +124,7 @@ def host_command(command: str,
         log.info(f&#39;test_mode received command: {command}&#39;)
     if noresponse:
         return f&#39;{command} sent&#39;
-    if pipelog is None:
-        pipelog = &#39;./logs/hostpipe.log&#39;
+    pipelog = pipelog or HOSTPIPE_LOG
     if not os.path.isfile(pipelog):
         raise FileNotFoundError(f&#39;Could not find file {pipelog}&#39;)
     response_str = host_get_response(command,
@@ -216,6 +217,10 @@ def host_get_response(command: str,
                         f&#39; after {timeout} seconds&#39;)
             break
         filepass += 1
+        if filepass &gt; HOSTPIPE_LOG_ITERATION_MAX:
+            log.warning(f&#39;Exceeded max={HOSTPIPE_LOG_ITERATION_MAX}&#39;
+                        &#39; iterations on hostpipe log&#39;)
+            break
         log.debug(f&#39;{pipelog} read iteration {filepass}&#39;)
         lines = open(pipelog, &#39;r&#39;).readlines()
         for line in reversed(lines):
@@ -313,7 +318,7 @@ and the calling function must handle an empty string response.</p>
 <dt><strong><code>noresponse</code></strong></dt>
 <dd>Flag if set don't look for a response.</dd>
 <dt><strong><code>timeout</code></strong></dt>
-<dd>The time in seconds to wait for a response.</dd>
+<dd>The time in seconds to wait for a response (default 0.25).</dd>
 <dt><strong><code>log</code></strong></dt>
 <dd>An optional logger for debug purposes.</dd>
 <dt><strong><code>pipelog</code></strong></dt>
@@ -347,7 +352,7 @@ FileNotFoundError if the hostpipe log cannot be found.</p></div>
     Args:
         command: The command to be executed on the host.
         noresponse: Flag if set don&#39;t look for a response.
-        timeout: The time in seconds to wait for a response.
+        timeout: The time in seconds to wait for a response (default 0.25).
         log: An optional logger for debug purposes.
         pipelog: Override default hostpipe.log, typically used with test_mode.
         test_mode: Boolean to mock responses.
@@ -366,7 +371,7 @@ FileNotFoundError if the hostpipe log cannot be found.</p></div>
     if not test_mode:
         log.debug(f&#39;Sending {modcommand} to hostpipe via shell&#39;)
         try:
-            run(f&#39;echo &#34;{_escaped_command(modcommand)}&#34; &gt; {PIPEPATH} &amp;&#39;,
+            run(f&#39;echo &#34;{_escaped_command(modcommand)}&#34; &gt; {HOSTPIPE_PATH} &amp;&#39;,
                 shell=True,
                 timeout=timeout)
         except TimeoutExpired:
@@ -377,8 +382,7 @@ FileNotFoundError if the hostpipe log cannot be found.</p></div>
         log.info(f&#39;test_mode received command: {command}&#39;)
     if noresponse:
         return f&#39;{command} sent&#39;
-    if pipelog is None:
-        pipelog = &#39;./logs/hostpipe.log&#39;
+    pipelog = pipelog or HOSTPIPE_LOG
     if not os.path.isfile(pipelog):
         raise FileNotFoundError(f&#39;Could not find file {pipelog}&#39;)
     response_str = host_get_response(command,
@@ -462,6 +466,10 @@ FileNotFoundError if the hostpipe log cannot be found.</p></div>
                         f&#39; after {timeout} seconds&#39;)
             break
         filepass += 1
+        if filepass &gt; HOSTPIPE_LOG_ITERATION_MAX:
+            log.warning(f&#39;Exceeded max={HOSTPIPE_LOG_ITERATION_MAX}&#39;
+                        &#39; iterations on hostpipe log&#39;)
+            break
         log.debug(f&#39;{pipelog} read iteration {filepass}&#39;)
         lines = open(pipelog, &#39;r&#39;).readlines()
         for line in reversed(lines):

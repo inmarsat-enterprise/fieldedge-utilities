@@ -1,8 +1,11 @@
 import json
+import logging
 import os
 import pytest
+from time import sleep
 
 from fieldedge_utilities import logger
+from fieldedge_utilities import timer
 
 TEST_STR = 'Testing basic logging functionality.'
 TEST_FILE = './logs/test.log'
@@ -71,3 +74,29 @@ def test_invalid_file_path(capsys):
     with pytest.raises(ValueError, match='Directory /bad/path not found'):
         log = logger.get_wrapping_logger(name='test',
                                          filename='/bad/path/test.log')
+
+
+log = logging.getLogger()
+timer_cycles = 0
+
+
+def timer_callback():
+    global timer_cycles
+    log.info('Timer called me')
+    timer_cycles += 1
+
+
+def test_library_log(capsys):
+    global timer_cycles
+    testlog = logger.get_wrapping_logger(name='test', filename=TEST_FILE)
+    for h in testlog.handlers:
+        logger.add_handler(log, h)
+    logger.apply_formatter(log, logger.get_formatter())
+    testlog.warning('This is a test warning')
+    rt = timer.RepeatingTimer(seconds=2, target=timer_callback, verbose_debug=True)
+    rt.start()
+    rt.start_timer()
+    while timer_cycles < 2:
+        sleep(1)
+    assert True
+    os.remove(TEST_FILE)

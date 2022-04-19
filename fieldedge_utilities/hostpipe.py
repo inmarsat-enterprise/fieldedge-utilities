@@ -15,13 +15,14 @@ References environment variables:
 * `MAX_FILE_SIZE` int MegaBytes (default 2)
 
 """
+import logging
 import os
 from datetime import datetime
 from logging import DEBUG, Logger
 from subprocess import TimeoutExpired, run
 from time import sleep, time
 
-from fieldedge_utilities.logger import get_wrapping_logger
+_log = logging.getLogger(__name__)
 
 APP_ENV = os.getenv('APP_ENV', 'docker')
 HOST_USER = os.getenv('HOST_USER', 'fieldedge')
@@ -39,7 +40,6 @@ HOSTPIPE_LOG_ITERATION_MAX = int(os.getenv('HOSTPIPE_LOG_ITERATION_MAX', 15))
 def host_command(command: str,
                  noresponse: bool = False,
                  timeout: float = DEFAULT_TIMEOUT,
-                 log: Logger = None,
                  pipelog: str = None,
                  test_mode: bool = False,
                  ) -> str:
@@ -54,7 +54,6 @@ def host_command(command: str,
         command: The command to be executed on the host.
         noresponse: Flag if set don't look for a response.
         timeout: The time in seconds to wait for a response (default 0.25).
-        log: An optional logger for debug purposes.
         pipelog: Override default hostpipe.log, typically used with test_mode.
         test_mode: Boolean to mock responses.
     
@@ -66,21 +65,20 @@ def host_command(command: str,
         FileNotFoundError if the hostpipe log cannot be found.
 
     """
-    log = log or get_wrapping_logger()
     modcommand = _apply_preamble(command)
     command_time = time()
     if not test_mode:
-        log.debug(f'Sending {modcommand} to hostpipe via shell')
+        _log.debug(f'Sending {modcommand} to hostpipe via shell')
         try:
             run(f'echo "{_escaped_command(modcommand)}" > {HOSTPIPE_PATH} &',
                 shell=True,
                 timeout=timeout)
         except TimeoutExpired:
             err = f'Command {command} timed out waiting for hostpipe'
-            log.error(err)
+            _log.error(err)
             raise TimeoutError(err)
     else:
-        log.info(f'test_mode received command: {command}')
+        _log.info(f'test_mode received command: {command}')
     if noresponse:
         return f'{command} sent'
     pipelog = pipelog or HOSTPIPE_LOG
@@ -90,20 +88,19 @@ def host_command(command: str,
                                      command_time=command_time,
                                      pipelog=pipelog,
                                      timeout=timeout,
-                                     log=log,
                                      test_mode=test_mode,
                                      ).strip()
     deleted_count = _maintain_pipelog(pipelog)
     if deleted_count > 0:
-        log.info(f'Removed {deleted_count} oldest lines from {pipelog}')
-    if log.getEffectiveLevel() == DEBUG:
+        _log.info(f'Removed {deleted_count} oldest lines from {pipelog}')
+    if _log.getEffectiveLevel() == DEBUG:
         if response_str == '':
             abv_response = '<no response>'
         elif len(response_str) < 25:
             abv_response = response_str.replace('\n', ';')
         else:
             abv_response = response_str[:20].replace("\n", ";") + '...'
-        log.debug(f'Hostpipe: {command} -> {abv_response}')
+        _log.debug(f'Hostpipe: {command} -> {abv_response}')
     return response_str
 
 
@@ -142,15 +139,13 @@ def host_get_response(command: str,
                       command_time: float = None,
                       pipelog: str = None,
                       timeout: float = DEFAULT_TIMEOUT,
-                      log: Logger = None,
                       test_mode: bool = False,
                       ) -> str:
-    """Retrieves the response to the command from the host pipe log.
+    """Retrieves the response to the command from the host pipe _log.
     
     Args:
         command: The host command sent previously.
         timeout: The maximum time in seconds to try for a response.
-        log: Optional logging facility
     
     Returns:
         A string concatenating all the response lines following the command.
@@ -159,28 +154,27 @@ def host_get_response(command: str,
         FileNotFoundError if the hostpipe log cannot be found.
 
     """
-    log = log or get_wrapping_logger()
     calltime = time()
     modcommand = _apply_preamble(command)
     if pipelog is None:
         pipelog = './logs/hostpipe.log'
     if not os.path.isfile(pipelog):
         raise FileNotFoundError(f'Could not find file {pipelog}')
-    log.debug(f'Searching {pipelog} for {modcommand}')
+    _log.debug(f'Searching {pipelog} for {modcommand}')
     response = []
     filepass = 0
     while len(response) == 0:
         # test_mode assumes manual step through will usually violate timeout
         if not test_mode and time() > calltime + timeout:
-            log.warning(f'Response to {command} timed out'
+            _log.warning(f'Response to {command} timed out'
                         f' after {timeout} seconds')
             break
         filepass += 1
         if filepass > HOSTPIPE_LOG_ITERATION_MAX:
-            log.warning(f'Exceeded max={HOSTPIPE_LOG_ITERATION_MAX}'
+            _log.warning(f'Exceeded max={HOSTPIPE_LOG_ITERATION_MAX}'
                         ' iterations on hostpipe log')
             break
-        log.debug(f'{pipelog} read iteration {filepass}')
+        _log.debug(f'{pipelog} read iteration {filepass}')
         lines = open(pipelog, 'r').readlines()
         for line in reversed(lines):
             if (not test_mode and
@@ -191,7 +185,7 @@ def host_get_response(command: str,
                 break
             if ',command=' in line:
                 logged_command = line.split(',command=')[1].strip()
-                log.debug(f'Found command {logged_command} in {pipelog}'
+                _log.debug(f'Found command {logged_command} in {pipelog}'
                           f'({_get_line_ts(line)})'
                           f' with {len(response)} response lines')
                 if logged_command != modcommand:
@@ -202,12 +196,12 @@ def host_get_response(command: str,
                         rts = _get_line_ts(resline)
                         if rts == cts:
                             to_remove.append(resline)
-                    log.debug(f'Mismatch: {logged_command} != {modcommand}'
+                    _log.debug(f'Mismatch: {logged_command} != {modcommand}'
                               f' -> dropping {len(to_remove)} response lines')
                     response = [l for l in response if l not in to_remove]
                 else:
                     # we reached the original command so can stop parsing response
-                    log.debug(f'Found target {modcommand}'
+                    _log.debug(f'Found target {modcommand}'
                               f' with {len(response)} response lines')
                     response = [l[len(RESPONSE_PREFIX):] for l in response]
                     break

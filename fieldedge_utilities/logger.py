@@ -27,7 +27,7 @@ import os
 import sys
 from time import gmtime
 
-from fieldedge_utilities.path import clean_path, get_caller_name
+from fieldedge_utilities.path import clean_path
 
 FORMAT_CSV = ('%(asctime)s.%(msecs)03dZ,[%(levelname)s],(%(threadName)s),'
               '%(module)s.%(funcName)s:%(lineno)d,%(message)s')
@@ -40,17 +40,20 @@ FORMAT_JSON = ('{'
                 ',"line":%(lineno)d'
                 ',"message":"%(message)s"'
                 '}')
+DATEFMT = '%Y-%m-%dT%H:%M:%S'
 
 
-# Logging to STDOUT or STDERR
-class _LessThanFilter(logging.Filter):
-    """Filters logs below a specified level for routing to a given handler."""
+class LogFilterLessThan(logging.Filter):
+    """Filters logs below a specified level for routing to a given handler.
+    
+    Intended to route `WARNING` and higher to `STDERR` and lower to `STDOUT`.
+
+    """
     def __init__(self,
                  exclusive_maximum: int = logging.WARNING,
                  name: str = None):
         if name is None:
             name = f'LessThan{logging.getLevelName(exclusive_maximum)}'
-        # super(_LessThanFilter, self).__init__(name)
         super().__init__(name)
         self.max_level = exclusive_maximum
 
@@ -59,15 +62,15 @@ class _LessThanFilter(logging.Filter):
         return 1 if record.levelno < self.max_level else 0
 
 
-class _OneLineExceptionFormatter(logging.Formatter):
-    """Formats exceptions into a single line stack trace."""
+class LogFormatterOneLineException(logging.Formatter):
+    """Formats exceptions into a single line stack trace.
+    
+    Also replaces the record message with the error type.
+
+    """
     def formatException(self, exc_info):
         original = super().formatException(exc_info)
-        lines = original.splitlines()
-        result = ''
-        for i, line in enumerate(lines):
-            result += (' -> ' if i > 0 else '') + line.strip()
-        return result
+        return ' -> '.join([x.strip() for x in original.splitlines()])
 
     def format(self, record):
         result = super().format(record)
@@ -78,29 +81,131 @@ class _OneLineExceptionFormatter(logging.Formatter):
 
 
 def get_logfile_name(logger: logging.Logger) -> str:
-    """Returns the logger's RotatingFileHandler name."""
-    for h in logger.handlers:
-        if isinstance(h, RotatingFileHandler):
-            return h.baseFilename
-    return None
-
-
-def _is_log_handler(logger: logging.Logger, handler: object) -> bool:
-    """Returns true if the handler is found in the logger.
+    """Returns the logger's RotatingFileHandler name.
     
     Args:
-        logger (logging.Logger)
-        handler (logging handler)
-    
-    Returns:
-        True if the handler is in the logger.
+        logger: The Logger to retrieve its file name from.
+
+    Raises:
+        TypeError if Logger is invalid
 
     """
     if not isinstance(logger, logging.Logger):
-        return False
+        raise TypeError('Invalid Logger')
+    for h in logger.handlers:
+        if isinstance(h, RotatingFileHandler):
+            return h.baseFilename
+
+
+def add_handler(logger: logging.Logger, handler: logging.Handler) -> None:
+    """Adds a handler to a logger if one of the same name is not present.
+    
+    Args:
+        logger: The logger to add the handler to.
+        handler: The handler to add to the logger.
+    
+    Raises:
+        TypeError if Logger or Handler are invalid
+        ValueError if a handler with the same name is already in the logger.
+
+    """
+    if not isinstance(logger, logging.Logger):
+        raise TypeError('Invalid Logger')
+    if not isinstance(handler, logging.Handler):
+        raise TypeError('Invalid Handler')
     for h in logger.handlers:
         if h.name == handler.name:
-            return True
+            raise ValueError(f'Logger already has a handler named {h.name}')
+    logger.addHandler(handler)
+
+
+def apply_formatter(logger: logging.Logger,
+                    formatter: logging.Formatter) -> None:
+    """Applies the log formatter to all handlers in the logger.
+    
+    Args:
+        logger: The logger with the handler targets.
+        formatter: The formatter to apply.
+
+    Raises:
+        TypeError if Logger or Handler are invalid
+    
+    """
+    if not isinstance(logger, logging.Logger):
+        raise TypeError('Invalid Logger')
+    if not isinstance(formatter, logging.Formatter):
+        raise TypeError('Invalid Formatter')
+    for h in logger.handlers:
+        h.setFormatter(formatter)
+
+
+def apply_loglevel(logger: logging.Logger, level: int) -> None:
+    """Sets the log level on all handlers except stderr (always WARNING).
+    
+    Args:
+        logger: The logger whose handlers to apply the level to.
+        level: The logging level to apply
+
+    Raises:
+        TypeError if Logger is invalid
+    
+    """
+    if not isinstance(logger, logging.Logger):
+        raise TypeError('Invalid Logger')
+    for h in logger.handlers:
+        if 'stderr' not in h.name:
+            h.setLevel(level)
+
+
+def get_formatter(format: str = 'csv') -> logging.Formatter:
+    """Returns a standardized log formatter.
+    
+    Args:
+        format: `csv` or `json` are supported.
+    
+    Returns:
+        A logging.Formatter
+
+    """
+    fmt = FORMAT_JSON if format == 'json' else FORMAT_CSV
+    log_formatter = LogFormatterOneLineException(fmt, DATEFMT)
+    log_formatter.converter = gmtime
+    return log_formatter
+
+
+def get_handler_file(filename: str,
+                     file_size: int = 5,
+                     **kwargs) -> RotatingFileHandler:
+    if not filename:
+        raise ValueError('Missing filename')
+    filename = clean_path(filename)
+    if not os.path.isdir(os.path.dirname(filename)):
+        raise FileNotFoundError('Invalid logfile path'
+            f' {os.path.dirname(filename)}')
+    handler = RotatingFileHandler(
+        filename=filename,
+        mode=kwargs.pop('mode', 'a'),
+        maxBytes=kwargs.pop('maxBytes', int(file_size * 1024 * 1024)),
+        backupCount=kwargs.pop('backupCount', 2),
+        encoding=kwargs.pop('encoding', None),
+        delay=kwargs.pop('delay', 0),
+    )
+    handler.name = f'{kwargs.pop("name", __name__)}_file_handler'
+    return handler
+
+
+def get_handler_stdout(**kwargs) -> logging.StreamHandler:
+    handler_stdout = logging.StreamHandler(sys.stdout)
+    handler_stdout.name = f'{kwargs.pop("name", __name__)}_stdout_handler'
+    handler_stdout.addFilter(LogFilterLessThan(logging.WARNING))
+    return handler_stdout
+
+
+def get_handler_stderr(**kwargs) -> logging.StreamHandler:
+    handler_stderr = logging.StreamHandler(sys.stderr)
+    handler_stderr.name = f'{kwargs.pop("name", __name__)}_stderr_handler'
+    handler_stderr.setLevel(logging.WARNING)
+    return handler_stderr
 
 
 def get_wrapping_logger(name: str = None,
@@ -131,60 +236,27 @@ def get_wrapping_logger(name: str = None,
             backupCount (int): defaults to 2
     
     Returns:
-        A logger with console stream handler and (optional) file handler.
+        A `Logger` with console `StreamHandler` and (optional)
+            `RotatingFileHandler`.
     
     Raises:
-        FileNotFoundError if a logfile name is specified with an invalid
-            directory.
+        `FileNotFoundError` if a logfile name is specified with an invalid path.
     
     """
-    if format == 'json':
-        fmt = FORMAT_JSON
-    else:
-        fmt = FORMAT_CSV
-    log_formatter = _OneLineExceptionFormatter(fmt=fmt,
-                                               datefmt='%Y-%m-%dT%H:%M:%S')
-    log_formatter.converter = gmtime
-    if name is None:
-        name = get_caller_name()
+    if not name:
+        name = __name__
     logger = logging.getLogger(name)
-    if logger.getEffectiveLevel() == logging.DEBUG:
-        log_level = logging.DEBUG
-    #: Set up log file
     if filename is not None:
-        try:
-            filename = clean_path(filename)
-            if not os.path.isdir(os.path.dirname(filename)):
-                raise FileNotFoundError('Invalid logfile path'
-                    f' {os.path.dirname(filename)}')
-            handler_file = RotatingFileHandler(
-                filename=filename,
-                mode=kwargs.pop('mode', 'a'),
-                maxBytes=kwargs.pop('maxBytes', int(file_size * 1024 * 1024)),
-                backupCount=kwargs.pop('backupCount', 2),
-                encoding=kwargs.pop('encoding', None),
-                delay=kwargs.pop('delay', 0))
-            handler_file.name = name + '_file_handler'
-            handler_file.setFormatter(log_formatter)
-            handler_file.setLevel(log_level)
-            if not _is_log_handler(logger, handler_file):
-                logger.addHandler(handler_file)
-        except Exception as e:
-            logger.exception(f'Could not create RotatingFileHandler {filename}'
-                f' ({e})')
-            raise e
+        filename = clean_path(filename)
+        if not os.path.isdir(os.path.dirname(filename)):
+            raise FileNotFoundError('Invalid logfile path'
+                f' {os.path.dirname(filename)}')
+        add_handler(logger, get_handler_file(filename,
+                                             name=name,
+                                             file_size=file_size,
+                                             **kwargs))
+    add_handler(logger, get_handler_stdout(name=name))
+    add_handler(logger, get_handler_stderr(name=name))
+    apply_formatter(logger, get_formatter(format))
     logger.setLevel(log_level)
-    handler_stdout = logging.StreamHandler(sys.stdout)
-    handler_stdout.name = name + '_stdout_handler'
-    handler_stdout.setFormatter(log_formatter)
-    handler_stdout.setLevel(log_level)
-    handler_stdout.addFilter(_LessThanFilter(logging.WARNING))
-    if not _is_log_handler(logger, handler_stdout):
-        logger.addHandler(handler_stdout)
-    handler_stderr = logging.StreamHandler(sys.stderr)
-    handler_stderr.name = name + '_stderr_handler'
-    handler_stderr.setFormatter(log_formatter)
-    handler_stderr.setLevel(logging.WARNING)
-    if not _is_log_handler(logger, handler_stderr):
-        logger.addHandler(handler_stderr)
     return logger

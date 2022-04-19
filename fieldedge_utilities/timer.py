@@ -1,7 +1,6 @@
 import logging
 import threading
 from time import time
-from typing import Callable, Tuple
 
 _log = logging.getLogger(__name__)
 
@@ -25,8 +24,8 @@ class RepeatingTimer(threading.Thread):
     """
     def __init__(self,
                  seconds: int,
-                 target: Callable,
-                 args: Tuple = (),
+                 target: callable,
+                 args: tuple = (),
                  kwargs: dict = {},
                  name: str = None,
                  sleep_chunk: float = 0.25,
@@ -58,7 +57,7 @@ class RepeatingTimer(threading.Thread):
             err_str = 'RepeatingTimer seconds must be integer >= 0'
             raise ValueError(err_str)
         super().__init__(daemon=daemon)
-        self.name = name or f'{str(target)}_timer_thread'
+        self.name = name or f'{target.__name__}_timer_thread'
         self.interval = seconds
         if target is None:
             _log.warning(f'No target specified for RepeatingTimer {self.name}')

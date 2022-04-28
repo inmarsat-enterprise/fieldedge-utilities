@@ -53,47 +53,61 @@ in a **Docker** container listening on port 1883 for authenticated connections.
 
 &#34;&#34;&#34;
 import json
+import logging
 import os
 from atexit import register as on_exit
-from logging import DEBUG, Logger
-from socket import timeout   #: for Python &lt; 3.10 compatibility vs TimeoutError
+from enum import Enum, IntEnum
+from socket import timeout  # : for Python &lt; 3.10 compatibility vs TimeoutError
 from threading import enumerate as enumerate_threads
 from time import sleep, time
-from typing import Callable, Union
 
 from dotenv import load_dotenv
-from paho.mqtt.client import MQTT_ERR_SUCCESS, Client
+from paho.mqtt.client import Client as PahoClient
+from paho.mqtt.client import MQTTMessage as PahoMessage
 
-from fieldedge_utilities.logger import get_wrapping_logger
+MQTT_HOST = os.getenv(&#39;MQTT_HOST&#39;, &#39;fieldedge-broker&#39;)
+MQTT_USER = os.getenv(&#39;MQTT_USER&#39;)
+MQTT_PASS = os.getenv(&#39;MQTT_PASS&#39;)
+
+JSON_DUMPS_COMPATIBLE = (dict, list, tuple, str, int, float, Enum, bool)
+
+_log = logging.getLogger(__name__)
 
 load_dotenv()
 
-CONNECTION_RESULT_CODES = {
-    0: &#39;MQTT_ERR_SUCCESS&#39;,
-    1: &#39;MQTT_ERR_INCORRECT_PROTOCOL&#39;,
-    2: &#39;MQTT_ERR_INVALID_CLIENT_ID&#39;,
-    3: &#39;MQTT_ERR_SERVER_UNAVAILABLE&#39;,
-    4: &#39;MQTT_ERR_BAD_USERNAME_PASSWORD&#39;,
-    5: &#39;MQTT_ERR_UNAUTHORIZED&#39;,
-    6: &#39;MQTT_ERR_CONNECTION_LOST&#39;,
-    7: &#39;MQTT_ERR_TIMEOUT_WAITING_FOR_LENGTH&#39;,
-    8: &#39;MQTT_ERR_TIMEOUT_WAITING_FOR_PAYLOAD&#39;,
-    9: &#39;MQTT_ERR_TIMEOUT_WAITING_FOR_CONNACK&#39;,
-    10: &#39;MQTT_ERR_TIMEOUT_WAITING_FOR_SUBACK&#39;,
-    11: &#39;MQTT_ERR_TIMEOUT_WAITING_FOR_UNSUBACK&#39;,
-    12: &#39;MQTT_ERR_TIMEOUT_WAITING_FOR_PINGRESP&#39;,
-}
+
+class MqttResultCode(IntEnum):
+    SUCCESS = 0
+    ERR_INCORRECT_PROTOCOL = 1
+    ERR_INVALID_CLIENT_ID = 2
+    ERR_SERVER_UNAVAILABLE = 3
+    ERR_BAD_USERNAME_OR_PASSWORD = 4
+    ERR_UNAUTHORIZED = 5
+    ERR_CONNECTION_LOST = 6
+    ERR_TIMEOUT_LENGTH = 7
+    ERR_TIMEOUT_PAYLOAD = 8
+    ERR_TIMEOUT_CONNACK = 9
+    ERR_TIMEOUT_SUBACK = 10
+    ERR_TIMEOUT_UNSUBACK = 11
+    ERR_TIMEOUT_PINGRESP = 12
+    ERR_MALFORMED_LENGTH = 13
+    ERR_COMMUNICATION_PORT = 14
+    ERR_ADDRESS_PARSING = 15
+    ERR_MALFORMED_PACKET = 16
+    ERR_SUBSCRIPTION_FAILURE = 17
+    ERR_PAYLOAD_DECODE_FAILURE = 18
+    ERR_COMPILE_DECODER = 19
+    ERR_UNSUPPORTED_PACKET_TYPE = 20
 
 
 def _get_mqtt_result(rc: int) -&gt; str:
-    if rc in CONNECTION_RESULT_CODES:
-        return CONNECTION_RESULT_CODES[rc]
+    if rc in MqttResultCode:
+        return MqttResultCode(rc).name
     return &#39;UNKNOWN&#39;
 
 
 class MqttError(Exception):
     &#34;&#34;&#34;A MQTT-specific error.&#34;&#34;&#34;
-    pass
 
 
 class MqttClient:
@@ -101,74 +115,81 @@ class MqttClient:
 
     Attributes:
         client_id (str): A unique client_id.
-        on_message (Callable): A function called when a subscribed message
-            is received from the broker.
-        on_connect (Callable): A function called when the client connects
-            to the broker.
-        on_disconnect (Callable): A function called when the client disconnects.
+        subscriptions (dict): A dictionary of subscriptions with qos and
+            message ID properties
+        on_message (callable): The callback when subscribed messages are
+            received as `topic`(str), `message`(dict|str).
         is_connected (bool): Status of the connection to the broker.
+        auto_connect (bool): Automatically attempts to connect when created
+            or reconnect after disconnection.
         connect_retry_interval (int): Seconds between broker reconnect attempts.
 
     &#34;&#34;&#34;
     def __init__(self,
-                 client_id: str,
-                 on_message: Callable[..., &#34;tuple[str, object]&#34;] = None,
-                 subscribe_default: Union[str, &#34;list[str]&#34;] = None,
-                 on_connect: Callable = None,
-                 on_disconnect: Callable = None,
-                 logger: Logger = None,
-                 connect_retry_interval: int = 5,
+                 client_id: str = __name__,
+                 on_message: callable = None,
+                 subscribe_default: &#39;str|list[str]&#39; = None,
                  auto_connect: bool = True,
-                 port: int = 1883,
-                 keepalive: int = 60,
-                 bind_address: str = &#39;&#39;,
-                 certfile: str = None,
+                 connect_retry_interval: int = 5,
+                 **kwargs,
                  ):
         &#34;&#34;&#34;Initializes a managed MQTT client.
         
         Args:
-            client_id (str): The unique client ID
-            on_message (Callable): The callback when subscribed messages are
-                received as `topic, message`.
-            subscribe_default (Union[str, list[str]]): The default
-                subscription(s) established on re/connection.
-            on_connect (Callable): (optional) callback when connection to the
-                broker is established.
-            on_disconnect (Callable): (optional) callback when disconnecting
-                from the broker.
-            logger (Logger): (optional) Logger
+            client_id (str): The unique client ID (default importing module
+                `__name__`)
+            on_message (callable): The callback when subscribed messages are
+                received as `topic`(str), `message`(dict|str).
+            subscribe_default (str|list[str]): The default subscription(s)
+                established on re/connection.
             connect_retry_interval (int): Seconds between broker reconnect
-                attempts.
-            auto_connect (bool): Automatically attempts to connect when created.
-            port (int): The MQTT port the broker is listening on.
-            keepalive (int): The socket timeout and/or keepalive ping interval
-                in seconds.
-            bind_address (str): (optional) A local bind address
-            certfile (str): If using TLS, the path of the certificate
+                attempts if auto_connect is `True`.
+            auto_connect (bool): Automatically attempts to connect when created
+                or reconnect after disconnection.
+            **kwargs: include Paho MQTT Client overrides such as:
+            
+            * `on_connect` and/or `on_disconnect`
+            * `host`, `port` (default 1883) and `keepalive` (default 60)
+            * `username` and `password`
+            * `ca_certs`, `certfile`, `keyfile`
+            * `qos` (default = 0)
 
         Raises:
             `MqttError` if the client_id is not valid.
 
         &#34;&#34;&#34;
-        self._host = os.getenv(&#39;MQTT_HOST&#39;) or &#39;fieldedge-broker&#39;
-        self._user = os.getenv(&#39;MQTT_USER&#39;) or None
-        self._pass = os.getenv(&#39;MQTT_PASS&#39;) or None
-        self._port = port
-        self._keepalive = keepalive
-        self._bind_address = bind_address
-        self._certfile = certfile
-        self._log = logger or get_wrapping_logger(name=&#39;mqtt_client&#39;)
+        self._host = kwargs.get(&#39;host&#39;, MQTT_HOST)
+        self._username = kwargs.get(&#39;username&#39;, MQTT_USER)
+        self._password = kwargs.get(&#39;password&#39;, MQTT_PASS)
+        self._port = kwargs.get(&#39;port&#39;, 1883)
+        self._keepalive = kwargs.get(&#39;keepalive&#39;, 60)
+        self._bind_address = kwargs.get(&#39;bind_address&#39;, &#39;&#39;)
+        self._ca_certs = kwargs.get(&#39;ca_certs&#39;, None)
+        self._certfile = kwargs.get(&#39;certfile&#39;, None)
+        self._keyfile = kwargs.get(&#39;keyfile&#39;, None)
         if not isinstance(client_id, str) or client_id == &#39;&#39;:
-            self._log.error(&#39;Invalid client_id&#39;)
+            _log.error(&#39;Invalid client_id&#39;)
             raise MqttError(&#39;Invalid client_id&#39;)
         if not callable(on_message):
-            self._log.warning(&#39;No on_message specified&#39;)
+            _log.warning(&#39;No on_message specified&#39;)
         on_exit(self._cleanup)
         self.on_message = on_message
-        self.on_connect = on_connect
-        self.on_disconnect = on_disconnect
-        self.client_id = client_id
-        self._mqtt = Client()
+        self.on_connect = kwargs.get(&#39;on_connect&#39;, None)
+        self.on_disconnect = kwargs.get(&#39;on_disconnect&#39;, None)
+        self._qos = kwargs.get(&#39;qos&#39;, 0)
+        self._client_id = client_id
+        self._client_uid = kwargs.get(&#39;client_uid&#39;, True)
+        if self._host.endswith(&#39;azure-devices.net&#39;):
+            _log.info(&#39;Configuring Azure IoT Hub subscriptions&#39;)
+            self._client_uid = False
+            subscribe_default = [
+                f&#39;devices/{self.client_id}/messages/devicebound/#&#39;,
+                &#39;$iothub/twin/res/#&#39;,
+                &#39;$iothub/methods/POST/#&#39;,
+            ]
+        if self._client_uid:
+            self.client_id = client_id
+        self._mqtt = PahoClient()
         self.is_connected = False
         self._subscriptions = {}
         self.connect_retry_interval = connect_retry_interval
@@ -178,7 +199,7 @@ class MqttClient:
             if not isinstance(subscribe_default, list):
                 subscribe_default = [subscribe_default]
             for sub in subscribe_default:
-                self.subscribe(sub)
+                self.subscribe(sub, self._qos)
         if self.auto_connect:
             self.connect()
     
@@ -188,13 +209,16 @@ class MqttClient:
     
     @client_id.setter
     def client_id(self, id: str):
-        try:
-            if isinstance(int(id.split(&#39;_&#39;)[1]), int):
-                # previously made unique, could be a bouncing MQTT connection
-                id = id.split(&#39;_&#39;)[0]
-        except (ValueError, IndexError):
-            pass   #: new id will be made unique
-        self._client_id = f&#39;{id}_{int(time())}&#39;
+        if not self._client_uid:
+            self._client_id = id
+        else:
+            try:
+                if isinstance(int(id.split(&#39;_&#39;)[1]), int):
+                    # previously made unique, could be a bouncing connection
+                    id = id.split(&#39;_&#39;)[0]
+            except (ValueError, IndexError):
+                pass   #: new id will be made unique
+            self._client_id = f&#39;{id}_{int(time())}&#39;
 
     @property
     def subscriptions(self) -&gt; dict:
@@ -214,8 +238,8 @@ class MqttClient:
     def _cleanup(self, *args):
         # TODO: logging raises an error since the log file was closed
         # for arg in args:
-        #     self._log.debug(f&#39;mqtt cleanup called with arg = {arg}&#39;)
-        # self._log.debug(&#39;Terminating MQTT connection&#39;)
+        #     _log.debug(f&#39;mqtt cleanup called with arg = {arg}&#39;)
+        # _log.debug(&#39;Terminating MQTT connection&#39;)
         self._mqtt.user_data_set(&#39;terminate&#39;)
         self._mqtt.loop_stop()
         self._mqtt.disconnect()
@@ -223,21 +247,23 @@ class MqttClient:
     def connect(self):
         &#34;&#34;&#34;Attempts to establish a connection to the broker and re-subscribe.&#34;&#34;&#34;
         try:
-            self._log.debug(&#39;Attempting MQTT broker connection&#39;
-                            f&#39; to {self._host} as {self._client_id}&#39;)
+            _log.debug(f&#39;Attempting MQTT broker connection to {self._host}&#39;
+                       f&#39; as {self._client_id}&#39;)
             self._mqtt.reinitialise(client_id=self.client_id)
             self._mqtt.user_data_set(None)
             self._mqtt.on_connect = self._mqtt_on_connect
             self._mqtt.on_disconnect = self._mqtt_on_disconnect
             self._mqtt.on_subscribe = self._mqtt_on_subscribe
             self._mqtt.on_message = self._mqtt_on_message
-            if self._user and self._pass:
-                self._mqtt.username_pw_set(username=self._user,
-                                           password=self._pass)
+            if self._username and self._password:
+                self._mqtt.username_pw_set(username=self._username,
+                                           password=self._password)
             if self._port == 8883:
-                self._mqtt.tls_set(self._certfile)
-                self._mqtt.tls_insecure_set(True)
-            self._mqtt.connect(self._host,
+                self._mqtt.tls_set(ca_certs=self._ca_certs,
+                                   certfile=self._certfile,
+                                   keyfile=self._keyfile)
+                # self._mqtt.tls_insecure_set(False)
+            self._mqtt.connect(host=self._host,
                                port=self._port,
                                keepalive=self._keepalive,
                                bind_address=self._bind_address)
@@ -252,13 +278,13 @@ class MqttClient:
         except (ConnectionError, timeout, TimeoutError) as err:
             self._failed_connect_attempts += 1
             if self.connect_retry_interval &gt; 0:
-                self._log.warning(f&#39;Unable to connect to {self._host} ({err})&#39;
-                    f&#39; - retrying in {self.connect_retry_interval} seconds&#39;)
+                _log.warning(f&#39;Unable to connect to {self._host} ({err})&#39;
+                             f&#39; - retrying in {self.connect_retry_interval} s&#39;)
                 sleep(self.connect_retry_interval)
                 self.connect()
             else:
-                self._log.warning(f&#39;Failed to connect to {self._host}&#39;
-                    &#39; but retry disabled - call method connect to retry&#39;)
+                _log.warning(f&#39;Failed to connect to {self._host}&#39;
+                             &#39; but retry disabled - call connect() to retry&#39;)
 
     def disconnect(self):
         &#34;&#34;&#34;Attempts to disconnect from the broker.&#34;&#34;&#34;
@@ -266,10 +292,15 @@ class MqttClient:
         self._mqtt.loop_stop()
         self._mqtt.disconnect()
 
-    def _mqtt_on_connect(self, client, userdata, flags, rc):
+    def _mqtt_on_connect(self,
+                         client: PahoClient,
+                         userdata: any,
+                         flags: dict,
+                         rc: int):
+        &#34;&#34;&#34;Internal callback re-subscribes on (re)connection.&#34;&#34;&#34;
         self._failed_connect_attempts = 0
-        if rc == 0:
-            self._log.debug(f&#39;Established MQTT connection to {self._host}&#39;)
+        if rc == MqttResultCode.SUCCESS:
+            _log.debug(f&#39;Established MQTT connection to {self._host}&#39;)
             if not self.is_connected:
                 for sub in self.subscriptions:
                     self._mqtt_subscribe(sub, self.subscriptions[sub][&#39;qos&#39;])
@@ -277,39 +308,82 @@ class MqttClient:
             if self.on_connect:
                 self.on_connect(client, userdata, flags, rc)
         else:
-            self._log.error(f&#39;MQTT broker connection result code: {rc}&#39;
-                            f&#39; ({_get_mqtt_result(rc)})&#39;)
+            _log.error(f&#39;MQTT broker connection result code: {rc}&#39;
+                       f&#39; ({_get_mqtt_result(rc)})&#39;)
     
     def _mqtt_subscribe(self, topic: str, qos: int = 0):
-        self._log.debug(f&#39;{self._client_id} subscribing to {topic} (qos={qos})&#39;)
-        (result, mid) = self._mqtt.subscribe(topic=topic, qos=2)
-        if result == MQTT_ERR_SUCCESS:
+        &#34;&#34;&#34;Internal subscription handler assigns id indicating *subscribed*.&#34;&#34;&#34;
+        (result, mid) = self._mqtt.subscribe(topic=topic, qos=qos)
+        _log.debug(f&#39;{self._client_id} subscribing to {topic}&#39;
+                   f&#39; (qos={qos}, mid={mid})&#39;)
+        if result == MqttResultCode.SUCCESS:
+            if mid == 0:
+                _log.warning(f&#39;Received mid={mid} expected &gt; 0&#39;)
             self._subscriptions[topic][&#39;mid&#39;] = mid
         else:
-            self._log.error(f&#39;MQTT Error {result} subscribing to {topic}&#39;)
-
-    def _mqtt_unsubscribe(self, topic: str):
-        self._log.debug(f&#39;{self._client_id} unsubscribing to {topic}&#39;)
-        (result, mid) = self._mqtt.unsubscribe(topic)
-        if result != MQTT_ERR_SUCCESS:
-            self._log.error(f&#39;MQTT Error {result} unsubscribing to {topic}&#39;)
+            _log.error(f&#39;MQTT Error {result} subscribing to {topic}&#39;)
 
     def subscribe(self, topic: str, qos: int = 0) -&gt; None:
         &#34;&#34;&#34;Adds a subscription.
         
         Subscriptions property is updated with qos and message id.
+        Message id `mid` is 0 when not actively subscribed.
 
         Args:
             topic (str): The MQTT topic to subscribe to
             qos (int): The MQTT qos 0..2
 
         &#34;&#34;&#34;
-        self._log.debug(f&#39;Adding subscription {topic} (qos={qos})&#39;)
+        _log.debug(f&#39;Adding subscription {topic} (qos={qos})&#39;)
         self._subscriptions[topic] = {&#39;qos&#39;: qos, &#39;mid&#39;: 0}
         if self.is_connected:
             self._mqtt_subscribe(topic, qos)
         else:
-            self._log.warning(&#39;MQTT not connected will subscribe later&#39;)
+            _log.warning(&#39;MQTT not connected will subscribe later&#39;)
+
+    def _mqtt_on_subscribe(self,
+                           client: PahoClient,
+                           userdata: any,
+                           mid: int,
+                           granted_qos: &#39;list[int]&#39;):
+        match = &#39;&#39;
+        for sub in self.subscriptions:
+            if mid == self.subscriptions[sub][&#39;mid&#39;]:
+                _log.info(f&#39;Subscription to {sub} successful&#39;
+                          f&#39; (mid={mid}, granted_qos={granted_qos})&#39;)
+                match = sub
+                break
+        if not match:
+            _log.error(f&#39;Unable to match mid={mid} to pending subscription&#39;)
+
+    def is_subscribed(self, topic: str):
+        if (topic in self.subscriptions and
+            self.subscriptions[topic][&#39;mid&#39;] &gt; 0):
+            return True
+        return False
+
+    def _mqtt_on_message(self,
+                         client: PahoClient,
+                         userdata: any,
+                         message: PahoMessage):
+        &#34;&#34;&#34;Internal callback on message simplifies passback to topic/payload.&#34;&#34;&#34;
+        payload = message.payload.decode()
+        try:
+            payload = json.loads(payload)
+        except json.JSONDecodeError as e:
+            _log.debug(f&#39;MQTT message payload non-JSON ({e})&#39;)
+        _log.debug(f&#39;MQTT received message &#34;{payload}&#34;&#39;
+            f&#39;on topic &#34;{message.topic}&#34; with QoS {message.qos}&#39;)
+        if userdata:
+            _log.debug(f&#39;MQTT client userdata: {userdata}&#39;)
+        self.on_message(message.topic, payload)
+
+    def _mqtt_unsubscribe(self, topic: str):
+        _log.debug(f&#39;{self._client_id} unsubscribing to {topic}&#39;)
+        (result, mid) = self._mqtt.unsubscribe(topic)
+        if result != MqttResultCode.SUCCESS:
+            _log.error(f&#39;MQTT Error {result} unsubscribing to {topic}&#39;
+                       f&#39; (mid {mid})&#39;)
 
     def unsubscribe(self, topic: str) -&gt; None:
         &#34;&#34;&#34;Removes a subscription.
@@ -318,48 +392,30 @@ class MqttClient:
             topic (str): The MQTT topic to unsubscribe
 
         &#34;&#34;&#34;
-        self._log.debug(f&#39;Removing subscription {topic}&#39;)
+        _log.debug(f&#39;Removing subscription {topic}&#39;)
         if topic in self._subscriptions:
             del self._subscriptions[topic]
         if self.is_connected:
             self._mqtt_unsubscribe(topic)
 
-    def _mqtt_on_disconnect(self, client, userdata, rc):
+    def _mqtt_on_disconnect(self, client: PahoClient, userdata: any, rc: int):
+        &#34;&#34;&#34;Internal callback when disconnected, clears subscription status.&#34;&#34;&#34;
         if self.on_disconnect:
             self.on_disconnect(client, userdata, rc)
         if userdata != &#39;terminate&#39;:
-            self._log.warning(&#39;MQTT broker disconnected&#39;
-                              f&#39; - result code {rc} ({_get_mqtt_result(rc)})&#39;)
+            _log.warning(&#39;MQTT broker disconnected&#39;
+                         f&#39; - result code {rc} ({_get_mqtt_result(rc)})&#39;)
             self._mqtt.loop_stop()
+            for sub in self.subscriptions:
+                self._subscriptions[sub][&#39;mid&#39;] = 0
             # get new unique ID to avoid bouncing connection
-            self.client_id = self.client_id
             self.is_connected = False
             if self.auto_connect:
+                if self._client_uid:
+                    self.client_id = self.client_id
                 self.connect()
 
-    def _mqtt_on_subscribe(self, client, userdata, mid, granted_qos):
-        self._log.debug(f&#39;MQTT subscription message id: {mid}&#39;)
-        for sub in self.subscriptions:
-            if mid != self.subscriptions[sub][&#39;mid&#39;]:
-                self._log.error(&#39;Subscription failed&#39;
-                                f&#39; message id={mid}&#39;
-                                f&#39; expected {self.subscriptions[sub][&#34;mid&#34;]}&#39;)
-            else:
-                self._log.info(f&#39;Subscription to {sub} successful&#39;)
-
-    def _mqtt_on_message(self, client, userdata, message):
-        payload = message.payload.decode()
-        try:
-            payload = json.loads(payload)
-        except json.JSONDecodeError as e:
-            self._log.debug(f&#39;MQTT message payload non-JSON ({e})&#39;)
-        self._log.debug(f&#39;MQTT received message &#34;{payload}&#34;&#39;
-            f&#39;on topic &#34;{message.topic}&#34; with QoS {message.qos}&#39;)
-        if userdata:
-            self._log.debug(f&#39;MQTT client userdata: {userdata}&#39;)
-        self.on_message(message.topic, payload)
-
-    def publish(self, topic: str, message: &#39;str|dict&#39;, qos: int = 1):
+    def publish(self, topic: str, message: &#39;str|dict&#39;, qos: int = 1) -&gt; bool:
         &#34;&#34;&#34;Publishes a message to a MQTT topic.
 
         If the message is a dictionary, 
@@ -370,18 +426,37 @@ class MqttClient:
             qos (int): The MQTT Quality of Service (0, 1 or 2)
 
         &#34;&#34;&#34;
-        if not isinstance(message, str):
+        if message and not isinstance(message, (str, dict)):
+            raise ValueError(f&#39;Invalid message {message}&#39;)
+        if self._host.endswith(&#39;.azure-devices.net&#39;):
+            device_to_cloud = f&#39;devices/{self.client_id}/messages/events/&#39;
+            if device_to_cloud not in topic:
+                _log.warning(&#39;Applying Azure device-to-cloud topic prefix&#39;)
+                topic = f&#39;{device_to_cloud}/{topic}&#39;
+        if isinstance(message, dict):
+            for k, v in message.items():
+                if not isinstance(k, str):
+                    _log.warning(f&#39;{k} ({type(k)}) will be converted to str(k)&#39;)
+                if isinstance(v, JSON_DUMPS_COMPATIBLE) or v is None:
+                    continue
+                if hasattr(v, &#39;__dict__&#39;):
+                    try:
+                        message[k] = vars(v)
+                    except TypeError:
+                        errstr = f&#39;Could not convert [{k}] = {type(v)}&#39;
+                        _log.warning(errstr)
+                        raise ValueError(f&#39;Unhandled message...{errstr}&#39;)
             message = json.dumps(message, skipkeys=True)
         if not isinstance(qos, int) or qos not in range(0, 3):
-            self._log.warning(f&#39;Invalid MQTT QoS {qos} - using QoS 1&#39;)
+            _log.warning(f&#39;Invalid MQTT QoS {qos} - using QoS 1&#39;)
             qos = 1
-        self._log.debug(f&#39;MQTT publishing: {topic}: {message}&#39;)
         (rc, mid) = self._mqtt.publish(topic=topic, payload=message, qos=qos)
-        del mid
-        if rc != MQTT_ERR_SUCCESS:
+        _log.debug(f&#39;MQTT published (mid={mid}) {topic} {message}&#39;)
+        if rc != MqttResultCode.SUCCESS:
             errmsg = f&#39;Publishing error {rc} ({_get_mqtt_result(rc)})&#39;
-            self._log.error(errmsg)
-            # raise MqttError(errmsg)</code></pre>
+            _log.error(errmsg)
+            return False
+        return True</code></pre>
 </details>
 </section>
 <section>
@@ -395,7 +470,7 @@ class MqttClient:
 <dl>
 <dt id="fieldedge_utilities.mqtt.MqttClient"><code class="flex name class">
 <span>class <span class="ident">MqttClient</span></span>
-<span>(</span><span>client_id: str, on_message: Callable[..., ForwardRef('tuple[str, object]')] = None, subscribe_default: Union[str, ForwardRef('list[str]')] = None, on_connect: Callable = None, on_disconnect: Callable = None, logger: logging.Logger = None, connect_retry_interval: int = 5, auto_connect: bool = True, port: int = 1883, keepalive: int = 60, bind_address: str = '', certfile: str = None)</span>
+<span>(</span><span>client_id: str = 'fieldedge_utilities.mqtt', on_message: <built-in function callable> = None, subscribe_default: str|list[str] = None, auto_connect: bool = True, connect_retry_interval: int = 5, **kwargs)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>A customized MQTT client.</p>
@@ -403,16 +478,17 @@ class MqttClient:
 <dl>
 <dt><strong><code>client_id</code></strong> :&ensp;<code>str</code></dt>
 <dd>A unique client_id.</dd>
-<dt><strong><code>on_message</code></strong> :&ensp;<code>Callable</code></dt>
-<dd>A function called when a subscribed message
-is received from the broker.</dd>
-<dt><strong><code>on_connect</code></strong> :&ensp;<code>Callable</code></dt>
-<dd>A function called when the client connects
-to the broker.</dd>
-<dt><strong><code>on_disconnect</code></strong> :&ensp;<code>Callable</code></dt>
-<dd>A function called when the client disconnects.</dd>
+<dt><strong><code>subscriptions</code></strong> :&ensp;<code>dict</code></dt>
+<dd>A dictionary of subscriptions with qos and
+message ID properties</dd>
+<dt><strong><code>on_message</code></strong> :&ensp;<code>callable</code></dt>
+<dd>The callback when subscribed messages are
+received as <code>topic</code>(str), <code>message</code>(dict|str).</dd>
 <dt><strong><code>is_connected</code></strong> :&ensp;<code>bool</code></dt>
 <dd>Status of the connection to the broker.</dd>
+<dt><strong><code>auto_connect</code></strong> :&ensp;<code>bool</code></dt>
+<dd>Automatically attempts to connect when created
+or reconnect after disconnection.</dd>
 <dt><strong><code>connect_retry_interval</code></strong> :&ensp;<code>int</code></dt>
 <dd>Seconds between broker reconnect attempts.</dd>
 </dl>
@@ -420,36 +496,29 @@ to the broker.</dd>
 <h2 id="args">Args</h2>
 <dl>
 <dt><strong><code>client_id</code></strong> :&ensp;<code>str</code></dt>
-<dd>The unique client ID</dd>
-<dt><strong><code>on_message</code></strong> :&ensp;<code>Callable</code></dt>
+<dd>The unique client ID (default importing module
+<code>__name__</code>)</dd>
+<dt><strong><code>on_message</code></strong> :&ensp;<code>callable</code></dt>
 <dd>The callback when subscribed messages are
-received as <code>topic, message</code>.</dd>
-<dt><strong><code>subscribe_default</code></strong> :&ensp;<code>Union[str, list[str]]</code></dt>
-<dd>The default
-subscription(s) established on re/connection.</dd>
-<dt><strong><code>on_connect</code></strong> :&ensp;<code>Callable</code></dt>
-<dd>(optional) callback when connection to the
-broker is established.</dd>
-<dt><strong><code>on_disconnect</code></strong> :&ensp;<code>Callable</code></dt>
-<dd>(optional) callback when disconnecting
-from the broker.</dd>
-<dt><strong><code>logger</code></strong> :&ensp;<code>Logger</code></dt>
-<dd>(optional) Logger</dd>
+received as <code>topic</code>(str), <code>message</code>(dict|str).</dd>
+<dt>subscribe_default (str|list[str]): The default subscription(s)</dt>
+<dt>established on re/connection.</dt>
 <dt><strong><code>connect_retry_interval</code></strong> :&ensp;<code>int</code></dt>
 <dd>Seconds between broker reconnect
-attempts.</dd>
+attempts if auto_connect is <code>True</code>.</dd>
 <dt><strong><code>auto_connect</code></strong> :&ensp;<code>bool</code></dt>
-<dd>Automatically attempts to connect when created.</dd>
-<dt><strong><code>port</code></strong> :&ensp;<code>int</code></dt>
-<dd>The MQTT port the broker is listening on.</dd>
-<dt><strong><code>keepalive</code></strong> :&ensp;<code>int</code></dt>
-<dd>The socket timeout and/or keepalive ping interval
-in seconds.</dd>
-<dt><strong><code>bind_address</code></strong> :&ensp;<code>str</code></dt>
-<dd>(optional) A local bind address</dd>
-<dt><strong><code>certfile</code></strong> :&ensp;<code>str</code></dt>
-<dd>If using TLS, the path of the certificate</dd>
+<dd>Automatically attempts to connect when created
+or reconnect after disconnection.</dd>
+<dt><strong><code>**kwargs</code></strong></dt>
+<dd>include Paho MQTT Client overrides such as:</dd>
 </dl>
+<ul>
+<li><code>on_connect</code> and/or <code>on_disconnect</code></li>
+<li><code>host</code>, <code>port</code> (default 1883) and <code>keepalive</code> (default 60)</li>
+<li><code>username</code> and <code>password</code></li>
+<li><code>ca_certs</code>, <code>certfile</code>, <code>keyfile</code></li>
+<li><code>qos</code> (default = 0)</li>
+</ul>
 <h2 id="raises">Raises</h2>
 <p><code><a title="fieldedge_utilities.mqtt.MqttError" href="#fieldedge_utilities.mqtt.MqttError">MqttError</a></code> if the client_id is not valid.</p></div>
 <details class="source">
@@ -461,74 +530,81 @@ in seconds.</dd>
 
     Attributes:
         client_id (str): A unique client_id.
-        on_message (Callable): A function called when a subscribed message
-            is received from the broker.
-        on_connect (Callable): A function called when the client connects
-            to the broker.
-        on_disconnect (Callable): A function called when the client disconnects.
+        subscriptions (dict): A dictionary of subscriptions with qos and
+            message ID properties
+        on_message (callable): The callback when subscribed messages are
+            received as `topic`(str), `message`(dict|str).
         is_connected (bool): Status of the connection to the broker.
+        auto_connect (bool): Automatically attempts to connect when created
+            or reconnect after disconnection.
         connect_retry_interval (int): Seconds between broker reconnect attempts.
 
     &#34;&#34;&#34;
     def __init__(self,
-                 client_id: str,
-                 on_message: Callable[..., &#34;tuple[str, object]&#34;] = None,
-                 subscribe_default: Union[str, &#34;list[str]&#34;] = None,
-                 on_connect: Callable = None,
-                 on_disconnect: Callable = None,
-                 logger: Logger = None,
-                 connect_retry_interval: int = 5,
+                 client_id: str = __name__,
+                 on_message: callable = None,
+                 subscribe_default: &#39;str|list[str]&#39; = None,
                  auto_connect: bool = True,
-                 port: int = 1883,
-                 keepalive: int = 60,
-                 bind_address: str = &#39;&#39;,
-                 certfile: str = None,
+                 connect_retry_interval: int = 5,
+                 **kwargs,
                  ):
         &#34;&#34;&#34;Initializes a managed MQTT client.
         
         Args:
-            client_id (str): The unique client ID
-            on_message (Callable): The callback when subscribed messages are
-                received as `topic, message`.
-            subscribe_default (Union[str, list[str]]): The default
-                subscription(s) established on re/connection.
-            on_connect (Callable): (optional) callback when connection to the
-                broker is established.
-            on_disconnect (Callable): (optional) callback when disconnecting
-                from the broker.
-            logger (Logger): (optional) Logger
+            client_id (str): The unique client ID (default importing module
+                `__name__`)
+            on_message (callable): The callback when subscribed messages are
+                received as `topic`(str), `message`(dict|str).
+            subscribe_default (str|list[str]): The default subscription(s)
+                established on re/connection.
             connect_retry_interval (int): Seconds between broker reconnect
-                attempts.
-            auto_connect (bool): Automatically attempts to connect when created.
-            port (int): The MQTT port the broker is listening on.
-            keepalive (int): The socket timeout and/or keepalive ping interval
-                in seconds.
-            bind_address (str): (optional) A local bind address
-            certfile (str): If using TLS, the path of the certificate
+                attempts if auto_connect is `True`.
+            auto_connect (bool): Automatically attempts to connect when created
+                or reconnect after disconnection.
+            **kwargs: include Paho MQTT Client overrides such as:
+            
+            * `on_connect` and/or `on_disconnect`
+            * `host`, `port` (default 1883) and `keepalive` (default 60)
+            * `username` and `password`
+            * `ca_certs`, `certfile`, `keyfile`
+            * `qos` (default = 0)
 
         Raises:
             `MqttError` if the client_id is not valid.
 
         &#34;&#34;&#34;
-        self._host = os.getenv(&#39;MQTT_HOST&#39;) or &#39;fieldedge-broker&#39;
-        self._user = os.getenv(&#39;MQTT_USER&#39;) or None
-        self._pass = os.getenv(&#39;MQTT_PASS&#39;) or None
-        self._port = port
-        self._keepalive = keepalive
-        self._bind_address = bind_address
-        self._certfile = certfile
-        self._log = logger or get_wrapping_logger(name=&#39;mqtt_client&#39;)
+        self._host = kwargs.get(&#39;host&#39;, MQTT_HOST)
+        self._username = kwargs.get(&#39;username&#39;, MQTT_USER)
+        self._password = kwargs.get(&#39;password&#39;, MQTT_PASS)
+        self._port = kwargs.get(&#39;port&#39;, 1883)
+        self._keepalive = kwargs.get(&#39;keepalive&#39;, 60)
+        self._bind_address = kwargs.get(&#39;bind_address&#39;, &#39;&#39;)
+        self._ca_certs = kwargs.get(&#39;ca_certs&#39;, None)
+        self._certfile = kwargs.get(&#39;certfile&#39;, None)
+        self._keyfile = kwargs.get(&#39;keyfile&#39;, None)
         if not isinstance(client_id, str) or client_id == &#39;&#39;:
-            self._log.error(&#39;Invalid client_id&#39;)
+            _log.error(&#39;Invalid client_id&#39;)
             raise MqttError(&#39;Invalid client_id&#39;)
         if not callable(on_message):
-            self._log.warning(&#39;No on_message specified&#39;)
+            _log.warning(&#39;No on_message specified&#39;)
         on_exit(self._cleanup)
         self.on_message = on_message
-        self.on_connect = on_connect
-        self.on_disconnect = on_disconnect
-        self.client_id = client_id
-        self._mqtt = Client()
+        self.on_connect = kwargs.get(&#39;on_connect&#39;, None)
+        self.on_disconnect = kwargs.get(&#39;on_disconnect&#39;, None)
+        self._qos = kwargs.get(&#39;qos&#39;, 0)
+        self._client_id = client_id
+        self._client_uid = kwargs.get(&#39;client_uid&#39;, True)
+        if self._host.endswith(&#39;azure-devices.net&#39;):
+            _log.info(&#39;Configuring Azure IoT Hub subscriptions&#39;)
+            self._client_uid = False
+            subscribe_default = [
+                f&#39;devices/{self.client_id}/messages/devicebound/#&#39;,
+                &#39;$iothub/twin/res/#&#39;,
+                &#39;$iothub/methods/POST/#&#39;,
+            ]
+        if self._client_uid:
+            self.client_id = client_id
+        self._mqtt = PahoClient()
         self.is_connected = False
         self._subscriptions = {}
         self.connect_retry_interval = connect_retry_interval
@@ -538,7 +614,7 @@ in seconds.</dd>
             if not isinstance(subscribe_default, list):
                 subscribe_default = [subscribe_default]
             for sub in subscribe_default:
-                self.subscribe(sub)
+                self.subscribe(sub, self._qos)
         if self.auto_connect:
             self.connect()
     
@@ -548,13 +624,16 @@ in seconds.</dd>
     
     @client_id.setter
     def client_id(self, id: str):
-        try:
-            if isinstance(int(id.split(&#39;_&#39;)[1]), int):
-                # previously made unique, could be a bouncing MQTT connection
-                id = id.split(&#39;_&#39;)[0]
-        except (ValueError, IndexError):
-            pass   #: new id will be made unique
-        self._client_id = f&#39;{id}_{int(time())}&#39;
+        if not self._client_uid:
+            self._client_id = id
+        else:
+            try:
+                if isinstance(int(id.split(&#39;_&#39;)[1]), int):
+                    # previously made unique, could be a bouncing connection
+                    id = id.split(&#39;_&#39;)[0]
+            except (ValueError, IndexError):
+                pass   #: new id will be made unique
+            self._client_id = f&#39;{id}_{int(time())}&#39;
 
     @property
     def subscriptions(self) -&gt; dict:
@@ -574,8 +653,8 @@ in seconds.</dd>
     def _cleanup(self, *args):
         # TODO: logging raises an error since the log file was closed
         # for arg in args:
-        #     self._log.debug(f&#39;mqtt cleanup called with arg = {arg}&#39;)
-        # self._log.debug(&#39;Terminating MQTT connection&#39;)
+        #     _log.debug(f&#39;mqtt cleanup called with arg = {arg}&#39;)
+        # _log.debug(&#39;Terminating MQTT connection&#39;)
         self._mqtt.user_data_set(&#39;terminate&#39;)
         self._mqtt.loop_stop()
         self._mqtt.disconnect()
@@ -583,21 +662,23 @@ in seconds.</dd>
     def connect(self):
         &#34;&#34;&#34;Attempts to establish a connection to the broker and re-subscribe.&#34;&#34;&#34;
         try:
-            self._log.debug(&#39;Attempting MQTT broker connection&#39;
-                            f&#39; to {self._host} as {self._client_id}&#39;)
+            _log.debug(f&#39;Attempting MQTT broker connection to {self._host}&#39;
+                       f&#39; as {self._client_id}&#39;)
             self._mqtt.reinitialise(client_id=self.client_id)
             self._mqtt.user_data_set(None)
             self._mqtt.on_connect = self._mqtt_on_connect
             self._mqtt.on_disconnect = self._mqtt_on_disconnect
             self._mqtt.on_subscribe = self._mqtt_on_subscribe
             self._mqtt.on_message = self._mqtt_on_message
-            if self._user and self._pass:
-                self._mqtt.username_pw_set(username=self._user,
-                                           password=self._pass)
+            if self._username and self._password:
+                self._mqtt.username_pw_set(username=self._username,
+                                           password=self._password)
             if self._port == 8883:
-                self._mqtt.tls_set(self._certfile)
-                self._mqtt.tls_insecure_set(True)
-            self._mqtt.connect(self._host,
+                self._mqtt.tls_set(ca_certs=self._ca_certs,
+                                   certfile=self._certfile,
+                                   keyfile=self._keyfile)
+                # self._mqtt.tls_insecure_set(False)
+            self._mqtt.connect(host=self._host,
                                port=self._port,
                                keepalive=self._keepalive,
                                bind_address=self._bind_address)
@@ -612,13 +693,13 @@ in seconds.</dd>
         except (ConnectionError, timeout, TimeoutError) as err:
             self._failed_connect_attempts += 1
             if self.connect_retry_interval &gt; 0:
-                self._log.warning(f&#39;Unable to connect to {self._host} ({err})&#39;
-                    f&#39; - retrying in {self.connect_retry_interval} seconds&#39;)
+                _log.warning(f&#39;Unable to connect to {self._host} ({err})&#39;
+                             f&#39; - retrying in {self.connect_retry_interval} s&#39;)
                 sleep(self.connect_retry_interval)
                 self.connect()
             else:
-                self._log.warning(f&#39;Failed to connect to {self._host}&#39;
-                    &#39; but retry disabled - call method connect to retry&#39;)
+                _log.warning(f&#39;Failed to connect to {self._host}&#39;
+                             &#39; but retry disabled - call connect() to retry&#39;)
 
     def disconnect(self):
         &#34;&#34;&#34;Attempts to disconnect from the broker.&#34;&#34;&#34;
@@ -626,10 +707,15 @@ in seconds.</dd>
         self._mqtt.loop_stop()
         self._mqtt.disconnect()
 
-    def _mqtt_on_connect(self, client, userdata, flags, rc):
+    def _mqtt_on_connect(self,
+                         client: PahoClient,
+                         userdata: any,
+                         flags: dict,
+                         rc: int):
+        &#34;&#34;&#34;Internal callback re-subscribes on (re)connection.&#34;&#34;&#34;
         self._failed_connect_attempts = 0
-        if rc == 0:
-            self._log.debug(f&#39;Established MQTT connection to {self._host}&#39;)
+        if rc == MqttResultCode.SUCCESS:
+            _log.debug(f&#39;Established MQTT connection to {self._host}&#39;)
             if not self.is_connected:
                 for sub in self.subscriptions:
                     self._mqtt_subscribe(sub, self.subscriptions[sub][&#39;qos&#39;])
@@ -637,39 +723,82 @@ in seconds.</dd>
             if self.on_connect:
                 self.on_connect(client, userdata, flags, rc)
         else:
-            self._log.error(f&#39;MQTT broker connection result code: {rc}&#39;
-                            f&#39; ({_get_mqtt_result(rc)})&#39;)
+            _log.error(f&#39;MQTT broker connection result code: {rc}&#39;
+                       f&#39; ({_get_mqtt_result(rc)})&#39;)
     
     def _mqtt_subscribe(self, topic: str, qos: int = 0):
-        self._log.debug(f&#39;{self._client_id} subscribing to {topic} (qos={qos})&#39;)
-        (result, mid) = self._mqtt.subscribe(topic=topic, qos=2)
-        if result == MQTT_ERR_SUCCESS:
+        &#34;&#34;&#34;Internal subscription handler assigns id indicating *subscribed*.&#34;&#34;&#34;
+        (result, mid) = self._mqtt.subscribe(topic=topic, qos=qos)
+        _log.debug(f&#39;{self._client_id} subscribing to {topic}&#39;
+                   f&#39; (qos={qos}, mid={mid})&#39;)
+        if result == MqttResultCode.SUCCESS:
+            if mid == 0:
+                _log.warning(f&#39;Received mid={mid} expected &gt; 0&#39;)
             self._subscriptions[topic][&#39;mid&#39;] = mid
         else:
-            self._log.error(f&#39;MQTT Error {result} subscribing to {topic}&#39;)
-
-    def _mqtt_unsubscribe(self, topic: str):
-        self._log.debug(f&#39;{self._client_id} unsubscribing to {topic}&#39;)
-        (result, mid) = self._mqtt.unsubscribe(topic)
-        if result != MQTT_ERR_SUCCESS:
-            self._log.error(f&#39;MQTT Error {result} unsubscribing to {topic}&#39;)
+            _log.error(f&#39;MQTT Error {result} subscribing to {topic}&#39;)
 
     def subscribe(self, topic: str, qos: int = 0) -&gt; None:
         &#34;&#34;&#34;Adds a subscription.
         
         Subscriptions property is updated with qos and message id.
+        Message id `mid` is 0 when not actively subscribed.
 
         Args:
             topic (str): The MQTT topic to subscribe to
             qos (int): The MQTT qos 0..2
 
         &#34;&#34;&#34;
-        self._log.debug(f&#39;Adding subscription {topic} (qos={qos})&#39;)
+        _log.debug(f&#39;Adding subscription {topic} (qos={qos})&#39;)
         self._subscriptions[topic] = {&#39;qos&#39;: qos, &#39;mid&#39;: 0}
         if self.is_connected:
             self._mqtt_subscribe(topic, qos)
         else:
-            self._log.warning(&#39;MQTT not connected will subscribe later&#39;)
+            _log.warning(&#39;MQTT not connected will subscribe later&#39;)
+
+    def _mqtt_on_subscribe(self,
+                           client: PahoClient,
+                           userdata: any,
+                           mid: int,
+                           granted_qos: &#39;list[int]&#39;):
+        match = &#39;&#39;
+        for sub in self.subscriptions:
+            if mid == self.subscriptions[sub][&#39;mid&#39;]:
+                _log.info(f&#39;Subscription to {sub} successful&#39;
+                          f&#39; (mid={mid}, granted_qos={granted_qos})&#39;)
+                match = sub
+                break
+        if not match:
+            _log.error(f&#39;Unable to match mid={mid} to pending subscription&#39;)
+
+    def is_subscribed(self, topic: str):
+        if (topic in self.subscriptions and
+            self.subscriptions[topic][&#39;mid&#39;] &gt; 0):
+            return True
+        return False
+
+    def _mqtt_on_message(self,
+                         client: PahoClient,
+                         userdata: any,
+                         message: PahoMessage):
+        &#34;&#34;&#34;Internal callback on message simplifies passback to topic/payload.&#34;&#34;&#34;
+        payload = message.payload.decode()
+        try:
+            payload = json.loads(payload)
+        except json.JSONDecodeError as e:
+            _log.debug(f&#39;MQTT message payload non-JSON ({e})&#39;)
+        _log.debug(f&#39;MQTT received message &#34;{payload}&#34;&#39;
+            f&#39;on topic &#34;{message.topic}&#34; with QoS {message.qos}&#39;)
+        if userdata:
+            _log.debug(f&#39;MQTT client userdata: {userdata}&#39;)
+        self.on_message(message.topic, payload)
+
+    def _mqtt_unsubscribe(self, topic: str):
+        _log.debug(f&#39;{self._client_id} unsubscribing to {topic}&#39;)
+        (result, mid) = self._mqtt.unsubscribe(topic)
+        if result != MqttResultCode.SUCCESS:
+            _log.error(f&#39;MQTT Error {result} unsubscribing to {topic}&#39;
+                       f&#39; (mid {mid})&#39;)
 
     def unsubscribe(self, topic: str) -&gt; None:
         &#34;&#34;&#34;Removes a subscription.
@@ -678,48 +807,30 @@ in seconds.</dd>
             topic (str): The MQTT topic to unsubscribe
 
         &#34;&#34;&#34;
-        self._log.debug(f&#39;Removing subscription {topic}&#39;)
+        _log.debug(f&#39;Removing subscription {topic}&#39;)
         if topic in self._subscriptions:
             del self._subscriptions[topic]
         if self.is_connected:
             self._mqtt_unsubscribe(topic)
 
-    def _mqtt_on_disconnect(self, client, userdata, rc):
+    def _mqtt_on_disconnect(self, client: PahoClient, userdata: any, rc: int):
+        &#34;&#34;&#34;Internal callback when disconnected, clears subscription status.&#34;&#34;&#34;
         if self.on_disconnect:
             self.on_disconnect(client, userdata, rc)
         if userdata != &#39;terminate&#39;:
-            self._log.warning(&#39;MQTT broker disconnected&#39;
-                              f&#39; - result code {rc} ({_get_mqtt_result(rc)})&#39;)
+            _log.warning(&#39;MQTT broker disconnected&#39;
+                         f&#39; - result code {rc} ({_get_mqtt_result(rc)})&#39;)
             self._mqtt.loop_stop()
+            for sub in self.subscriptions:
+                self._subscriptions[sub][&#39;mid&#39;] = 0
             # get new unique ID to avoid bouncing connection
-            self.client_id = self.client_id
             self.is_connected = False
             if self.auto_connect:
+                if self._client_uid:
+                    self.client_id = self.client_id
                 self.connect()
 
-    def _mqtt_on_subscribe(self, client, userdata, mid, granted_qos):
-        self._log.debug(f&#39;MQTT subscription message id: {mid}&#39;)
-        for sub in self.subscriptions:
-            if mid != self.subscriptions[sub][&#39;mid&#39;]:
-                self._log.error(&#39;Subscription failed&#39;
-                                f&#39; message id={mid}&#39;
-                                f&#39; expected {self.subscriptions[sub][&#34;mid&#34;]}&#39;)
-            else:
-                self._log.info(f&#39;Subscription to {sub} successful&#39;)
-
-    def _mqtt_on_message(self, client, userdata, message):
-        payload = message.payload.decode()
-        try:
-            payload = json.loads(payload)
-        except json.JSONDecodeError as e:
-            self._log.debug(f&#39;MQTT message payload non-JSON ({e})&#39;)
-        self._log.debug(f&#39;MQTT received message &#34;{payload}&#34;&#39;
-            f&#39;on topic &#34;{message.topic}&#34; with QoS {message.qos}&#39;)
-        if userdata:
-            self._log.debug(f&#39;MQTT client userdata: {userdata}&#39;)
-        self.on_message(message.topic, payload)
-
-    def publish(self, topic: str, message: &#39;str|dict&#39;, qos: int = 1):
+    def publish(self, topic: str, message: &#39;str|dict&#39;, qos: int = 1) -&gt; bool:
         &#34;&#34;&#34;Publishes a message to a MQTT topic.
 
         If the message is a dictionary, 
@@ -730,17 +841,37 @@ in seconds.</dd>
             qos (int): The MQTT Quality of Service (0, 1 or 2)
 
         &#34;&#34;&#34;
-        if not isinstance(message, str):
+        if message and not isinstance(message, (str, dict)):
+            raise ValueError(f&#39;Invalid message {message}&#39;)
+        if self._host.endswith(&#39;.azure-devices.net&#39;):
+            device_to_cloud = f&#39;devices/{self.client_id}/messages/events/&#39;
+            if device_to_cloud not in topic:
+                _log.warning(&#39;Applying Azure device-to-cloud topic prefix&#39;)
+                topic = f&#39;{device_to_cloud}/{topic}&#39;
+        if isinstance(message, dict):
+            for k, v in message.items():
+                if not isinstance(k, str):
+                    _log.warning(f&#39;{k} ({type(k)}) will be converted to str(k)&#39;)
+                if isinstance(v, JSON_DUMPS_COMPATIBLE) or v is None:
+                    continue
+                if hasattr(v, &#39;__dict__&#39;):
+                    try:
+                        message[k] = vars(v)
+                    except TypeError:
+                        errstr = f&#39;Could not convert [{k}] = {type(v)}&#39;
+                        _log.warning(errstr)
+                        raise ValueError(f&#39;Unhandled message...{errstr}&#39;)
             message = json.dumps(message, skipkeys=True)
         if not isinstance(qos, int) or qos not in range(0, 3):
-            self._log.warning(f&#39;Invalid MQTT QoS {qos} - using QoS 1&#39;)
+            _log.warning(f&#39;Invalid MQTT QoS {qos} - using QoS 1&#39;)
             qos = 1
-        self._log.debug(f&#39;MQTT publishing: {topic}: {message}&#39;)
         (rc, mid) = self._mqtt.publish(topic=topic, payload=message, qos=qos)
-        del mid
-        if rc != MQTT_ERR_SUCCESS:
+        _log.debug(f&#39;MQTT published (mid={mid}) {topic} {message}&#39;)
+        if rc != MqttResultCode.SUCCESS:
             errmsg = f&#39;Publishing error {rc} ({_get_mqtt_result(rc)})&#39;
-            self._log.error(errmsg)</code></pre>
+            _log.error(errmsg)
+            return False
+        return True</code></pre>
 </details>
 <h3>Instance variables</h3>
 <dl>
@@ -804,21 +935,23 @@ def subscriptions(self) -&gt; dict:
 <pre><code class="python">def connect(self):
     &#34;&#34;&#34;Attempts to establish a connection to the broker and re-subscribe.&#34;&#34;&#34;
     try:
-        self._log.debug(&#39;Attempting MQTT broker connection&#39;
-                        f&#39; to {self._host} as {self._client_id}&#39;)
+        _log.debug(f&#39;Attempting MQTT broker connection to {self._host}&#39;
+                   f&#39; as {self._client_id}&#39;)
         self._mqtt.reinitialise(client_id=self.client_id)
         self._mqtt.user_data_set(None)
         self._mqtt.on_connect = self._mqtt_on_connect
         self._mqtt.on_disconnect = self._mqtt_on_disconnect
         self._mqtt.on_subscribe = self._mqtt_on_subscribe
         self._mqtt.on_message = self._mqtt_on_message
-        if self._user and self._pass:
-            self._mqtt.username_pw_set(username=self._user,
-                                       password=self._pass)
+        if self._username and self._password:
+            self._mqtt.username_pw_set(username=self._username,
+                                       password=self._password)
         if self._port == 8883:
-            self._mqtt.tls_set(self._certfile)
-            self._mqtt.tls_insecure_set(True)
-        self._mqtt.connect(self._host,
+            self._mqtt.tls_set(ca_certs=self._ca_certs,
+                               certfile=self._certfile,
+                               keyfile=self._keyfile)
+            # self._mqtt.tls_insecure_set(False)
+        self._mqtt.connect(host=self._host,
                            port=self._port,
                            keepalive=self._keepalive,
                            bind_address=self._bind_address)
@@ -833,13 +966,13 @@ def subscriptions(self) -&gt; dict:
     except (ConnectionError, timeout, TimeoutError) as err:
         self._failed_connect_attempts += 1
         if self.connect_retry_interval &gt; 0:
-            self._log.warning(f&#39;Unable to connect to {self._host} ({err})&#39;
-                f&#39; - retrying in {self.connect_retry_interval} seconds&#39;)
+            _log.warning(f&#39;Unable to connect to {self._host} ({err})&#39;
+                         f&#39; - retrying in {self.connect_retry_interval} s&#39;)
             sleep(self.connect_retry_interval)
             self.connect()
         else:
-            self._log.warning(f&#39;Failed to connect to {self._host}&#39;
-                &#39; but retry disabled - call method connect to retry&#39;)</code></pre>
+            _log.warning(f&#39;Failed to connect to {self._host}&#39;
+                         &#39; but retry disabled - call connect() to retry&#39;)</code></pre>
 </details>
 </dd>
 <dt id="fieldedge_utilities.mqtt.MqttClient.disconnect"><code class="name flex">
@@ -858,8 +991,24 @@ def subscriptions(self) -&gt; dict:
     self._mqtt.disconnect()</code></pre>
 </details>
 </dd>
+<dt id="fieldedge_utilities.mqtt.MqttClient.is_subscribed"><code class="name flex">
+<span>def <span class="ident">is_subscribed</span></span>(<span>self, topic: str)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def is_subscribed(self, topic: str):
+    if (topic in self.subscriptions and
+        self.subscriptions[topic][&#39;mid&#39;] &gt; 0):
+        return True
+    return False</code></pre>
+</details>
+</dd>
 <dt id="fieldedge_utilities.mqtt.MqttClient.publish"><code class="name flex">
-<span>def <span class="ident">publish</span></span>(<span>self, topic: str, message: str|dict, qos: int = 1)</span>
+<span>def <span class="ident">publish</span></span>(<span>self, topic: str, message: str|dict, qos: int = 1) ‑> bool</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Publishes a message to a MQTT topic.</p>
@@ -876,7 +1025,7 @@ def subscriptions(self) -&gt; dict:
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def publish(self, topic: str, message: &#39;str|dict&#39;, qos: int = 1):
+<pre><code class="python">def publish(self, topic: str, message: &#39;str|dict&#39;, qos: int = 1) -&gt; bool:
     &#34;&#34;&#34;Publishes a message to a MQTT topic.
 
     If the message is a dictionary, 
@@ -887,17 +1036,37 @@ def subscriptions(self) -&gt; dict:
         qos (int): The MQTT Quality of Service (0, 1 or 2)
 
     &#34;&#34;&#34;
-    if not isinstance(message, str):
+    if message and not isinstance(message, (str, dict)):
+        raise ValueError(f&#39;Invalid message {message}&#39;)
+    if self._host.endswith(&#39;.azure-devices.net&#39;):
+        device_to_cloud = f&#39;devices/{self.client_id}/messages/events/&#39;
+        if device_to_cloud not in topic:
+            _log.warning(&#39;Applying Azure device-to-cloud topic prefix&#39;)
+            topic = f&#39;{device_to_cloud}/{topic}&#39;
+    if isinstance(message, dict):
+        for k, v in message.items():
+            if not isinstance(k, str):
+                _log.warning(f&#39;{k} ({type(k)}) will be converted to str(k)&#39;)
+            if isinstance(v, JSON_DUMPS_COMPATIBLE) or v is None:
+                continue
+            if hasattr(v, &#39;__dict__&#39;):
+                try:
+                    message[k] = vars(v)
+                except TypeError:
+                    errstr = f&#39;Could not convert [{k}] = {type(v)}&#39;
+                    _log.warning(errstr)
+                    raise ValueError(f&#39;Unhandled message...{errstr}&#39;)
         message = json.dumps(message, skipkeys=True)
     if not isinstance(qos, int) or qos not in range(0, 3):
-        self._log.warning(f&#39;Invalid MQTT QoS {qos} - using QoS 1&#39;)
+        _log.warning(f&#39;Invalid MQTT QoS {qos} - using QoS 1&#39;)
         qos = 1
-    self._log.debug(f&#39;MQTT publishing: {topic}: {message}&#39;)
     (rc, mid) = self._mqtt.publish(topic=topic, payload=message, qos=qos)
-    del mid
-    if rc != MQTT_ERR_SUCCESS:
+    _log.debug(f&#39;MQTT published (mid={mid}) {topic} {message}&#39;)
+    if rc != MqttResultCode.SUCCESS:
         errmsg = f&#39;Publishing error {rc} ({_get_mqtt_result(rc)})&#39;
-        self._log.error(errmsg)</code></pre>
+        _log.error(errmsg)
+        return False
+    return True</code></pre>
 </details>
 </dd>
 <dt id="fieldedge_utilities.mqtt.MqttClient.subscribe"><code class="name flex">
@@ -905,7 +1074,8 @@ def subscriptions(self) -&gt; dict:
 </code></dt>
 <dd>
 <div class="desc"><p>Adds a subscription.</p>
-<p>Subscriptions property is updated with qos and message id.</p>
+<p>Subscriptions property is updated with qos and message id.
+Message id <code>mid</code> is 0 when not actively subscribed.</p>
 <h2 id="args">Args</h2>
 <dl>
 <dt><strong><code>topic</code></strong> :&ensp;<code>str</code></dt>
@@ -921,18 +1091,19 @@ def subscriptions(self) -&gt; dict:
     &#34;&#34;&#34;Adds a subscription.
     
     Subscriptions property is updated with qos and message id.
+    Message id `mid` is 0 when not actively subscribed.
 
     Args:
         topic (str): The MQTT topic to subscribe to
         qos (int): The MQTT qos 0..2
 
     &#34;&#34;&#34;
-    self._log.debug(f&#39;Adding subscription {topic} (qos={qos})&#39;)
+    _log.debug(f&#39;Adding subscription {topic} (qos={qos})&#39;)
     self._subscriptions[topic] = {&#39;qos&#39;: qos, &#39;mid&#39;: 0}
     if self.is_connected:
         self._mqtt_subscribe(topic, qos)
     else:
-        self._log.warning(&#39;MQTT not connected will subscribe later&#39;)</code></pre>
+        _log.warning(&#39;MQTT not connected will subscribe later&#39;)</code></pre>
 </details>
 </dd>
 <dt id="fieldedge_utilities.mqtt.MqttClient.unsubscribe"><code class="name flex">
@@ -956,7 +1127,7 @@ def subscriptions(self) -&gt; dict:
         topic (str): The MQTT topic to unsubscribe
 
     &#34;&#34;&#34;
-    self._log.debug(f&#39;Removing subscription {topic}&#39;)
+    _log.debug(f&#39;Removing subscription {topic}&#39;)
     if topic in self._subscriptions:
         del self._subscriptions[topic]
     if self.is_connected:
@@ -976,14 +1147,140 @@ def subscriptions(self) -&gt; dict:
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class MqttError(Exception):
-    &#34;&#34;&#34;A MQTT-specific error.&#34;&#34;&#34;
-    pass</code></pre>
+    &#34;&#34;&#34;A MQTT-specific error.&#34;&#34;&#34;</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
 <li>builtins.Exception</li>
 <li>builtins.BaseException</li>
 </ul>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttResultCode"><code class="flex name class">
+<span>class <span class="ident">MqttResultCode</span></span>
+<span>(</span><span>value, names=None, *, module=None, qualname=None, type=None, start=1)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>An enumeration.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class MqttResultCode(IntEnum):
+    SUCCESS = 0
+    ERR_INCORRECT_PROTOCOL = 1
+    ERR_INVALID_CLIENT_ID = 2
+    ERR_SERVER_UNAVAILABLE = 3
+    ERR_BAD_USERNAME_OR_PASSWORD = 4
+    ERR_UNAUTHORIZED = 5
+    ERR_CONNECTION_LOST = 6
+    ERR_TIMEOUT_LENGTH = 7
+    ERR_TIMEOUT_PAYLOAD = 8
+    ERR_TIMEOUT_CONNACK = 9
+    ERR_TIMEOUT_SUBACK = 10
+    ERR_TIMEOUT_UNSUBACK = 11
+    ERR_TIMEOUT_PINGRESP = 12
+    ERR_MALFORMED_LENGTH = 13
+    ERR_COMMUNICATION_PORT = 14
+    ERR_ADDRESS_PARSING = 15
+    ERR_MALFORMED_PACKET = 16
+    ERR_SUBSCRIPTION_FAILURE = 17
+    ERR_PAYLOAD_DECODE_FAILURE = 18
+    ERR_COMPILE_DECODER = 19
+    ERR_UNSUPPORTED_PACKET_TYPE = 20</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>enum.IntEnum</li>
+<li>builtins.int</li>
+<li>enum.Enum</li>
+</ul>
+<h3>Class variables</h3>
+<dl>
+<dt id="fieldedge_utilities.mqtt.MqttResultCode.ERR_ADDRESS_PARSING"><code class="name">var <span class="ident">ERR_ADDRESS_PARSING</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttResultCode.ERR_BAD_USERNAME_OR_PASSWORD"><code class="name">var <span class="ident">ERR_BAD_USERNAME_OR_PASSWORD</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttResultCode.ERR_COMMUNICATION_PORT"><code class="name">var <span class="ident">ERR_COMMUNICATION_PORT</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttResultCode.ERR_COMPILE_DECODER"><code class="name">var <span class="ident">ERR_COMPILE_DECODER</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttResultCode.ERR_CONNECTION_LOST"><code class="name">var <span class="ident">ERR_CONNECTION_LOST</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttResultCode.ERR_INCORRECT_PROTOCOL"><code class="name">var <span class="ident">ERR_INCORRECT_PROTOCOL</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttResultCode.ERR_INVALID_CLIENT_ID"><code class="name">var <span class="ident">ERR_INVALID_CLIENT_ID</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttResultCode.ERR_MALFORMED_LENGTH"><code class="name">var <span class="ident">ERR_MALFORMED_LENGTH</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttResultCode.ERR_MALFORMED_PACKET"><code class="name">var <span class="ident">ERR_MALFORMED_PACKET</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttResultCode.ERR_PAYLOAD_DECODE_FAILURE"><code class="name">var <span class="ident">ERR_PAYLOAD_DECODE_FAILURE</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttResultCode.ERR_SERVER_UNAVAILABLE"><code class="name">var <span class="ident">ERR_SERVER_UNAVAILABLE</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttResultCode.ERR_SUBSCRIPTION_FAILURE"><code class="name">var <span class="ident">ERR_SUBSCRIPTION_FAILURE</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttResultCode.ERR_TIMEOUT_CONNACK"><code class="name">var <span class="ident">ERR_TIMEOUT_CONNACK</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttResultCode.ERR_TIMEOUT_LENGTH"><code class="name">var <span class="ident">ERR_TIMEOUT_LENGTH</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttResultCode.ERR_TIMEOUT_PAYLOAD"><code class="name">var <span class="ident">ERR_TIMEOUT_PAYLOAD</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttResultCode.ERR_TIMEOUT_PINGRESP"><code class="name">var <span class="ident">ERR_TIMEOUT_PINGRESP</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttResultCode.ERR_TIMEOUT_SUBACK"><code class="name">var <span class="ident">ERR_TIMEOUT_SUBACK</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttResultCode.ERR_TIMEOUT_UNSUBACK"><code class="name">var <span class="ident">ERR_TIMEOUT_UNSUBACK</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttResultCode.ERR_UNAUTHORIZED"><code class="name">var <span class="ident">ERR_UNAUTHORIZED</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttResultCode.ERR_UNSUPPORTED_PACKET_TYPE"><code class="name">var <span class="ident">ERR_UNSUPPORTED_PACKET_TYPE</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttResultCode.SUCCESS"><code class="name">var <span class="ident">SUCCESS</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+</dl>
 </dd>
 </dl>
 </section>
@@ -1008,6 +1305,7 @@ def subscriptions(self) -&gt; dict:
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.connect" href="#fieldedge_utilities.mqtt.MqttClient.connect">connect</a></code></li>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.disconnect" href="#fieldedge_utilities.mqtt.MqttClient.disconnect">disconnect</a></code></li>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.failed_connection_attempts" href="#fieldedge_utilities.mqtt.MqttClient.failed_connection_attempts">failed_connection_attempts</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttClient.is_subscribed" href="#fieldedge_utilities.mqtt.MqttClient.is_subscribed">is_subscribed</a></code></li>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.publish" href="#fieldedge_utilities.mqtt.MqttClient.publish">publish</a></code></li>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.subscribe" href="#fieldedge_utilities.mqtt.MqttClient.subscribe">subscribe</a></code></li>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.subscriptions" href="#fieldedge_utilities.mqtt.MqttClient.subscriptions">subscriptions</a></code></li>
@@ -1016,6 +1314,32 @@ def subscriptions(self) -&gt; dict:
 </li>
 <li>
 <h4><code><a title="fieldedge_utilities.mqtt.MqttError" href="#fieldedge_utilities.mqtt.MqttError">MqttError</a></code></h4>
+</li>
+<li>
+<h4><code><a title="fieldedge_utilities.mqtt.MqttResultCode" href="#fieldedge_utilities.mqtt.MqttResultCode">MqttResultCode</a></code></h4>
+<ul class="">
+<li><code><a title="fieldedge_utilities.mqtt.MqttResultCode.ERR_ADDRESS_PARSING" href="#fieldedge_utilities.mqtt.MqttResultCode.ERR_ADDRESS_PARSING">ERR_ADDRESS_PARSING</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttResultCode.ERR_BAD_USERNAME_OR_PASSWORD" href="#fieldedge_utilities.mqtt.MqttResultCode.ERR_BAD_USERNAME_OR_PASSWORD">ERR_BAD_USERNAME_OR_PASSWORD</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttResultCode.ERR_COMMUNICATION_PORT" href="#fieldedge_utilities.mqtt.MqttResultCode.ERR_COMMUNICATION_PORT">ERR_COMMUNICATION_PORT</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttResultCode.ERR_COMPILE_DECODER" href="#fieldedge_utilities.mqtt.MqttResultCode.ERR_COMPILE_DECODER">ERR_COMPILE_DECODER</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttResultCode.ERR_CONNECTION_LOST" href="#fieldedge_utilities.mqtt.MqttResultCode.ERR_CONNECTION_LOST">ERR_CONNECTION_LOST</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttResultCode.ERR_INCORRECT_PROTOCOL" href="#fieldedge_utilities.mqtt.MqttResultCode.ERR_INCORRECT_PROTOCOL">ERR_INCORRECT_PROTOCOL</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttResultCode.ERR_INVALID_CLIENT_ID" href="#fieldedge_utilities.mqtt.MqttResultCode.ERR_INVALID_CLIENT_ID">ERR_INVALID_CLIENT_ID</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttResultCode.ERR_MALFORMED_LENGTH" href="#fieldedge_utilities.mqtt.MqttResultCode.ERR_MALFORMED_LENGTH">ERR_MALFORMED_LENGTH</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttResultCode.ERR_MALFORMED_PACKET" href="#fieldedge_utilities.mqtt.MqttResultCode.ERR_MALFORMED_PACKET">ERR_MALFORMED_PACKET</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttResultCode.ERR_PAYLOAD_DECODE_FAILURE" href="#fieldedge_utilities.mqtt.MqttResultCode.ERR_PAYLOAD_DECODE_FAILURE">ERR_PAYLOAD_DECODE_FAILURE</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttResultCode.ERR_SERVER_UNAVAILABLE" href="#fieldedge_utilities.mqtt.MqttResultCode.ERR_SERVER_UNAVAILABLE">ERR_SERVER_UNAVAILABLE</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttResultCode.ERR_SUBSCRIPTION_FAILURE" href="#fieldedge_utilities.mqtt.MqttResultCode.ERR_SUBSCRIPTION_FAILURE">ERR_SUBSCRIPTION_FAILURE</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttResultCode.ERR_TIMEOUT_CONNACK" href="#fieldedge_utilities.mqtt.MqttResultCode.ERR_TIMEOUT_CONNACK">ERR_TIMEOUT_CONNACK</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttResultCode.ERR_TIMEOUT_LENGTH" href="#fieldedge_utilities.mqtt.MqttResultCode.ERR_TIMEOUT_LENGTH">ERR_TIMEOUT_LENGTH</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttResultCode.ERR_TIMEOUT_PAYLOAD" href="#fieldedge_utilities.mqtt.MqttResultCode.ERR_TIMEOUT_PAYLOAD">ERR_TIMEOUT_PAYLOAD</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttResultCode.ERR_TIMEOUT_PINGRESP" href="#fieldedge_utilities.mqtt.MqttResultCode.ERR_TIMEOUT_PINGRESP">ERR_TIMEOUT_PINGRESP</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttResultCode.ERR_TIMEOUT_SUBACK" href="#fieldedge_utilities.mqtt.MqttResultCode.ERR_TIMEOUT_SUBACK">ERR_TIMEOUT_SUBACK</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttResultCode.ERR_TIMEOUT_UNSUBACK" href="#fieldedge_utilities.mqtt.MqttResultCode.ERR_TIMEOUT_UNSUBACK">ERR_TIMEOUT_UNSUBACK</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttResultCode.ERR_UNAUTHORIZED" href="#fieldedge_utilities.mqtt.MqttResultCode.ERR_UNAUTHORIZED">ERR_UNAUTHORIZED</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttResultCode.ERR_UNSUPPORTED_PACKET_TYPE" href="#fieldedge_utilities.mqtt.MqttResultCode.ERR_UNSUPPORTED_PACKET_TYPE">ERR_UNSUPPORTED_PACKET_TYPE</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttResultCode.SUCCESS" href="#fieldedge_utilities.mqtt.MqttResultCode.SUCCESS">SUCCESS</a></code></li>
+</ul>
 </li>
 </ul>
 </li>

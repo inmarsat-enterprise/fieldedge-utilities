@@ -22,9 +22,9 @@ Format is:
 
 """
 import logging
-from logging.handlers import RotatingFileHandler
 import os
 import sys
+from logging.handlers import RotatingFileHandler
 from time import gmtime
 
 from fieldedge_utilities.path import clean_path
@@ -216,6 +216,8 @@ def get_wrapping_logger(name: str = None,
                         **kwargs) -> logging.Logger:
     """Sets up a wrapping logger that writes to console and optionally a file.
 
+    DEPRECATED in favour of get_fieldede_logger
+
     * Default logging level is `INFO`
     * Timestamps are UTC ISO 8601 format
     * Initializes logging to stdout/stderr, and optionally a CSV or JSON
@@ -257,6 +259,56 @@ def get_wrapping_logger(name: str = None,
                                              **kwargs))
     add_handler(logger, get_handler_stdout(name=name))
     add_handler(logger, get_handler_stderr(name=name))
+    apply_formatter(logger, get_formatter(format))
+    logger.setLevel(log_level)
+    return logger
+
+
+def get_fieldedge_logger(filename: str = None,
+                         file_size: int = 5,
+                         log_level: 'int|str' = logging.INFO,
+                         format: str = 'csv',
+                         **kwargs) -> logging.Logger:
+    """Sets up a root logger that writes to console and optionally a file.
+
+    * Default logging level is `INFO`
+    * Timestamps are UTC ISO 8601 format
+    * Initializes logging to stdout/stderr, and optionally a CSV or JSON
+    formatted file. Default is CSV.
+    * Wraps files at a given `file_size` in MB, with default 2 backups.
+    
+    Args:
+        name: Name of the logger (if None, uses name of calling module).
+        filename: Name of the file/path if writing to a file.
+        file_size: Max size of the file in megabytes, before wrapping.
+        log_level: the logging level (default INFO)
+        format: `csv` or `json`
+        kwargs: Optional overrides for RotatingFileHandler
+            mode (str): defaults to `a` (append)
+            maxBytes (int): overrides file_size
+            backupCount (int): defaults to 2
+    
+    Returns:
+        A `Logger` with console `StreamHandler` and (optional)
+            `RotatingFileHandler`.
+    
+    Raises:
+        `FileNotFoundError` if a logfile name is specified with an invalid path.
+    
+    """
+    logger = logging.getLogger()
+    if isinstance(log_level, str):
+        log_level = log_level.upper()
+    if filename is not None:
+        filename = clean_path(filename)
+        if not os.path.isdir(os.path.dirname(filename)):
+            raise FileNotFoundError('Invalid logfile path'
+                                    f' {os.path.dirname(filename)}')
+        add_handler(logger, get_handler_file(filename,
+                                             file_size=file_size,
+                                             **kwargs))
+    add_handler(logger, get_handler_stdout())
+    add_handler(logger, get_handler_stderr())
     apply_formatter(logger, get_formatter(format))
     logger.setLevel(log_level)
     return logger

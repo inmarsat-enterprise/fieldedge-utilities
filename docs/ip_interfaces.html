@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
 <meta name="generator" content="pdoc 0.10.0" />
 <title>fieldedge_utilities.ip_interfaces API documentation</title>
-<meta name="description" content="Tools for querying IP interface properties of the system." />
+<meta name="description" content="Tools for querying IP interface properties of the system …" />
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
 <link rel="stylesheet preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/github.min.css" crossorigin>
@@ -23,11 +23,16 @@
 </header>
 <section id="section-intro">
 <p>Tools for querying IP interface properties of the system.</p>
+<p>An environment variable <code>INTERFACE_VALID_PREFIXES</code> can be configured to
+override the default set of <code>eth</code> and <code>wlan</code> prefixes.</p>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">&#34;&#34;&#34;Tools for querying IP interface properties of the system.
+
+An environment variable `INTERFACE_VALID_PREFIXES` can be configured to
+override the default set of `eth` and `wlan` prefixes.
 &#34;&#34;&#34;
 import ifaddr
 import ipaddress
@@ -56,10 +61,13 @@ def get_interfaces(valid_prefixes: &#39;list[str]&#39; = VALID_PREFIXES,
     interfaces = {}
     adapters = ifaddr.get_adapters()
     for adapter in adapters:
+        assert isinstance(adapter, ifaddr.Adapter)
+        assert isinstance(adapter.name, str)
         if (valid_prefixes is not None and
             not any(adapter.name.startswith(x) for x in valid_prefixes)):
             continue
         for ip in adapter.ips:
+            assert isinstance(ip, ifaddr.IP)
             if &#39;.&#39; in ip.ip:
                 base_ip = ip.ip
                 if include_subnet:
@@ -102,6 +110,8 @@ def is_valid_ip(ip_address: str, ipv4_only: bool = True) -&gt; bool:
     &#34;&#34;&#34;
     try:
         ip_address = ipaddress.ip_address(ip_address)
+        assert (isinstance(ip_address, ipaddress.IPv4Address) or
+                isinstance(ip_address, ipaddress.IPv6Address))
         if ipv4_only:
             return ip_address.version == 4
         return True
@@ -154,10 +164,13 @@ def is_valid_ip(ip_address: str, ipv4_only: bool = True) -&gt; bool:
     interfaces = {}
     adapters = ifaddr.get_adapters()
     for adapter in adapters:
+        assert isinstance(adapter, ifaddr.Adapter)
+        assert isinstance(adapter.name, str)
         if (valid_prefixes is not None and
             not any(adapter.name.startswith(x) for x in valid_prefixes)):
             continue
         for ip in adapter.ips:
+            assert isinstance(ip, ifaddr.IP)
             if &#39;.&#39; in ip.ip:
                 base_ip = ip.ip
                 if include_subnet:
@@ -236,6 +249,8 @@ def is_valid_ip(ip_address: str, ipv4_only: bool = True) -&gt; bool:
     &#34;&#34;&#34;
     try:
         ip_address = ipaddress.ip_address(ip_address)
+        assert (isinstance(ip_address, ipaddress.IPv4Address) or
+                isinstance(ip_address, ipaddress.IPv6Address))
         if ipv4_only:
             return ip_address.version == 4
         return True

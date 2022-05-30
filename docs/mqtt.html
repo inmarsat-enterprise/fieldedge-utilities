@@ -60,6 +60,7 @@ from enum import Enum, IntEnum
 from socket import timeout  # : for Python &lt; 3.10 compatibility vs TimeoutError
 from threading import enumerate as enumerate_threads
 from time import sleep, time
+from typing import Callable
 
 from dotenv import load_dotenv
 from paho.mqtt.client import Client as PahoClient
@@ -101,9 +102,10 @@ class MqttResultCode(IntEnum):
 
 
 def _get_mqtt_result(rc: int) -&gt; str:
-    if rc in MqttResultCode:
+    try:
         return MqttResultCode(rc).name
-    return &#39;UNKNOWN&#39;
+    except:
+        return &#39;UNKNOWN&#39;
 
 
 class MqttError(Exception):
@@ -136,8 +138,7 @@ class MqttClient:
         &#34;&#34;&#34;Initializes a managed MQTT client.
         
         Args:
-            client_id (str): The unique client ID (default importing module
-                `__name__`)
+            client_id (str): The client ID (default imports module `__name__`)
             on_message (callable): The callback when subscribed messages are
                 received as `topic`(str), `message`(dict|str).
             subscribe_default (str|list[str]): The default subscription(s)
@@ -146,9 +147,11 @@ class MqttClient:
                 attempts if auto_connect is `True`.
             auto_connect (bool): Automatically attempts to connect when created
                 or reconnect after disconnection.
-            **kwargs: include Paho MQTT Client overrides such as:
+            **kwargs: includes advanced feature overrides such as:
             
-            * `on_connect` and/or `on_disconnect`
+            * `unique_client_id` defaults to True, appends a timestamp to the
+            client_id to avoid being rejected by the host.
+            * `on_connect`, `on_disconnect`, `on_log` callbacks
             * `host`, `port` (default 1883) and `keepalive` (default 60)
             * `username` and `password`
             * `ca_certs`, `certfile`, `keyfile`
@@ -180,16 +183,12 @@ class MqttClient:
         self._client_id = client_id
         self._client_uid = kwargs.get(&#39;client_uid&#39;, True)
         if self._host.endswith(&#39;azure-devices.net&#39;):
-            _log.info(&#39;Configuring Azure IoT Hub subscriptions&#39;)
+            _log.debug(&#39;Using static Azure IoT Device ID as client_id&#39;)
             self._client_uid = False
-            subscribe_default = [
-                f&#39;devices/{self.client_id}/messages/devicebound/#&#39;,
-                &#39;$iothub/twin/res/#&#39;,
-                &#39;$iothub/methods/POST/#&#39;,
-            ]
         if self._client_uid:
             self.client_id = client_id
-        self._mqtt = PahoClient()
+        self._clean_session = kwargs.get(&#39;clean_session&#39;, True)
+        self._mqtt = PahoClient(clean_session=self._clean_session)
         self.is_connected = False
         self._subscriptions = {}
         self.connect_retry_interval = connect_retry_interval
@@ -234,6 +233,32 @@ class MqttClient:
     @property
     def failed_connection_attempts(self) -&gt; int:
         return self._failed_connect_attempts
+
+    @property
+    def on_log(self) -&gt; Callable:
+        return self._mqtt.on_log
+
+    @on_log.setter
+    def on_log(self, callback: Callable):
+        if not isinstance(callback, Callable):
+            raise ValueError(&#39;Callback must be a function&#39;)
+        self._mqtt.on_log = callback
+
+    @property
+    def socket_timeout(self) -&gt; int:
+        read_timeout = int(self._mqtt._sockpairR.gettimeout())
+        write_timeout = int(self._mqtt._sockpairW.gettimeout())
+        if read_timeout != write_timeout:
+            _log.warning(f&#39;Read timeout ({read_timeout})&#39;
+                         f&#39; != Write timeout ({write_timeout})&#39;)
+        return write_timeout
+
+    @socket_timeout.setter
+    def socket_timeout(self, value: int):
+        if not (0 &lt; value &lt;= 120):
+            raise ValueError(&#39;Socket timeout must be 1..120 seconds&#39;)
+        self._mqtt._sockpairR.settimeout(float(value))
+        self._mqtt._sockpairW.settimeout(float(value))
 
     def _cleanup(self, *args):
         # TODO: logging raises an error since the log file was closed
@@ -339,7 +364,7 @@ class MqttClient:
         if self.is_connected:
             self._mqtt_subscribe(topic, qos)
         else:
-            _log.warning(&#39;MQTT not connected will subscribe later&#39;)
+            _log.warning(f&#39;MQTT not connected...subscribing to {topic} later&#39;)
 
     def _mqtt_on_subscribe(self,
                            client: PahoClient,
@@ -432,7 +457,7 @@ class MqttClient:
             device_to_cloud = f&#39;devices/{self.client_id}/messages/events/&#39;
             if device_to_cloud not in topic:
                 _log.warning(&#39;Applying Azure device-to-cloud topic prefix&#39;)
-                topic = f&#39;{device_to_cloud}/{topic}&#39;
+                topic = f&#39;{device_to_cloud}{topic}&#39;
         if isinstance(message, dict):
             for k, v in message.items():
                 if not isinstance(k, str):
@@ -496,8 +521,7 @@ or reconnect after disconnection.</dd>
 <h2 id="args">Args</h2>
 <dl>
 <dt><strong><code>client_id</code></strong> :&ensp;<code>str</code></dt>
-<dd>The unique client ID (default importing module
-<code>__name__</code>)</dd>
+<dd>The client ID (default imports module <code>__name__</code>)</dd>
 <dt><strong><code>on_message</code></strong> :&ensp;<code>callable</code></dt>
 <dd>The callback when subscribed messages are
 received as <code>topic</code>(str), <code>message</code>(dict|str).</dd>
@@ -510,10 +534,12 @@ attempts if auto_connect is <code>True</code>.</dd>
 <dd>Automatically attempts to connect when created
 or reconnect after disconnection.</dd>
 <dt><strong><code>**kwargs</code></strong></dt>
-<dd>include Paho MQTT Client overrides such as:</dd>
+<dd>includes advanced feature overrides such as:</dd>
 </dl>
 <ul>
-<li><code>on_connect</code> and/or <code>on_disconnect</code></li>
+<li><code>unique_client_id</code> defaults to True, appends a timestamp to the
+client_id to avoid being rejected by the host.</li>
+<li><code>on_connect</code>, <code>on_disconnect</code>, <code>on_log</code> callbacks</li>
 <li><code>host</code>, <code>port</code> (default 1883) and <code>keepalive</code> (default 60)</li>
 <li><code>username</code> and <code>password</code></li>
 <li><code>ca_certs</code>, <code>certfile</code>, <code>keyfile</code></li>
@@ -551,8 +577,7 @@ or reconnect after disconnection.</dd>
         &#34;&#34;&#34;Initializes a managed MQTT client.
         
         Args:
-            client_id (str): The unique client ID (default importing module
-                `__name__`)
+            client_id (str): The client ID (default imports module `__name__`)
             on_message (callable): The callback when subscribed messages are
                 received as `topic`(str), `message`(dict|str).
             subscribe_default (str|list[str]): The default subscription(s)
@@ -561,9 +586,11 @@ or reconnect after disconnection.</dd>
                 attempts if auto_connect is `True`.
             auto_connect (bool): Automatically attempts to connect when created
                 or reconnect after disconnection.
-            **kwargs: include Paho MQTT Client overrides such as:
+            **kwargs: includes advanced feature overrides such as:
             
-            * `on_connect` and/or `on_disconnect`
+            * `unique_client_id` defaults to True, appends a timestamp to the
+            client_id to avoid being rejected by the host.
+            * `on_connect`, `on_disconnect`, `on_log` callbacks
             * `host`, `port` (default 1883) and `keepalive` (default 60)
             * `username` and `password`
             * `ca_certs`, `certfile`, `keyfile`
@@ -595,16 +622,12 @@ or reconnect after disconnection.</dd>
         self._client_id = client_id
         self._client_uid = kwargs.get(&#39;client_uid&#39;, True)
         if self._host.endswith(&#39;azure-devices.net&#39;):
-            _log.info(&#39;Configuring Azure IoT Hub subscriptions&#39;)
+            _log.debug(&#39;Using static Azure IoT Device ID as client_id&#39;)
             self._client_uid = False
-            subscribe_default = [
-                f&#39;devices/{self.client_id}/messages/devicebound/#&#39;,
-                &#39;$iothub/twin/res/#&#39;,
-                &#39;$iothub/methods/POST/#&#39;,
-            ]
         if self._client_uid:
             self.client_id = client_id
-        self._mqtt = PahoClient()
+        self._clean_session = kwargs.get(&#39;clean_session&#39;, True)
+        self._mqtt = PahoClient(clean_session=self._clean_session)
         self.is_connected = False
         self._subscriptions = {}
         self.connect_retry_interval = connect_retry_interval
@@ -649,6 +672,32 @@ or reconnect after disconnection.</dd>
     @property
     def failed_connection_attempts(self) -&gt; int:
         return self._failed_connect_attempts
+
+    @property
+    def on_log(self) -&gt; Callable:
+        return self._mqtt.on_log
+
+    @on_log.setter
+    def on_log(self, callback: Callable):
+        if not isinstance(callback, Callable):
+            raise ValueError(&#39;Callback must be a function&#39;)
+        self._mqtt.on_log = callback
+
+    @property
+    def socket_timeout(self) -&gt; int:
+        read_timeout = int(self._mqtt._sockpairR.gettimeout())
+        write_timeout = int(self._mqtt._sockpairW.gettimeout())
+        if read_timeout != write_timeout:
+            _log.warning(f&#39;Read timeout ({read_timeout})&#39;
+                         f&#39; != Write timeout ({write_timeout})&#39;)
+        return write_timeout
+
+    @socket_timeout.setter
+    def socket_timeout(self, value: int):
+        if not (0 &lt; value &lt;= 120):
+            raise ValueError(&#39;Socket timeout must be 1..120 seconds&#39;)
+        self._mqtt._sockpairR.settimeout(float(value))
+        self._mqtt._sockpairW.settimeout(float(value))
 
     def _cleanup(self, *args):
         # TODO: logging raises an error since the log file was closed
@@ -754,7 +803,7 @@ or reconnect after disconnection.</dd>
         if self.is_connected:
             self._mqtt_subscribe(topic, qos)
         else:
-            _log.warning(&#39;MQTT not connected will subscribe later&#39;)
+            _log.warning(f&#39;MQTT not connected...subscribing to {topic} later&#39;)
 
     def _mqtt_on_subscribe(self,
                            client: PahoClient,
@@ -847,7 +896,7 @@ or reconnect after disconnection.</dd>
             device_to_cloud = f&#39;devices/{self.client_id}/messages/events/&#39;
             if device_to_cloud not in topic:
                 _log.warning(&#39;Applying Azure device-to-cloud topic prefix&#39;)
-                topic = f&#39;{device_to_cloud}/{topic}&#39;
+                topic = f&#39;{device_to_cloud}{topic}&#39;
         if isinstance(message, dict):
             for k, v in message.items():
                 if not isinstance(k, str):
@@ -897,6 +946,35 @@ def client_id(self):
 <pre><code class="python">@property
 def failed_connection_attempts(self) -&gt; int:
     return self._failed_connect_attempts</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttClient.on_log"><code class="name">var <span class="ident">on_log</span> : Callable</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def on_log(self) -&gt; Callable:
+    return self._mqtt.on_log</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttClient.socket_timeout"><code class="name">var <span class="ident">socket_timeout</span> : int</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def socket_timeout(self) -&gt; int:
+    read_timeout = int(self._mqtt._sockpairR.gettimeout())
+    write_timeout = int(self._mqtt._sockpairW.gettimeout())
+    if read_timeout != write_timeout:
+        _log.warning(f&#39;Read timeout ({read_timeout})&#39;
+                     f&#39; != Write timeout ({write_timeout})&#39;)
+    return write_timeout</code></pre>
 </details>
 </dd>
 <dt id="fieldedge_utilities.mqtt.MqttClient.subscriptions"><code class="name">var <span class="ident">subscriptions</span> : dict</code></dt>
@@ -1042,7 +1120,7 @@ def subscriptions(self) -&gt; dict:
         device_to_cloud = f&#39;devices/{self.client_id}/messages/events/&#39;
         if device_to_cloud not in topic:
             _log.warning(&#39;Applying Azure device-to-cloud topic prefix&#39;)
-            topic = f&#39;{device_to_cloud}/{topic}&#39;
+            topic = f&#39;{device_to_cloud}{topic}&#39;
     if isinstance(message, dict):
         for k, v in message.items():
             if not isinstance(k, str):
@@ -1103,7 +1181,7 @@ Message id <code>mid</code> is 0 when not actively subscribed.</p>
     if self.is_connected:
         self._mqtt_subscribe(topic, qos)
     else:
-        _log.warning(&#39;MQTT not connected will subscribe later&#39;)</code></pre>
+        _log.warning(f&#39;MQTT not connected...subscribing to {topic} later&#39;)</code></pre>
 </details>
 </dd>
 <dt id="fieldedge_utilities.mqtt.MqttClient.unsubscribe"><code class="name flex">
@@ -1306,7 +1384,9 @@ Message id <code>mid</code> is 0 when not actively subscribed.</p>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.disconnect" href="#fieldedge_utilities.mqtt.MqttClient.disconnect">disconnect</a></code></li>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.failed_connection_attempts" href="#fieldedge_utilities.mqtt.MqttClient.failed_connection_attempts">failed_connection_attempts</a></code></li>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.is_subscribed" href="#fieldedge_utilities.mqtt.MqttClient.is_subscribed">is_subscribed</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttClient.on_log" href="#fieldedge_utilities.mqtt.MqttClient.on_log">on_log</a></code></li>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.publish" href="#fieldedge_utilities.mqtt.MqttClient.publish">publish</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttClient.socket_timeout" href="#fieldedge_utilities.mqtt.MqttClient.socket_timeout">socket_timeout</a></code></li>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.subscribe" href="#fieldedge_utilities.mqtt.MqttClient.subscribe">subscribe</a></code></li>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.subscriptions" href="#fieldedge_utilities.mqtt.MqttClient.subscriptions">subscriptions</a></code></li>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.unsubscribe" href="#fieldedge_utilities.mqtt.MqttClient.unsubscribe">unsubscribe</a></code></li>

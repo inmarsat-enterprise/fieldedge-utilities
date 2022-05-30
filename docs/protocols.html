@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
 <meta name="generator" content="pdoc 0.10.0" />
 <title>fieldedge_utilities.protocols API documentation</title>
-<meta name="description" content="Future provision for protocol analysis." />
+<meta name="description" content="Enumerated types for protocol analysis." />
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
 <link rel="stylesheet preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/github.min.css" crossorigin>
@@ -22,12 +22,12 @@
 <h1 class="title">Module <code>fieldedge_utilities.protocols</code></h1>
 </header>
 <section id="section-intro">
-<p>Future provision for protocol analysis.</p>
+<p>Enumerated types for protocol analysis.</p>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">&#34;&#34;&#34;Future provision for protocol analysis.&#34;&#34;&#34;
+<pre><code class="python">&#34;&#34;&#34;Enumerated types for protocol analysis.&#34;&#34;&#34;
 from enum import Enum
 
 
@@ -35,7 +35,7 @@ class KnownTcpPorts(Enum):
     &#34;&#34;&#34;Mappings for application layer TCP ports.&#34;&#34;&#34;
     SMTP = 25
     HTTP = 80
-    HTTPS = 443
+    HTTP_TLS = 443
     HTTP_ALT = 8080
     DNS = 53
     FTP = 20
@@ -47,18 +47,18 @@ class KnownTcpPorts(Enum):
     MODBUS = 502
     MODBUS_TLS = 802
     DNP = 20000
-    DNPS = 19999
+    DNP_TLS = 19999
     IEC60870 = 2404
     OPCUA = 4840
-    OPCUAS = 4843   # OPC-UA secure
+    OPCUA_TLS = 4843   # OPC-UA secure
     SRCP = 4303   # Simple Railroad Command Protocol
     MQTT = 1883
     MQTT_TLS = 8883
     MQTT_SOCKET = 9001
     COAP = 5683
-    COAPS = 5684   # Constrained Application Protocol Secure
+    COAP_TLS = 5684   # Constrained Application Protocol Secure
     DOCKERAPI = 2375
-    DOCKERAPIS = 2376
+    DOCKERAPI_TLS = 2376
     KAFKA = 9092   # Apache Kafka message queue
     OPENVPN = 1194
     IPSEC = 1293
@@ -99,7 +99,7 @@ class KnownUdpPorts(Enum):
     &#34;&#34;&#34;Mappings for application layer TCP ports.&#34;&#34;&#34;
     SMTP = 25
     HTTP = 80
-    HTTPS = 443
+    HTTP_TLS = 443
     HTTP_ALT = 8080
     DNS = 53
     FTP = 20
@@ -111,18 +111,18 @@ class KnownUdpPorts(Enum):
     MODBUS = 502
     MODBUS_TLS = 802
     DNP = 20000
-    DNPS = 19999
+    DNP_TLS = 19999
     IEC60870 = 2404
     OPCUA = 4840
-    OPCUAS = 4843   # OPC-UA secure
+    OPCUA_TLS = 4843   # OPC-UA secure
     SRCP = 4303   # Simple Railroad Command Protocol
     MQTT = 1883
     MQTT_TLS = 8883
     MQTT_SOCKET = 9001
     COAP = 5683
-    COAPS = 5684   # Constrained Application Protocol Secure
+    COAP_TLS = 5684   # Constrained Application Protocol Secure
     DOCKERAPI = 2375
-    DOCKERAPIS = 2376
+    DOCKERAPI_TLS = 2376
     KAFKA = 9092   # Apache Kafka message queue
     OPENVPN = 1194
     IPSEC = 1293
@@ -141,7 +141,7 @@ class KnownUdpPorts(Enum):
 <dd>
 <div class="desc"></div>
 </dd>
-<dt id="fieldedge_utilities.protocols.KnownTcpPorts.COAPS"><code class="name">var <span class="ident">COAPS</span></code></dt>
+<dt id="fieldedge_utilities.protocols.KnownTcpPorts.COAP_TLS"><code class="name">var <span class="ident">COAP_TLS</span></code></dt>
 <dd>
 <div class="desc"></div>
 </dd>
@@ -149,7 +149,7 @@ class KnownUdpPorts(Enum):
 <dd>
 <div class="desc"></div>
 </dd>
-<dt id="fieldedge_utilities.protocols.KnownTcpPorts.DNPS"><code class="name">var <span class="ident">DNPS</span></code></dt>
+<dt id="fieldedge_utilities.protocols.KnownTcpPorts.DNP_TLS"><code class="name">var <span class="ident">DNP_TLS</span></code></dt>
 <dd>
 <div class="desc"></div>
 </dd>
@@ -161,7 +161,7 @@ class KnownUdpPorts(Enum):
 <dd>
 <div class="desc"></div>
 </dd>
-<dt id="fieldedge_utilities.protocols.KnownTcpPorts.DOCKERAPIS"><code class="name">var <span class="ident">DOCKERAPIS</span></code></dt>
+<dt id="fieldedge_utilities.protocols.KnownTcpPorts.DOCKERAPI_TLS"><code class="name">var <span class="ident">DOCKERAPI_TLS</span></code></dt>
 <dd>
 <div class="desc"></div>
 </dd>
@@ -181,11 +181,11 @@ class KnownUdpPorts(Enum):
 <dd>
 <div class="desc"></div>
 </dd>
-<dt id="fieldedge_utilities.protocols.KnownTcpPorts.HTTPS"><code class="name">var <span class="ident">HTTPS</span></code></dt>
+<dt id="fieldedge_utilities.protocols.KnownTcpPorts.HTTP_ALT"><code class="name">var <span class="ident">HTTP_ALT</span></code></dt>
 <dd>
 <div class="desc"></div>
 </dd>
-<dt id="fieldedge_utilities.protocols.KnownTcpPorts.HTTP_ALT"><code class="name">var <span class="ident">HTTP_ALT</span></code></dt>
+<dt id="fieldedge_utilities.protocols.KnownTcpPorts.HTTP_TLS"><code class="name">var <span class="ident">HTTP_TLS</span></code></dt>
 <dd>
 <div class="desc"></div>
 </dd>
@@ -229,7 +229,7 @@ class KnownUdpPorts(Enum):
 <dd>
 <div class="desc"></div>
 </dd>
-<dt id="fieldedge_utilities.protocols.KnownTcpPorts.OPCUAS"><code class="name">var <span class="ident">OPCUAS</span></code></dt>
+<dt id="fieldedge_utilities.protocols.KnownTcpPorts.OPCUA_TLS"><code class="name">var <span class="ident">OPCUA_TLS</span></code></dt>
 <dd>
 <div class="desc"></div>
 </dd>
@@ -337,18 +337,18 @@ class KnownUdpPorts(Enum):
 <h4><code><a title="fieldedge_utilities.protocols.KnownTcpPorts" href="#fieldedge_utilities.protocols.KnownTcpPorts">KnownTcpPorts</a></code></h4>
 <ul class="two-column">
 <li><code><a title="fieldedge_utilities.protocols.KnownTcpPorts.COAP" href="#fieldedge_utilities.protocols.KnownTcpPorts.COAP">COAP</a></code></li>
-<li><code><a title="fieldedge_utilities.protocols.KnownTcpPorts.COAPS" href="#fieldedge_utilities.protocols.KnownTcpPorts.COAPS">COAPS</a></code></li>
+<li><code><a title="fieldedge_utilities.protocols.KnownTcpPorts.COAP_TLS" href="#fieldedge_utilities.protocols.KnownTcpPorts.COAP_TLS">COAP_TLS</a></code></li>
 <li><code><a title="fieldedge_utilities.protocols.KnownTcpPorts.DNP" href="#fieldedge_utilities.protocols.KnownTcpPorts.DNP">DNP</a></code></li>
-<li><code><a title="fieldedge_utilities.protocols.KnownTcpPorts.DNPS" href="#fieldedge_utilities.protocols.KnownTcpPorts.DNPS">DNPS</a></code></li>
+<li><code><a title="fieldedge_utilities.protocols.KnownTcpPorts.DNP_TLS" href="#fieldedge_utilities.protocols.KnownTcpPorts.DNP_TLS">DNP_TLS</a></code></li>
 <li><code><a title="fieldedge_utilities.protocols.KnownTcpPorts.DNS" href="#fieldedge_utilities.protocols.KnownTcpPorts.DNS">DNS</a></code></li>
 <li><code><a title="fieldedge_utilities.protocols.KnownTcpPorts.DOCKERAPI" href="#fieldedge_utilities.protocols.KnownTcpPorts.DOCKERAPI">DOCKERAPI</a></code></li>
-<li><code><a title="fieldedge_utilities.protocols.KnownTcpPorts.DOCKERAPIS" href="#fieldedge_utilities.protocols.KnownTcpPorts.DOCKERAPIS">DOCKERAPIS</a></code></li>
+<li><code><a title="fieldedge_utilities.protocols.KnownTcpPorts.DOCKERAPI_TLS" href="#fieldedge_utilities.protocols.KnownTcpPorts.DOCKERAPI_TLS">DOCKERAPI_TLS</a></code></li>
 <li><code><a title="fieldedge_utilities.protocols.KnownTcpPorts.FLIR" href="#fieldedge_utilities.protocols.KnownTcpPorts.FLIR">FLIR</a></code></li>
 <li><code><a title="fieldedge_utilities.protocols.KnownTcpPorts.FTP" href="#fieldedge_utilities.protocols.KnownTcpPorts.FTP">FTP</a></code></li>
 <li><code><a title="fieldedge_utilities.protocols.KnownTcpPorts.FTP_CTRL" href="#fieldedge_utilities.protocols.KnownTcpPorts.FTP_CTRL">FTP_CTRL</a></code></li>
 <li><code><a title="fieldedge_utilities.protocols.KnownTcpPorts.HTTP" href="#fieldedge_utilities.protocols.KnownTcpPorts.HTTP">HTTP</a></code></li>
-<li><code><a title="fieldedge_utilities.protocols.KnownTcpPorts.HTTPS" href="#fieldedge_utilities.protocols.KnownTcpPorts.HTTPS">HTTPS</a></code></li>
 <li><code><a title="fieldedge_utilities.protocols.KnownTcpPorts.HTTP_ALT" href="#fieldedge_utilities.protocols.KnownTcpPorts.HTTP_ALT">HTTP_ALT</a></code></li>
+<li><code><a title="fieldedge_utilities.protocols.KnownTcpPorts.HTTP_TLS" href="#fieldedge_utilities.protocols.KnownTcpPorts.HTTP_TLS">HTTP_TLS</a></code></li>
 <li><code><a title="fieldedge_utilities.protocols.KnownTcpPorts.IEC60870" href="#fieldedge_utilities.protocols.KnownTcpPorts.IEC60870">IEC60870</a></code></li>
 <li><code><a title="fieldedge_utilities.protocols.KnownTcpPorts.IMAP" href="#fieldedge_utilities.protocols.KnownTcpPorts.IMAP">IMAP</a></code></li>
 <li><code><a title="fieldedge_utilities.protocols.KnownTcpPorts.IPSEC" href="#fieldedge_utilities.protocols.KnownTcpPorts.IPSEC">IPSEC</a></code></li>
@@ -359,7 +359,7 @@ class KnownUdpPorts(Enum):
 <li><code><a title="fieldedge_utilities.protocols.KnownTcpPorts.MQTT_SOCKET" href="#fieldedge_utilities.protocols.KnownTcpPorts.MQTT_SOCKET">MQTT_SOCKET</a></code></li>
 <li><code><a title="fieldedge_utilities.protocols.KnownTcpPorts.MQTT_TLS" href="#fieldedge_utilities.protocols.KnownTcpPorts.MQTT_TLS">MQTT_TLS</a></code></li>
 <li><code><a title="fieldedge_utilities.protocols.KnownTcpPorts.OPCUA" href="#fieldedge_utilities.protocols.KnownTcpPorts.OPCUA">OPCUA</a></code></li>
-<li><code><a title="fieldedge_utilities.protocols.KnownTcpPorts.OPCUAS" href="#fieldedge_utilities.protocols.KnownTcpPorts.OPCUAS">OPCUAS</a></code></li>
+<li><code><a title="fieldedge_utilities.protocols.KnownTcpPorts.OPCUA_TLS" href="#fieldedge_utilities.protocols.KnownTcpPorts.OPCUA_TLS">OPCUA_TLS</a></code></li>
 <li><code><a title="fieldedge_utilities.protocols.KnownTcpPorts.OPENVPN" href="#fieldedge_utilities.protocols.KnownTcpPorts.OPENVPN">OPENVPN</a></code></li>
 <li><code><a title="fieldedge_utilities.protocols.KnownTcpPorts.RDP" href="#fieldedge_utilities.protocols.KnownTcpPorts.RDP">RDP</a></code></li>
 <li><code><a title="fieldedge_utilities.protocols.KnownTcpPorts.RSYNC" href="#fieldedge_utilities.protocols.KnownTcpPorts.RSYNC">RSYNC</a></code></li>

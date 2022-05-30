@@ -1,4 +1,7 @@
 """Tools for querying IP interface properties of the system.
+
+An environment variable `INTERFACE_VALID_PREFIXES` can be configured to
+override the default set of `eth` and `wlan` prefixes.
 """
 import ifaddr
 import ipaddress
@@ -27,10 +30,13 @@ def get_interfaces(valid_prefixes: 'list[str]' = VALID_PREFIXES,
     interfaces = {}
     adapters = ifaddr.get_adapters()
     for adapter in adapters:
+        assert isinstance(adapter, ifaddr.Adapter)
+        assert isinstance(adapter.name, str)
         if (valid_prefixes is not None and
             not any(adapter.name.startswith(x) for x in valid_prefixes)):
             continue
         for ip in adapter.ips:
+            assert isinstance(ip, ifaddr.IP)
             if '.' in ip.ip:
                 base_ip = ip.ip
                 if include_subnet:
@@ -73,6 +79,8 @@ def is_valid_ip(ip_address: str, ipv4_only: bool = True) -> bool:
     """
     try:
         ip_address = ipaddress.ip_address(ip_address)
+        assert (isinstance(ip_address, ipaddress.IPv4Address) or
+                isinstance(ip_address, ipaddress.IPv6Address))
         if ipv4_only:
             return ip_address.version == 4
         return True

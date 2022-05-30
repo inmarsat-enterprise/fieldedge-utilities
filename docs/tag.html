@@ -83,6 +83,7 @@ def tag_class_properties(cls, tag: str = None, json: bool = True) -&gt; dict:
 
 
 def untag_property(tagged_property: str,
+                   tag: str = None,
                    include_tag: bool = False,
                    ) -&gt; &#39;str|tuple[str, str]&#39;:
     &#34;&#34;&#34;Reverts a JSON-format tagged property to its PEP representation.
@@ -92,6 +93,7 @@ def untag_property(tagged_property: str,
 
     Args:
         tagged_property: The tagged property value, allowing for camelCase.
+        tag: Optional to specify the tag, allowing for camelCase tags.
         include_tag: If True, a tuple is returned with the tag as the second
             element.
     
@@ -100,17 +102,29 @@ def untag_property(tagged_property: str,
             property value in snake_case, and the tag
 
     &#34;&#34;&#34;
+    if isinstance(tag, str) and tagged_property.startswith(tag):
+        tagged_property = tagged_property.replace(tag, f&#39;{tag}_&#39;)
     tagged_property = camel_to_snake(tagged_property)
-    parts = tagged_property.split(&#39;_&#39;)
+    parts = tagged_property.split(&#39;_&#39;, 1)
     if len(parts) &gt; 1:
         tag = parts[0]
-        prop = &#39;_&#39;.join(parts[1:])
+        prop = parts[1]
     else:
         tag = None
         prop = parts[0]
     if not include_tag:
         return prop
-    return (prop, tag)</code></pre>
+    return (prop, tag)
+
+
+def tag_merge(*dicts: dict):
+    merged = { &#39;config&#39;: [], &#39;readOnly&#39;: [] }
+    for d in dicts:
+        if not isinstance(d, dict) or &#39;config&#39; not in d or &#39;readOnly&#39; not in d:
+            raise ValueError(f&#39;Invalid tag dictionary {d}&#39;)
+        merged[&#39;config&#39;] = merged[&#39;config&#39;] + d[&#39;config&#39;]
+        merged[&#39;readOnly&#39;] = merged[&#39;readOnly&#39;] + d[&#39;readOnly&#39;]
+    return merged</code></pre>
 </details>
 </section>
 <section>
@@ -212,8 +226,27 @@ e.g. <code>modem_manufacturer</code>.</p>
     return json_tagged</code></pre>
 </details>
 </dd>
+<dt id="fieldedge_utilities.tag.tag_merge"><code class="name flex">
+<span>def <span class="ident">tag_merge</span></span>(<span>*dicts: dict)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def tag_merge(*dicts: dict):
+    merged = { &#39;config&#39;: [], &#39;readOnly&#39;: [] }
+    for d in dicts:
+        if not isinstance(d, dict) or &#39;config&#39; not in d or &#39;readOnly&#39; not in d:
+            raise ValueError(f&#39;Invalid tag dictionary {d}&#39;)
+        merged[&#39;config&#39;] = merged[&#39;config&#39;] + d[&#39;config&#39;]
+        merged[&#39;readOnly&#39;] = merged[&#39;readOnly&#39;] + d[&#39;readOnly&#39;]
+    return merged</code></pre>
+</details>
+</dd>
 <dt id="fieldedge_utilities.tag.untag_property"><code class="name flex">
-<span>def <span class="ident">untag_property</span></span>(<span>tagged_property: str, include_tag: bool = False) ‑> str|tuple[str, str]</span>
+<span>def <span class="ident">untag_property</span></span>(<span>tagged_property: str, tag: str = None, include_tag: bool = False) ‑> str|tuple[str, str]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Reverts a JSON-format tagged property to its PEP representation.</p>
@@ -223,6 +256,8 @@ e.g. <code>modem_manufacturer</code>.</p>
 <dl>
 <dt><strong><code>tagged_property</code></strong></dt>
 <dd>The tagged property value, allowing for camelCase.</dd>
+<dt><strong><code>tag</code></strong></dt>
+<dd>Optional to specify the tag, allowing for camelCase tags.</dd>
 <dt><strong><code>include_tag</code></strong></dt>
 <dd>If True, a tuple is returned with the tag as the second
 element.</dd>
@@ -235,6 +270,7 @@ property value in snake_case, and the tag</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def untag_property(tagged_property: str,
+                   tag: str = None,
                    include_tag: bool = False,
                    ) -&gt; &#39;str|tuple[str, str]&#39;:
     &#34;&#34;&#34;Reverts a JSON-format tagged property to its PEP representation.
@@ -244,6 +280,7 @@ property value in snake_case, and the tag</p></div>
 
     Args:
         tagged_property: The tagged property value, allowing for camelCase.
+        tag: Optional to specify the tag, allowing for camelCase tags.
         include_tag: If True, a tuple is returned with the tag as the second
             element.
     
@@ -252,11 +289,13 @@ property value in snake_case, and the tag</p></div>
             property value in snake_case, and the tag
 
     &#34;&#34;&#34;
+    if isinstance(tag, str) and tagged_property.startswith(tag):
+        tagged_property = tagged_property.replace(tag, f&#39;{tag}_&#39;)
     tagged_property = camel_to_snake(tagged_property)
-    parts = tagged_property.split(&#39;_&#39;)
+    parts = tagged_property.split(&#39;_&#39;, 1)
     if len(parts) &gt; 1:
         tag = parts[0]
-        prop = &#39;_&#39;.join(parts[1:])
+        prop = parts[1]
     else:
         tag = None
         prop = parts[0]
@@ -286,6 +325,7 @@ property value in snake_case, and the tag</p></div>
 <li><code><a title="fieldedge_utilities.tag.camel_to_snake" href="#fieldedge_utilities.tag.camel_to_snake">camel_to_snake</a></code></li>
 <li><code><a title="fieldedge_utilities.tag.snake_to_camel" href="#fieldedge_utilities.tag.snake_to_camel">snake_to_camel</a></code></li>
 <li><code><a title="fieldedge_utilities.tag.tag_class_properties" href="#fieldedge_utilities.tag.tag_class_properties">tag_class_properties</a></code></li>
+<li><code><a title="fieldedge_utilities.tag.tag_merge" href="#fieldedge_utilities.tag.tag_merge">tag_merge</a></code></li>
 <li><code><a title="fieldedge_utilities.tag.untag_property" href="#fieldedge_utilities.tag.untag_property">untag_property</a></code></li>
 </ul>
 </li>

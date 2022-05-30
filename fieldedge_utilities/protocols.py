@@ -1,4 +1,4 @@
-"""Future provision for protocol analysis."""
+"""Enumerated types for protocol analysis."""
 from enum import Enum
 
 
@@ -6,7 +6,7 @@ class KnownTcpPorts(Enum):
     """Mappings for application layer TCP ports."""
     SMTP = 25
     HTTP = 80
-    HTTPS = 443
+    HTTP_TLS = 443
     HTTP_ALT = 8080
     DNS = 53
     FTP = 20
@@ -18,18 +18,18 @@ class KnownTcpPorts(Enum):
     MODBUS = 502
     MODBUS_TLS = 802
     DNP = 20000
-    DNPS = 19999
+    DNP_TLS = 19999
     IEC60870 = 2404
     OPCUA = 4840
-    OPCUAS = 4843   # OPC-UA secure
+    OPCUA_TLS = 4843   # OPC-UA secure
     SRCP = 4303   # Simple Railroad Command Protocol
     MQTT = 1883
     MQTT_TLS = 8883
     MQTT_SOCKET = 9001
     COAP = 5683
-    COAPS = 5684   # Constrained Application Protocol Secure
+    COAP_TLS = 5684   # Constrained Application Protocol Secure
     DOCKERAPI = 2375
-    DOCKERAPIS = 2376
+    DOCKERAPI_TLS = 2376
     KAFKA = 9092   # Apache Kafka message queue
     OPENVPN = 1194
     IPSEC = 1293

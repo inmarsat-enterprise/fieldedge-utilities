@@ -17,46 +17,49 @@ class TestTag:
     
     @property
     def prop_two(self) -> str:
-        return self._prop_two
+        return self._prop_read_two
     
 
 def test_camel_to_snake():
     camel = 'thisIsCamelCase'
     snake = 'this_is_camel_case'
     assert tag.camel_to_snake(camel) == snake
+    assert tag.camel_to_snake(snake) == snake
 
 
 def test_snake_to_camel():
     snake = 'this_is_snake_case'
     camel = 'thisIsSnakeCase'
     assert tag.snake_to_camel(snake) == camel
+    assert tag.snake_to_camel(camel) == camel
 
 
 def test_tag_class_properties():
-    tagged_props = tag.tag_class_properties(TestTag, 'test')
+    test_tag = 'test'
+    tagged_props = tag.tag_class_properties(TestTag, test_tag)
     assert 'config' in tagged_props
     assert isinstance(tagged_props['config'], list)
     assert len(tagged_props['config']) == 1
     for item in tagged_props['config']:
         assert isinstance(item, str)
-        assert item.startswith('test_')
-    assert 'read_only' in tagged_props
-    assert isinstance(tagged_props['read_only'], list)
-    assert len(tagged_props['read_only']) == 1
-    for item in tagged_props['read_only']:
+        assert item.startswith(test_tag)
+        assert hasattr(TestTag, tag.camel_to_snake(item.replace(test_tag, '')))
+    assert 'readOnly' in tagged_props
+    assert isinstance(tagged_props['readOnly'], list)
+    assert len(tagged_props['readOnly']) == 1
+    for item in tagged_props['readOnly']:
         assert isinstance(item, str)
-        assert item.startswith('test_')
+        assert item.startswith(test_tag)
+        assert hasattr(TestTag, tag.camel_to_snake(item.replace(test_tag, '')))
 
 
-def test_tag_jsonify():
-    tagged_props = tag.tag_class_properties(TestTag, 'test')
-    jsonified = {}
-    for k, v in tagged_props.items():
-        jsonified_list = []
-        for item in v:
-            jsonified_list.append(tag.snake_to_camel(item))
-        jsonified[tag.snake_to_camel(k)] = jsonified_list
-    for k, v in jsonified.items():
-        assert tag.camel_to_snake(k) in tagged_props
-        for item in v:
-            assert tag.camel_to_snake(item) in tagged_props[tag.camel_to_snake(k)]
+def test_untag():
+    test_tag = 'test'
+    tagged_props = tag.tag_class_properties(TestTag, test_tag)
+    for key, value in tagged_props.items():
+        for item in value:
+            orig_prop, extracted_tag = tag.untag_property(item, True)
+            assert hasattr(TestTag, orig_prop)
+            assert extracted_tag == test_tag
+            orig_prop_alone = tag.untag_property(item)
+            assert hasattr(TestTag, orig_prop_alone)

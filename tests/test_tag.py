@@ -20,6 +20,24 @@ class TestTag:
         return self._prop_read_two
     
 
+class TestTagToo:
+    def __init__(self) -> None:
+        self._prop_config_too_one = 1
+        self._prop_read_too_two = 'two'
+    
+    @property
+    def prop_config_too_one(self) -> int:
+        return self._prop_config_too_one
+    
+    @prop_config_too_one.setter
+    def prop_config_too_one(self, value: int):
+        self._prop_config_too_one = value
+    
+    @property
+    def prop_read_too_two(self) -> str:
+        return self._prop_read_too_two
+
+
 def test_camel_to_snake():
     camel = 'thisIsCamelCase'
     snake = 'this_is_camel_case'
@@ -63,3 +81,15 @@ def test_untag():
             assert extracted_tag == test_tag
             orig_prop_alone = tag.untag_property(item)
             assert hasattr(TestTag, orig_prop_alone)
+
+
+def test_tag_merge():
+    test_tag1 = 'test_one'
+    test_tag2 = 'test_too'
+    tagged1 = tag.tag_class_properties(TestTag, test_tag1)
+    tagged2 = tag.tag_class_properties(TestTagToo, test_tag2)
+    merged = tag.tag_merge(tagged1, tagged2)
+    assert 'config' in merged
+    assert len(merged['config']) == 2
+    assert 'readOnly' in merged
+    assert len(merged['readOnly']) == 2

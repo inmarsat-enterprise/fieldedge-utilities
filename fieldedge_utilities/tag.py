@@ -54,6 +54,7 @@ def tag_class_properties(cls, tag: str = None, json: bool = True) -> dict:
 
 
 def untag_property(tagged_property: str,
+                   tag: str = None,
                    include_tag: bool = False,
                    ) -> 'str|tuple[str, str]':
     """Reverts a JSON-format tagged property to its PEP representation.
@@ -63,6 +64,7 @@ def untag_property(tagged_property: str,
 
     Args:
         tagged_property: The tagged property value, allowing for camelCase.
+        tag: Optional to specify the tag, allowing for camelCase tags.
         include_tag: If True, a tuple is returned with the tag as the second
             element.
     
@@ -71,14 +73,26 @@ def untag_property(tagged_property: str,
             property value in snake_case, and the tag
 
     """
+    if isinstance(tag, str) and tagged_property.startswith(tag):
+        tagged_property = tagged_property.replace(tag, f'{tag}_')
     tagged_property = camel_to_snake(tagged_property)
-    parts = tagged_property.split('_')
+    parts = tagged_property.split('_', 1)
     if len(parts) > 1:
         tag = parts[0]
-        prop = '_'.join(parts[1:])
+        prop = parts[1]
     else:
         tag = None
         prop = parts[0]
     if not include_tag:
         return prop
     return (prop, tag)
+
+
+def tag_merge(*dicts: dict):
+    merged = { 'config': [], 'readOnly': [] }
+    for d in dicts:
+        if not isinstance(d, dict) or 'config' not in d or 'readOnly' not in d:
+            raise ValueError(f'Invalid tag dictionary {d}')
+        merged['config'] = merged['config'] + d['config']
+        merged['readOnly'] = merged['readOnly'] + d['readOnly']
+    return merged

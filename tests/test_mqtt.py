@@ -77,9 +77,9 @@ def test_azure_sas(capsys):
                             ca_certs=AZURE_ROOT_CA,
                             )
     mqttc.connect()
-    subattempts = 0
-    while not mqttc.is_subscribed(subscribe_default) and subattempts <= 5:
-        subattempts += 1
+    attempts = 0
+    while not mqttc.is_subscribed(subscribe_default) and attempts <= 5:
+        attempts += 1
         sleep(0.5)
     assert mqttc.is_connected
     subtopic = f'{azure_base_topic}/telemetryReport'
@@ -112,7 +112,9 @@ def test_aws(capsys):
     # assert mqttc.is_connected
     mqttc.publish(TEST_TOPIC, TEST_PAYLOAD)
     captured = capsys.readouterr()
-    while not message_received:
+    attempts = 0
+    while not message_received and attempts <= 10:
+        attempts += 1
         sleep(0.5)
     captured = capsys.readouterr()
     assert message_received == f'{TEST_TOPIC}: {TEST_PAYLOAD}'

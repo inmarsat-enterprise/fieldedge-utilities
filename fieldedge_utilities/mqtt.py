@@ -21,6 +21,7 @@ from enum import Enum, IntEnum
 from socket import timeout  # : for Python < 3.10 compatibility vs TimeoutError
 from threading import enumerate as enumerate_threads
 from time import sleep, time
+from typing import Callable
 
 from dotenv import load_dotenv
 from paho.mqtt.client import Client as PahoClient
@@ -62,9 +63,10 @@ class MqttResultCode(IntEnum):
 
 
 def _get_mqtt_result(rc: int) -> str:
-    if rc in MqttResultCode:
+    try:
         return MqttResultCode(rc).name
-    return 'UNKNOWN'
+    except:
+        return 'UNKNOWN'
 
 
 class MqttError(Exception):
@@ -97,8 +99,7 @@ class MqttClient:
         """Initializes a managed MQTT client.
         
         Args:
-            client_id (str): The unique client ID (default importing module
-                `__name__`)
+            client_id (str): The client ID (default imports module `__name__`)
             on_message (callable): The callback when subscribed messages are
                 received as `topic`(str), `message`(dict|str).
             subscribe_default (str|list[str]): The default subscription(s)
@@ -107,9 +108,11 @@ class MqttClient:
                 attempts if auto_connect is `True`.
             auto_connect (bool): Automatically attempts to connect when created
                 or reconnect after disconnection.
-            **kwargs: include Paho MQTT Client overrides such as:
+            **kwargs: includes advanced feature overrides such as:
             
-            * `on_connect` and/or `on_disconnect`
+            * `unique_client_id` defaults to True, appends a timestamp to the
+            client_id to avoid being rejected by the host.
+            * `on_connect`, `on_disconnect`, `on_log` callbacks
             * `host`, `port` (default 1883) and `keepalive` (default 60)
             * `username` and `password`
             * `ca_certs`, `certfile`, `keyfile`
@@ -141,16 +144,12 @@ class MqttClient:
         self._client_id = client_id
         self._client_uid = kwargs.get('client_uid', True)
         if self._host.endswith('azure-devices.net'):
-            _log.info('Configuring Azure IoT Hub subscriptions')
+            _log.debug('Using static Azure IoT Device ID as client_id')
             self._client_uid = False
-            subscribe_default = [
-                f'devices/{self.client_id}/messages/devicebound/#',
-                '$iothub/twin/res/#',
-                '$iothub/methods/POST/#',
-            ]
         if self._client_uid:
             self.client_id = client_id
-        self._mqtt = PahoClient()
+        self._clean_session = kwargs.get('clean_session', True)
+        self._mqtt = PahoClient(clean_session=self._clean_session)
         self.is_connected = False
         self._subscriptions = {}
         self.connect_retry_interval = connect_retry_interval
@@ -195,6 +194,32 @@ class MqttClient:
     @property
     def failed_connection_attempts(self) -> int:
         return self._failed_connect_attempts
+
+    @property
+    def on_log(self) -> Callable:
+        return self._mqtt.on_log
+
+    @on_log.setter
+    def on_log(self, callback: Callable):
+        if not isinstance(callback, Callable):
+            raise ValueError('Callback must be a function')
+        self._mqtt.on_log = callback
+
+    @property
+    def socket_timeout(self) -> int:
+        read_timeout = int(self._mqtt._sockpairR.gettimeout())
+        write_timeout = int(self._mqtt._sockpairW.gettimeout())
+        if read_timeout != write_timeout:
+            _log.warning(f'Read timeout ({read_timeout})'
+                         f' != Write timeout ({write_timeout})')
+        return write_timeout
+
+    @socket_timeout.setter
+    def socket_timeout(self, value: int):
+        if not (0 < value <= 120):
+            raise ValueError('Socket timeout must be 1..120 seconds')
+        self._mqtt._sockpairR.settimeout(float(value))
+        self._mqtt._sockpairW.settimeout(float(value))
 
     def _cleanup(self, *args):
         # TODO: logging raises an error since the log file was closed
@@ -300,7 +325,7 @@ class MqttClient:
         if self.is_connected:
             self._mqtt_subscribe(topic, qos)
         else:
-            _log.warning('MQTT not connected will subscribe later')
+            _log.warning(f'MQTT not connected...subscribing to {topic} later')
 
     def _mqtt_on_subscribe(self,
                            client: PahoClient,
@@ -393,7 +418,7 @@ class MqttClient:
             device_to_cloud = f'devices/{self.client_id}/messages/events/'
             if device_to_cloud not in topic:
                 _log.warning('Applying Azure device-to-cloud topic prefix')
-                topic = f'{device_to_cloud}/{topic}'
+                topic = f'{device_to_cloud}{topic}'
         if isinstance(message, dict):
             for k, v in message.items():
                 if not isinstance(k, str):

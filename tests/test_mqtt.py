@@ -124,13 +124,23 @@ def test_aws(capsys):
 class TestNestedObj:
     def __init__(self) -> None:
         self.one = 1
-        
+        self.two = ['element']
+
+
 class TestObj:
     def __init__(self) -> None:
         self.one = 1
         self.two = TestNestedObj()
 
-def test_jsonify():
-    jsonable = mqtt._jsonable(TestObj())
-    jsonified = json.dumps(jsonable)
-    assert isinstance(jsonified, str)
+
+@pytest.fixture
+def test_obj():
+    return TestObj()
+
+
+def test_jsonable(test_obj):
+    jsonable = mqtt._jsonable(test_obj)
+    assert isinstance(json.dumps(jsonable), str)
+    wrapped = { 'key': test_obj }
+    jsonable = mqtt._jsonable(wrapped)
+    assert isinstance(json.dumps(jsonable), str)

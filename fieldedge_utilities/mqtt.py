@@ -441,13 +441,13 @@ class MqttClient:
 
 
 def _jsonable(obj: object):
-    res = None
+    res = obj
     try:
         json.dumps(obj)
-        res = obj
-    except:
-        if hasattr(obj, '__dict__'):
-            res = vars(obj)
+    except TypeError:
+        if hasattr(res, '__dict__'):
+            res = vars(res)
+        if isinstance(res, dict):
             for k, v in res.items():
                 res[k] = _jsonable(v)
     finally:

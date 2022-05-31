@@ -152,6 +152,12 @@ def test_jsonable(test_obj):
     wrapped = { 'key': test_obj }
     jsonable = mqtt._jsonable(wrapped)
     assert isinstance(json.dumps(jsonable), str)
+    with_list = { 'key': [test_obj] }
+    jsonable = mqtt._jsonable(with_list)
+    assert isinstance(json.dumps(jsonable), str)
+    with_complex = { 'key': [{ 'nkey': [test_obj] }] }
+    jsonable = mqtt._jsonable(with_complex)
+    assert isinstance(json.dumps(jsonable), str)
     specific = {
         'properties': {
             'modemPointingMode': False,

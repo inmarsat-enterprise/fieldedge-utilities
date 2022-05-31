@@ -445,6 +445,11 @@ def _jsonable(obj: object):
     try:
         json.dumps(obj)
     except TypeError:
+        if isinstance(res, list):
+            _temp = []
+            for element in res:
+                _temp.append(_jsonable(element))
+            res = _temp
         if hasattr(res, '__dict__'):
             res = vars(res)
         if isinstance(res, dict):

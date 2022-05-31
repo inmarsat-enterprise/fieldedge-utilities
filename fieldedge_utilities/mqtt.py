@@ -112,6 +112,7 @@ class MqttClient:
             
             * `unique_client_id` defaults to True, appends a timestamp to the
             client_id to avoid being rejected by the host.
+            * `bind_address` to bind to a specific IP
             * `on_connect`, `on_disconnect`, `on_log` callbacks
             * `host`, `port` (default 1883) and `keepalive` (default 60)
             * `username` and `password`
@@ -359,7 +360,7 @@ class MqttClient:
         except json.JSONDecodeError as e:
             _log.debug(f'MQTT message payload non-JSON ({e})')
         _log.debug(f'MQTT received message "{payload}"'
-            f'on topic "{message.topic}" with QoS {message.qos}')
+                   f' on topic "{message.topic}" with QoS {message.qos}')
         if userdata:
             _log.debug(f'MQTT client userdata: {userdata}')
         self.on_message(message.topic, payload)
@@ -401,7 +402,7 @@ class MqttClient:
                     self.client_id = self.client_id
                 self.connect()
 
-    def publish(self, topic: str, message: 'str|dict', qos: int = 1) -> bool:
+    def publish(self, topic: str, message: 'str|dict|None', qos: int = 1) -> bool:
         """Publishes a message to a MQTT topic.
 
         If the message is a dictionary, 
@@ -425,13 +426,7 @@ class MqttClient:
                     _log.warning(f'{k} ({type(k)}) will be converted to str(k)')
                 if isinstance(v, JSON_DUMPS_COMPATIBLE) or v is None:
                     continue
-                if hasattr(v, '__dict__'):
-                    try:
-                        message[k] = vars(v)
-                    except TypeError:
-                        errstr = f'Could not convert [{k}] = {type(v)}'
-                        _log.warning(errstr)
-                        raise ValueError(f'Unhandled message...{errstr}')
+                message[k] = _jsonable(v)
             message = json.dumps(message, skipkeys=True)
         if not isinstance(qos, int) or qos not in range(0, 3):
             _log.warning(f'Invalid MQTT QoS {qos} - using QoS 1')
@@ -443,3 +438,19 @@ class MqttClient:
             _log.error(errmsg)
             return False
         return True
+
+
+def _jsonable(obj: object):
+    res = None
+    try:
+        json.dumps(obj)
+        res = obj
+    except:
+        if hasattr(obj, '__dict__'):
+            res = vars(obj)
+            for k, v in res.items():
+                res[k] = _jsonable(v)
+    finally:
+        if res is None:
+            _log.error(f'Unable to JSONify {obj}')
+        return res

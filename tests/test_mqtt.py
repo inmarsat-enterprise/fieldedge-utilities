@@ -1,5 +1,6 @@
 
 import os
+import json
 from time import sleep
 
 import pytest
@@ -118,3 +119,18 @@ def test_aws(capsys):
         sleep(0.5)
     captured = capsys.readouterr()
     assert message_received == f'{TEST_TOPIC}: {TEST_PAYLOAD}'
+
+
+class TestNestedObj:
+    def __init__(self) -> None:
+        self.one = 1
+        
+class TestObj:
+    def __init__(self) -> None:
+        self.one = 1
+        self.two = TestNestedObj()
+
+def test_jsonify():
+    jsonable = mqtt._jsonable(TestObj())
+    jsonified = json.dumps(jsonable)
+    assert isinstance(jsonified, str)

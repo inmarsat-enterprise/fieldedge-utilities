@@ -151,6 +151,7 @@ class MqttClient:
             
             * `unique_client_id` defaults to True, appends a timestamp to the
             client_id to avoid being rejected by the host.
+            * `bind_address` to bind to a specific IP
             * `on_connect`, `on_disconnect`, `on_log` callbacks
             * `host`, `port` (default 1883) and `keepalive` (default 60)
             * `username` and `password`
@@ -398,7 +399,7 @@ class MqttClient:
         except json.JSONDecodeError as e:
             _log.debug(f&#39;MQTT message payload non-JSON ({e})&#39;)
         _log.debug(f&#39;MQTT received message &#34;{payload}&#34;&#39;
-            f&#39;on topic &#34;{message.topic}&#34; with QoS {message.qos}&#39;)
+                   f&#39; on topic &#34;{message.topic}&#34; with QoS {message.qos}&#39;)
         if userdata:
             _log.debug(f&#39;MQTT client userdata: {userdata}&#39;)
         self.on_message(message.topic, payload)
@@ -440,7 +441,7 @@ class MqttClient:
                     self.client_id = self.client_id
                 self.connect()
 
-    def publish(self, topic: str, message: &#39;str|dict&#39;, qos: int = 1) -&gt; bool:
+    def publish(self, topic: str, message: &#39;str|dict|None&#39;, qos: int = 1) -&gt; bool:
         &#34;&#34;&#34;Publishes a message to a MQTT topic.
 
         If the message is a dictionary, 
@@ -464,13 +465,7 @@ class MqttClient:
                     _log.warning(f&#39;{k} ({type(k)}) will be converted to str(k)&#39;)
                 if isinstance(v, JSON_DUMPS_COMPATIBLE) or v is None:
                     continue
-                if hasattr(v, &#39;__dict__&#39;):
-                    try:
-                        message[k] = vars(v)
-                    except TypeError:
-                        errstr = f&#39;Could not convert [{k}] = {type(v)}&#39;
-                        _log.warning(errstr)
-                        raise ValueError(f&#39;Unhandled message...{errstr}&#39;)
+                message[k] = _jsonable(v)
             message = json.dumps(message, skipkeys=True)
         if not isinstance(qos, int) or qos not in range(0, 3):
             _log.warning(f&#39;Invalid MQTT QoS {qos} - using QoS 1&#39;)
@@ -481,7 +476,23 @@ class MqttClient:
             errmsg = f&#39;Publishing error {rc} ({_get_mqtt_result(rc)})&#39;
             _log.error(errmsg)
             return False
-        return True</code></pre>
+        return True
+
+
+def _jsonable(obj: object):
+    res = None
+    try:
+        json.dumps(obj)
+        res = obj
+    except:
+        if hasattr(obj, &#39;__dict__&#39;):
+            res = vars(obj)
+            for k, v in res.items():
+                res[k] = _jsonable(v)
+    finally:
+        if res is None:
+            _log.error(f&#39;Unable to JSONify {obj}&#39;)
+        return res</code></pre>
 </details>
 </section>
 <section>
@@ -539,6 +550,7 @@ or reconnect after disconnection.</dd>
 <ul>
 <li><code>unique_client_id</code> defaults to True, appends a timestamp to the
 client_id to avoid being rejected by the host.</li>
+<li><code>bind_address</code> to bind to a specific IP</li>
 <li><code>on_connect</code>, <code>on_disconnect</code>, <code>on_log</code> callbacks</li>
 <li><code>host</code>, <code>port</code> (default 1883) and <code>keepalive</code> (default 60)</li>
 <li><code>username</code> and <code>password</code></li>
@@ -590,6 +602,7 @@ client_id to avoid being rejected by the host.</li>
             
             * `unique_client_id` defaults to True, appends a timestamp to the
             client_id to avoid being rejected by the host.
+            * `bind_address` to bind to a specific IP
             * `on_connect`, `on_disconnect`, `on_log` callbacks
             * `host`, `port` (default 1883) and `keepalive` (default 60)
             * `username` and `password`
@@ -837,7 +850,7 @@ client_id to avoid being rejected by the host.</li>
         except json.JSONDecodeError as e:
             _log.debug(f&#39;MQTT message payload non-JSON ({e})&#39;)
         _log.debug(f&#39;MQTT received message &#34;{payload}&#34;&#39;
-            f&#39;on topic &#34;{message.topic}&#34; with QoS {message.qos}&#39;)
+                   f&#39; on topic &#34;{message.topic}&#34; with QoS {message.qos}&#39;)
         if userdata:
             _log.debug(f&#39;MQTT client userdata: {userdata}&#39;)
         self.on_message(message.topic, payload)
@@ -879,7 +892,7 @@ client_id to avoid being rejected by the host.</li>
                     self.client_id = self.client_id
                 self.connect()
 
-    def publish(self, topic: str, message: &#39;str|dict&#39;, qos: int = 1) -&gt; bool:
+    def publish(self, topic: str, message: &#39;str|dict|None&#39;, qos: int = 1) -&gt; bool:
         &#34;&#34;&#34;Publishes a message to a MQTT topic.
 
         If the message is a dictionary, 
@@ -903,13 +916,7 @@ client_id to avoid being rejected by the host.</li>
                     _log.warning(f&#39;{k} ({type(k)}) will be converted to str(k)&#39;)
                 if isinstance(v, JSON_DUMPS_COMPATIBLE) or v is None:
                     continue
-                if hasattr(v, &#39;__dict__&#39;):
-                    try:
-                        message[k] = vars(v)
-                    except TypeError:
-                        errstr = f&#39;Could not convert [{k}] = {type(v)}&#39;
-                        _log.warning(errstr)
-                        raise ValueError(f&#39;Unhandled message...{errstr}&#39;)
+                message[k] = _jsonable(v)
             message = json.dumps(message, skipkeys=True)
         if not isinstance(qos, int) or qos not in range(0, 3):
             _log.warning(f&#39;Invalid MQTT QoS {qos} - using QoS 1&#39;)
@@ -1086,7 +1093,7 @@ def subscriptions(self) -&gt; dict:
 </details>
 </dd>
 <dt id="fieldedge_utilities.mqtt.MqttClient.publish"><code class="name flex">
-<span>def <span class="ident">publish</span></span>(<span>self, topic: str, message: str|dict, qos: int = 1) ‑> bool</span>
+<span>def <span class="ident">publish</span></span>(<span>self, topic: str, message: str|dict|None, qos: int = 1) ‑> bool</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Publishes a message to a MQTT topic.</p>
@@ -1103,7 +1110,7 @@ def subscriptions(self) -&gt; dict:
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def publish(self, topic: str, message: &#39;str|dict&#39;, qos: int = 1) -&gt; bool:
+<pre><code class="python">def publish(self, topic: str, message: &#39;str|dict|None&#39;, qos: int = 1) -&gt; bool:
     &#34;&#34;&#34;Publishes a message to a MQTT topic.
 
     If the message is a dictionary, 
@@ -1127,13 +1134,7 @@ def subscriptions(self) -&gt; dict:
                 _log.warning(f&#39;{k} ({type(k)}) will be converted to str(k)&#39;)
             if isinstance(v, JSON_DUMPS_COMPATIBLE) or v is None:
                 continue
-            if hasattr(v, &#39;__dict__&#39;):
-                try:
-                    message[k] = vars(v)
-                except TypeError:
-                    errstr = f&#39;Could not convert [{k}] = {type(v)}&#39;
-                    _log.warning(errstr)
-                    raise ValueError(f&#39;Unhandled message...{errstr}&#39;)
+            message[k] = _jsonable(v)
         message = json.dumps(message, skipkeys=True)
     if not isinstance(qos, int) or qos not in range(0, 3):
         _log.warning(f&#39;Invalid MQTT QoS {qos} - using QoS 1&#39;)

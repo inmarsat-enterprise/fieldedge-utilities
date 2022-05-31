@@ -451,6 +451,4 @@ def _jsonable(obj: object):
             for k, v in res.items():
                 res[k] = _jsonable(v)
     finally:
-        if res is None:
-            _log.error(f'Unable to JSONify {obj}')
         return res

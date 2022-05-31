@@ -1,6 +1,7 @@
 
 import os
 import json
+from enum import IntEnum
 from time import sleep
 
 import pytest
@@ -127,10 +128,17 @@ class TestNestedObj:
         self.two = ['element']
 
 
+class TestEnum(IntEnum):
+    FIRST = 1
+    SECOND = 2
+
+
 class TestObj:
     def __init__(self) -> None:
         self.one = 1
         self.two = TestNestedObj()
+        self.three = None
+        self.four = TestEnum.FIRST
 
 
 @pytest.fixture
@@ -143,4 +151,52 @@ def test_jsonable(test_obj):
     assert isinstance(json.dumps(jsonable), str)
     wrapped = { 'key': test_obj }
     jsonable = mqtt._jsonable(wrapped)
+    assert isinstance(json.dumps(jsonable), str)
+    specific = {
+        'properties': {
+            'modemPointingMode': False,
+            'modemWatchdog': None,
+            'modemAutomaticContextActivation': None,
+            'modemSmsRemoteEnabled': True,
+            'monitorMetricsInterval': 60,
+            'modemManufacturer': 'HUGHES',
+            'modemConnectedLocal': True,
+            'modemEnabledLocal': True,
+            'modemSatellite': test_obj,
+            'modemElevation': 33,
+            'modemAzimuth': 210,
+            'modemBeamType': TestEnum.FIRST,
+            'modemBeamId': 4,
+            'modemSnr': 58.0,
+            'modemSignalQuality': TestEnum.SECOND,
+            'modemImsi': '901112112900265',
+            'modemImei': '353938-03-002771-2',
+            'modemRegistered': True,
+            'modemRegistrationType': 'home',
+            'modemRegistrationChangeNotifications': False,
+            'modemPdpContexts': {
+                1: {
+                    'id': 1,
+                    'service': 'IP',
+                    'apn': 'stratos.bgan.inmarsat.com',
+                    'ip_addr': '216.86.246.2'
+                    }
+            },
+            'modemConnectedNetwork': True,
+            'modemLocation': {
+                'latitude': 42.0,
+                'longitude': -42.0,
+                'fix_type': '3D',
+                'fix_allowed': 'allowed',
+                'fix_time': '2022-05-31T01:07:50Z',
+                'timestamp': 1653959270
+            },
+            'modemModel': '9502',
+            'modemRevision': 'Software: 5.9.5.3, 09/25/2017',
+            'monitorInitialized': True
+        },
+        'uid': None,
+        'ts': 1653964306656
+    }
+    jsonable = mqtt._jsonable(specific)
     assert isinstance(json.dumps(jsonable), str)

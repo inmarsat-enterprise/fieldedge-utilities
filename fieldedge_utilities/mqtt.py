@@ -257,10 +257,16 @@ class MqttClient:
             threads_before = enumerate_threads()
             self._mqtt.loop_start()
             threads_after = enumerate_threads()
+            name = 'MqttThread'
+            number = 1
             for thread in threads_after:
                 if thread in threads_before:
+                    if thread.name.startswith('MqttThread'):
+                        number += 1
+                        name = f'MqttThread-{number}'
                     continue
-                thread.name = 'MqttThread'
+                _log.debug(f'Naming new MQTT client thread: {name}')
+                thread.name = name
                 break
         except (ConnectionError, timeout, TimeoutError) as err:
             self._failed_connect_attempts += 1

@@ -5,19 +5,23 @@ class TestTag:
     def __init__(self) -> None:
         self._prop_config_one = 1
         self._prop_read_two = 'two'
-        self.prop_three = 'three'
+        self._prop_three = 'three'
     
     @property
-    def prop_one(self) -> int:
+    def prop_config_one(self) -> int:
         return self._prop_one
     
-    @prop_one.setter
-    def prop_one(self, value: int):
+    @prop_config_one.setter
+    def prop_config_one(self, value: int):
         self._prop_one = value
     
     @property
-    def prop_two(self) -> str:
+    def prop_read_two(self) -> str:
         return self._prop_read_two
+    
+    @property
+    def exposed_properties(self):
+        return self._prop_three
     
 
 class TestTagToo:

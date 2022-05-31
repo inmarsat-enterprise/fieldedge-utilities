@@ -14,28 +14,40 @@ def camel_to_snake(camel_str: str) -> str:
     return pattern.sub('_', camel_str).lower()
 
 
-def tag_class_properties(cls, tag: str = None, json: bool = True) -> dict:
+def tag_class_properties(cls,
+                         tag: str = None,
+                         json: bool = True,
+                         ignore: 'list[str]' = ['exposed_properties'],
+                         ) -> dict:
     """Retrieves `@property`s from a class and tags them with a routing prefix.
     
     The dictionary items describe `read_only` and `config` items which each
     consist of a list of strings for the property names.
     Each property name is optionally prefixed by a `tag` for the class
     e.g. `modem_manufacturer`.
+    A reserved name `exposed_properties` is ignored by default, but a list of
+    values to ignore is supported.
     
     TODO: check `vars` vs `dir` use for robustness.
 
     Args:
         cls: The class to fetch properties from (`fset`)
         tag: A prefex to apply for identification/routing
+        json: Property names are expressed in camelCase
+        ignore: An optional filter of property names to ignore
     
     Returns:
         `{ 'config': [<str>], 'read_only': [<str>]}`
 
     """
     rw = [attr for attr, value in vars(cls).items()
-          if isinstance(value, property) and value.fset is not None]
+          if isinstance(value, property) and
+          value.fset is not None and
+          attr not in ignore]
     ro = [attr for attr, value in vars(cls).items()
-          if isinstance(value, property) and value.fset is None]
+          if isinstance(value, property) and
+          value.fset is None and
+          attr not in ignore]
     if tag is not None:
         for i, prop in enumerate(rw):
             rw[i] = f'{tag}_{prop}'

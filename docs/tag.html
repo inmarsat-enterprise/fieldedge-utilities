@@ -43,28 +43,40 @@ def camel_to_snake(camel_str: str) -&gt; str:
     return pattern.sub(&#39;_&#39;, camel_str).lower()
 
 
-def tag_class_properties(cls, tag: str = None, json: bool = True) -&gt; dict:
+def tag_class_properties(cls,
+                         tag: str = None,
+                         json: bool = True,
+                         ignore: &#39;list[str]&#39; = [&#39;exposed_properties&#39;],
+                         ) -&gt; dict:
     &#34;&#34;&#34;Retrieves `@property`s from a class and tags them with a routing prefix.
     
     The dictionary items describe `read_only` and `config` items which each
     consist of a list of strings for the property names.
     Each property name is optionally prefixed by a `tag` for the class
     e.g. `modem_manufacturer`.
+    A reserved name `exposed_properties` is ignored by default, but a list of
+    values to ignore is supported.
     
     TODO: check `vars` vs `dir` use for robustness.
 
     Args:
         cls: The class to fetch properties from (`fset`)
         tag: A prefex to apply for identification/routing
+        json: Property names are expressed in camelCase
+        ignore: An optional filter of property names to ignore
     
     Returns:
         `{ &#39;config&#39;: [&lt;str&gt;], &#39;read_only&#39;: [&lt;str&gt;]}`
 
     &#34;&#34;&#34;
     rw = [attr for attr, value in vars(cls).items()
-          if isinstance(value, property) and value.fset is not None]
+          if isinstance(value, property) and
+          value.fset is not None and
+          attr not in ignore]
     ro = [attr for attr, value in vars(cls).items()
-          if isinstance(value, property) and value.fset is None]
+          if isinstance(value, property) and
+          value.fset is None and
+          attr not in ignore]
     if tag is not None:
         for i, prop in enumerate(rw):
             rw[i] = f&#39;{tag}_{prop}&#39;
@@ -165,14 +177,16 @@ def tag_merge(*dicts: dict):
 </details>
 </dd>
 <dt id="fieldedge_utilities.tag.tag_class_properties"><code class="name flex">
-<span>def <span class="ident">tag_class_properties</span></span>(<span>cls, tag: str = None, json: bool = True) ‑> dict</span>
+<span>def <span class="ident">tag_class_properties</span></span>(<span>cls, tag: str = None, json: bool = True, ignore: list[str] = ['exposed_properties']) ‑> dict</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Retrieves <code>@property</code>s from a class and tags them with a routing prefix.</p>
 <p>The dictionary items describe <code>read_only</code> and <code>config</code> items which each
 consist of a list of strings for the property names.
 Each property name is optionally prefixed by a <code>tag</code> for the class
-e.g. <code>modem_manufacturer</code>.</p>
+e.g. <code>modem_manufacturer</code>.
+A reserved name <code>exposed_properties</code> is ignored by default, but a list of
+values to ignore is supported.</p>
 <p>TODO: check <code>vars</code> vs <code>dir</code> use for robustness.</p>
 <h2 id="args">Args</h2>
 <dl>
@@ -180,6 +194,10 @@ e.g. <code>modem_manufacturer</code>.</p>
 <dd>The class to fetch properties from (<code>fset</code>)</dd>
 <dt><strong><code>tag</code></strong></dt>
 <dd>A prefex to apply for identification/routing</dd>
+<dt><strong><code>json</code></strong></dt>
+<dd>Property names are expressed in camelCase</dd>
+<dt><strong><code>ignore</code></strong></dt>
+<dd>An optional filter of property names to ignore</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <p><code>{ 'config': [&lt;str&gt;], 'read_only': [&lt;str&gt;]}</code></p></div>
@@ -187,28 +205,40 @@ e.g. <code>modem_manufacturer</code>.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def tag_class_properties(cls, tag: str = None, json: bool = True) -&gt; dict:
+<pre><code class="python">def tag_class_properties(cls,
+                         tag: str = None,
+                         json: bool = True,
+                         ignore: &#39;list[str]&#39; = [&#39;exposed_properties&#39;],
+                         ) -&gt; dict:
     &#34;&#34;&#34;Retrieves `@property`s from a class and tags them with a routing prefix.
     
     The dictionary items describe `read_only` and `config` items which each
     consist of a list of strings for the property names.
     Each property name is optionally prefixed by a `tag` for the class
     e.g. `modem_manufacturer`.
+    A reserved name `exposed_properties` is ignored by default, but a list of
+    values to ignore is supported.
     
     TODO: check `vars` vs `dir` use for robustness.
 
     Args:
         cls: The class to fetch properties from (`fset`)
         tag: A prefex to apply for identification/routing
+        json: Property names are expressed in camelCase
+        ignore: An optional filter of property names to ignore
     
     Returns:
         `{ &#39;config&#39;: [&lt;str&gt;], &#39;read_only&#39;: [&lt;str&gt;]}`
 
     &#34;&#34;&#34;
     rw = [attr for attr, value in vars(cls).items()
-          if isinstance(value, property) and value.fset is not None]
+          if isinstance(value, property) and
+          value.fset is not None and
+          attr not in ignore]
     ro = [attr for attr, value in vars(cls).items()
-          if isinstance(value, property) and value.fset is None]
+          if isinstance(value, property) and
+          value.fset is None and
+          attr not in ignore]
     if tag is not None:
         for i, prop in enumerate(rw):
             rw[i] = f&#39;{tag}_{prop}&#39;

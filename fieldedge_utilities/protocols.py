@@ -1,4 +1,6 @@
-"""Enumerated types for protocol analysis."""
+"""Enumerated types for protocol analysis.
+
+"""
 from enum import Enum
 
 

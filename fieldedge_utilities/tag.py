@@ -1,4 +1,6 @@
-"""Helper functions for converting tags between PEP and JSON styles."""
+"""Helper functions for converting tags between PEP and JSON styles.
+
+"""
 import json
 import re
 
@@ -101,7 +103,16 @@ def untag_property(tagged_property: str,
     return (prop, tag)
 
 
-def tag_merge(*dicts: dict):
+def tag_merge(*dicts: dict) -> dict:
+    """Merge multiple tagged property dictionaries.
+    
+    Args:
+        *dicts: A set of dictionaries
+    
+    Returns:
+        Merged dictionary with: `{'config':[], 'readOnly': []}`
+
+    """
     merged = { 'config': [], 'readOnly': [] }
     for d in dicts:
         if not isinstance(d, dict) or 'config' not in d or 'readOnly' not in d:
@@ -111,7 +122,21 @@ def tag_merge(*dicts: dict):
     return merged
 
 
-def json_compatible(obj: object, camel_keys: bool = True):
+def json_compatible(obj: object, camel_keys: bool = True) -> dict:
+    """Returns a dictionary compatible with `json.dumps` function.
+
+    Nested objects are converted to dictionaries.
+    
+    Args:
+        obj: The source object.
+        camel_keys: Flag indicating whether to convert all nested dictionary
+            keys to `camelCase`.
+        
+    Returns:
+        A dictionary with nested arrays, dictionaries and other compatible with
+            `json.dumps`.
+
+    """
     res = obj
     if camel_keys and isinstance(res, dict):
         changed_keys = []

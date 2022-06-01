@@ -1,5 +1,6 @@
-"""Helpers for managing serial ports on the system."""
+"""Helpers for managing serial ports on the system.
 
+"""
 from serial.tools import list_ports
 from serial.tools.list_ports_common import ListPortInfo
 

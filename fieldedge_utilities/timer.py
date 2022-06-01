@@ -1,3 +1,6 @@
+"""A threaded timer class that allows flexible reconfiguration.
+
+"""
 import logging
 import threading
 from time import time

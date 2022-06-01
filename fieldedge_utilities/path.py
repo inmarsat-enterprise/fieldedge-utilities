@@ -1,5 +1,6 @@
-"""Tools for file path and caller traces."""
+"""Tools for file path and caller traces.
 
+"""
 import inspect
 import os
 from pathlib import Path

@@ -20,5 +20,6 @@ satellite data traffic optimisation.
 * Helpers for **`tag`** assignment of class definitions to expose properties
 for MQTT transport between microservices, converting between PEP and JSON style.
 * Helpers for managing **`serial`** ports on a host system.
+* Utilities for converting **`timestamp`**s between unix and ISO 8601
 
 [Docmentation](https://inmarsat-enterprise.github.io/fieldedge-utilities/)

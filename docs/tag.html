@@ -28,6 +28,7 @@
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">&#34;&#34;&#34;Helper functions for converting tags between PEP and JSON styles.&#34;&#34;&#34;
+import json
 import re
 
 
@@ -136,7 +137,36 @@ def tag_merge(*dicts: dict):
             raise ValueError(f&#39;Invalid tag dictionary {d}&#39;)
         merged[&#39;config&#39;] = merged[&#39;config&#39;] + d[&#39;config&#39;]
         merged[&#39;readOnly&#39;] = merged[&#39;readOnly&#39;] + d[&#39;readOnly&#39;]
-    return merged</code></pre>
+    return merged
+
+
+def json_compatible(obj: object, camel_keys: bool = True):
+    res = obj
+    if camel_keys and isinstance(res, dict):
+        changed_keys = []
+        for key in res:
+            camel_key = snake_to_camel(key)
+            if camel_key == key:
+                continue
+            changed_keys.append(key)
+            res[camel_key] = res.get(key)
+        for old_key in changed_keys:
+            del res[old_key]
+    try:
+        json.dumps(obj)
+    except TypeError:
+        if isinstance(res, list):
+            _temp = []
+            for element in res:
+                _temp.append(json_compatible(element, camel_keys))
+            res = _temp
+        if hasattr(res, &#39;__dict__&#39;):
+            res = vars(res)
+        if isinstance(res, dict):
+            for k, v in res.items():
+                res[k] = json_compatible(v, camel_keys)
+    finally:
+        return res</code></pre>
 </details>
 </section>
 <section>
@@ -159,6 +189,44 @@ def tag_merge(*dicts: dict):
     &#34;&#34;&#34;Converts a camelCase string to snake_case.&#34;&#34;&#34;
     pattern = re.compile(r&#39;(?&lt;!^)(?=[A-Z])&#39;)
     return pattern.sub(&#39;_&#39;, camel_str).lower()</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.tag.json_compatible"><code class="name flex">
+<span>def <span class="ident">json_compatible</span></span>(<span>obj: object, camel_keys: bool = True)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def json_compatible(obj: object, camel_keys: bool = True):
+    res = obj
+    if camel_keys and isinstance(res, dict):
+        changed_keys = []
+        for key in res:
+            camel_key = snake_to_camel(key)
+            if camel_key == key:
+                continue
+            changed_keys.append(key)
+            res[camel_key] = res.get(key)
+        for old_key in changed_keys:
+            del res[old_key]
+    try:
+        json.dumps(obj)
+    except TypeError:
+        if isinstance(res, list):
+            _temp = []
+            for element in res:
+                _temp.append(json_compatible(element, camel_keys))
+            res = _temp
+        if hasattr(res, &#39;__dict__&#39;):
+            res = vars(res)
+        if isinstance(res, dict):
+            for k, v in res.items():
+                res[k] = json_compatible(v, camel_keys)
+    finally:
+        return res</code></pre>
 </details>
 </dd>
 <dt id="fieldedge_utilities.tag.snake_to_camel"><code class="name flex">
@@ -353,6 +421,7 @@ property value in snake_case, and the tag</p></div>
 <li><h3><a href="#header-functions">Functions</a></h3>
 <ul class="">
 <li><code><a title="fieldedge_utilities.tag.camel_to_snake" href="#fieldedge_utilities.tag.camel_to_snake">camel_to_snake</a></code></li>
+<li><code><a title="fieldedge_utilities.tag.json_compatible" href="#fieldedge_utilities.tag.json_compatible">json_compatible</a></code></li>
 <li><code><a title="fieldedge_utilities.tag.snake_to_camel" href="#fieldedge_utilities.tag.snake_to_camel">snake_to_camel</a></code></li>
 <li><code><a title="fieldedge_utilities.tag.tag_class_properties" href="#fieldedge_utilities.tag.tag_class_properties">tag_class_properties</a></code></li>
 <li><code><a title="fieldedge_utilities.tag.tag_merge" href="#fieldedge_utilities.tag.tag_merge">tag_merge</a></code></li>

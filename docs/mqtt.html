@@ -56,7 +56,7 @@ import json
 import logging
 import os
 from atexit import register as on_exit
-from enum import Enum, IntEnum
+from enum import IntEnum
 from socket import timeout  # : for Python &lt; 3.10 compatibility vs TimeoutError
 from threading import enumerate as enumerate_threads
 from time import sleep, time
@@ -66,11 +66,11 @@ from dotenv import load_dotenv
 from paho.mqtt.client import Client as PahoClient
 from paho.mqtt.client import MQTTMessage as PahoMessage
 
+from fieldedge_utilities import tag
+
 MQTT_HOST = os.getenv(&#39;MQTT_HOST&#39;, &#39;fieldedge-broker&#39;)
 MQTT_USER = os.getenv(&#39;MQTT_USER&#39;)
 MQTT_PASS = os.getenv(&#39;MQTT_PASS&#39;)
-
-JSON_DUMPS_COMPATIBLE = (dict, list, tuple, str, int, float, Enum, bool)
 
 _log = logging.getLogger(__name__)
 
@@ -78,6 +78,7 @@ load_dotenv()
 
 
 class MqttResultCode(IntEnum):
+    &#34;&#34;&#34;Eclipse Paho MQTT Error Codes.&#34;&#34;&#34;
     SUCCESS = 0
     ERR_INCORRECT_PROTOCOL = 1
     ERR_INVALID_CLIENT_ID = 2
@@ -296,10 +297,16 @@ class MqttClient:
             threads_before = enumerate_threads()
             self._mqtt.loop_start()
             threads_after = enumerate_threads()
+            name = &#39;MqttThread&#39;
+            number = 1
             for thread in threads_after:
                 if thread in threads_before:
+                    if thread.name.startswith(&#39;MqttThread&#39;):
+                        number += 1
+                        name = f&#39;MqttThread-{number}&#39;
                     continue
-                thread.name = &#39;MqttThread&#39;
+                _log.debug(f&#39;Naming new MQTT client thread: {name}&#39;)
+                thread.name = name
                 break
         except (ConnectionError, timeout, TimeoutError) as err:
             self._failed_connect_attempts += 1
@@ -441,15 +448,25 @@ class MqttClient:
                     self.client_id = self.client_id
                 self.connect()
 
-    def publish(self, topic: str, message: &#39;str|dict|None&#39;, qos: int = 1) -&gt; bool:
+    def publish(self,
+                topic: str,
+                message: &#39;str|dict|None&#39;,
+                qos: int = 1,
+                camel_keys: bool = True,
+                ) -&gt; bool:
         &#34;&#34;&#34;Publishes a message to a MQTT topic.
 
         If the message is a dictionary, 
         
         Args:
-            topic (str): The MQTT topic
-            message (str|dict): The message to publish
-            qos (int): The MQTT Quality of Service (0, 1 or 2)
+            topic: The MQTT topic
+            message: The message to publish
+            qos: The MQTT Quality of Service (0, 1 or 2)
+            camel_keys: Ensures all embedded dictionary keys are JSON style
+                (camelCase)
+
+        Returns:
+            True if successful, else False.
 
         &#34;&#34;&#34;
         if message and not isinstance(message, (str, dict)):
@@ -460,13 +477,8 @@ class MqttClient:
                 _log.warning(&#39;Applying Azure device-to-cloud topic prefix&#39;)
                 topic = f&#39;{device_to_cloud}{topic}&#39;
         if isinstance(message, dict):
-            for k, v in message.items():
-                if not isinstance(k, str):
-                    _log.warning(f&#39;{k} ({type(k)}) will be converted to str(k)&#39;)
-                if isinstance(v, JSON_DUMPS_COMPATIBLE) or v is None:
-                    continue
-                message[k] = _jsonable(v)
-            message = json.dumps(message, skipkeys=True)
+            message = json.dumps(tag.json_compatible(message, camel_keys),
+                                 skipkeys=True)
         if not isinstance(qos, int) or qos not in range(0, 3):
             _log.warning(f&#39;Invalid MQTT QoS {qos} - using QoS 1&#39;)
             qos = 1
@@ -476,23 +488,7 @@ class MqttClient:
             errmsg = f&#39;Publishing error {rc} ({_get_mqtt_result(rc)})&#39;
             _log.error(errmsg)
             return False
-        return True
-
-
-def _jsonable(obj: object):
-    res = None
-    try:
-        json.dumps(obj)
-        res = obj
-    except:
-        if hasattr(obj, &#39;__dict__&#39;):
-            res = vars(obj)
-            for k, v in res.items():
-                res[k] = _jsonable(v)
-    finally:
-        if res is None:
-            _log.error(f&#39;Unable to JSONify {obj}&#39;)
-        return res</code></pre>
+        return True</code></pre>
 </details>
 </section>
 <section>
@@ -747,10 +743,16 @@ client_id to avoid being rejected by the host.</li>
             threads_before = enumerate_threads()
             self._mqtt.loop_start()
             threads_after = enumerate_threads()
+            name = &#39;MqttThread&#39;
+            number = 1
             for thread in threads_after:
                 if thread in threads_before:
+                    if thread.name.startswith(&#39;MqttThread&#39;):
+                        number += 1
+                        name = f&#39;MqttThread-{number}&#39;
                     continue
-                thread.name = &#39;MqttThread&#39;
+                _log.debug(f&#39;Naming new MQTT client thread: {name}&#39;)
+                thread.name = name
                 break
         except (ConnectionError, timeout, TimeoutError) as err:
             self._failed_connect_attempts += 1
@@ -892,15 +894,25 @@ client_id to avoid being rejected by the host.</li>
                     self.client_id = self.client_id
                 self.connect()
 
-    def publish(self, topic: str, message: &#39;str|dict|None&#39;, qos: int = 1) -&gt; bool:
+    def publish(self,
+                topic: str,
+                message: &#39;str|dict|None&#39;,
+                qos: int = 1,
+                camel_keys: bool = True,
+                ) -&gt; bool:
         &#34;&#34;&#34;Publishes a message to a MQTT topic.
 
         If the message is a dictionary, 
         
         Args:
-            topic (str): The MQTT topic
-            message (str|dict): The message to publish
-            qos (int): The MQTT Quality of Service (0, 1 or 2)
+            topic: The MQTT topic
+            message: The message to publish
+            qos: The MQTT Quality of Service (0, 1 or 2)
+            camel_keys: Ensures all embedded dictionary keys are JSON style
+                (camelCase)
+
+        Returns:
+            True if successful, else False.
 
         &#34;&#34;&#34;
         if message and not isinstance(message, (str, dict)):
@@ -911,13 +923,8 @@ client_id to avoid being rejected by the host.</li>
                 _log.warning(&#39;Applying Azure device-to-cloud topic prefix&#39;)
                 topic = f&#39;{device_to_cloud}{topic}&#39;
         if isinstance(message, dict):
-            for k, v in message.items():
-                if not isinstance(k, str):
-                    _log.warning(f&#39;{k} ({type(k)}) will be converted to str(k)&#39;)
-                if isinstance(v, JSON_DUMPS_COMPATIBLE) or v is None:
-                    continue
-                message[k] = _jsonable(v)
-            message = json.dumps(message, skipkeys=True)
+            message = json.dumps(tag.json_compatible(message, camel_keys),
+                                 skipkeys=True)
         if not isinstance(qos, int) or qos not in range(0, 3):
             _log.warning(f&#39;Invalid MQTT QoS {qos} - using QoS 1&#39;)
             qos = 1
@@ -1043,10 +1050,16 @@ def subscriptions(self) -&gt; dict:
         threads_before = enumerate_threads()
         self._mqtt.loop_start()
         threads_after = enumerate_threads()
+        name = &#39;MqttThread&#39;
+        number = 1
         for thread in threads_after:
             if thread in threads_before:
+                if thread.name.startswith(&#39;MqttThread&#39;):
+                    number += 1
+                    name = f&#39;MqttThread-{number}&#39;
                 continue
-            thread.name = &#39;MqttThread&#39;
+            _log.debug(f&#39;Naming new MQTT client thread: {name}&#39;)
+            thread.name = name
             break
     except (ConnectionError, timeout, TimeoutError) as err:
         self._failed_connect_attempts += 1
@@ -1093,32 +1106,48 @@ def subscriptions(self) -&gt; dict:
 </details>
 </dd>
 <dt id="fieldedge_utilities.mqtt.MqttClient.publish"><code class="name flex">
-<span>def <span class="ident">publish</span></span>(<span>self, topic: str, message: str|dict|None, qos: int = 1) ‑> bool</span>
+<span>def <span class="ident">publish</span></span>(<span>self, topic: str, message: str|dict|None, qos: int = 1, camel_keys: bool = True) ‑> bool</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Publishes a message to a MQTT topic.</p>
 <p>If the message is a dictionary, </p>
 <h2 id="args">Args</h2>
 <dl>
-<dt><strong><code>topic</code></strong> :&ensp;<code>str</code></dt>
+<dt><strong><code>topic</code></strong></dt>
 <dd>The MQTT topic</dd>
-<dt>message (str|dict): The message to publish</dt>
-<dt><strong><code>qos</code></strong> :&ensp;<code>int</code></dt>
+<dt><strong><code>message</code></strong></dt>
+<dd>The message to publish</dd>
+<dt><strong><code>qos</code></strong></dt>
 <dd>The MQTT Quality of Service (0, 1 or 2)</dd>
-</dl></div>
+<dt><strong><code>camel_keys</code></strong></dt>
+<dd>Ensures all embedded dictionary keys are JSON style
+(camelCase)</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>True if successful, else False.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def publish(self, topic: str, message: &#39;str|dict|None&#39;, qos: int = 1) -&gt; bool:
+<pre><code class="python">def publish(self,
+            topic: str,
+            message: &#39;str|dict|None&#39;,
+            qos: int = 1,
+            camel_keys: bool = True,
+            ) -&gt; bool:
     &#34;&#34;&#34;Publishes a message to a MQTT topic.
 
     If the message is a dictionary, 
     
     Args:
-        topic (str): The MQTT topic
-        message (str|dict): The message to publish
-        qos (int): The MQTT Quality of Service (0, 1 or 2)
+        topic: The MQTT topic
+        message: The message to publish
+        qos: The MQTT Quality of Service (0, 1 or 2)
+        camel_keys: Ensures all embedded dictionary keys are JSON style
+            (camelCase)
+
+    Returns:
+        True if successful, else False.
 
     &#34;&#34;&#34;
     if message and not isinstance(message, (str, dict)):
@@ -1129,13 +1158,8 @@ def subscriptions(self) -&gt; dict:
             _log.warning(&#39;Applying Azure device-to-cloud topic prefix&#39;)
             topic = f&#39;{device_to_cloud}{topic}&#39;
     if isinstance(message, dict):
-        for k, v in message.items():
-            if not isinstance(k, str):
-                _log.warning(f&#39;{k} ({type(k)}) will be converted to str(k)&#39;)
-            if isinstance(v, JSON_DUMPS_COMPATIBLE) or v is None:
-                continue
-            message[k] = _jsonable(v)
-        message = json.dumps(message, skipkeys=True)
+        message = json.dumps(tag.json_compatible(message, camel_keys),
+                             skipkeys=True)
     if not isinstance(qos, int) or qos not in range(0, 3):
         _log.warning(f&#39;Invalid MQTT QoS {qos} - using QoS 1&#39;)
         qos = 1
@@ -1239,12 +1263,13 @@ Message id <code>mid</code> is 0 when not actively subscribed.</p>
 <span>(</span><span>value, names=None, *, module=None, qualname=None, type=None, start=1)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>An enumeration.</p></div>
+<div class="desc"><p>Eclipse Paho MQTT Error Codes.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class MqttResultCode(IntEnum):
+    &#34;&#34;&#34;Eclipse Paho MQTT Error Codes.&#34;&#34;&#34;
     SUCCESS = 0
     ERR_INCORRECT_PROTOCOL = 1
     ERR_INVALID_CLIENT_ID = 2

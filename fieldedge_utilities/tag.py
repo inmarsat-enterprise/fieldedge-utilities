@@ -1,4 +1,5 @@
 """Helper functions for converting tags between PEP and JSON styles."""
+import json
 import re
 
 
@@ -108,3 +109,32 @@ def tag_merge(*dicts: dict):
         merged['config'] = merged['config'] + d['config']
         merged['readOnly'] = merged['readOnly'] + d['readOnly']
     return merged
+
+
+def json_compatible(obj: object, camel_keys: bool = True):
+    res = obj
+    if camel_keys and isinstance(res, dict):
+        changed_keys = []
+        for key in res:
+            camel_key = snake_to_camel(key)
+            if camel_key == key:
+                continue
+            changed_keys.append(key)
+            res[camel_key] = res.get(key)
+        for old_key in changed_keys:
+            del res[old_key]
+    try:
+        json.dumps(obj)
+    except TypeError:
+        if isinstance(res, list):
+            _temp = []
+            for element in res:
+                _temp.append(json_compatible(element, camel_keys))
+            res = _temp
+        if hasattr(res, '__dict__'):
+            res = vars(res)
+        if isinstance(res, dict):
+            for k, v in res.items():
+                res[k] = json_compatible(v, camel_keys)
+    finally:
+        return res

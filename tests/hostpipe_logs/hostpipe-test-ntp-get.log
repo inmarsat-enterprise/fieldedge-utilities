@@ -1,0 +1,2 @@
+2021-11-19T23:23:57.000Z,[INFO],command=runuser -u fieldedge -- grep -nr "pool pool.ntp.org" /etc/chrony/chrony.conf
+2021-11-19T23:23:57.000Z,[INFO],result=8:pool pool.ntp.org iburst maxsources 1 minpoll 12 maxpoll 12

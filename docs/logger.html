@@ -66,12 +66,12 @@ Format is:
 
 &#34;&#34;&#34;
 import logging
-from logging.handlers import RotatingFileHandler
 import os
 import sys
+from logging.handlers import RotatingFileHandler
 from time import gmtime
 
-from fieldedge_utilities.path import clean_path, get_caller_name
+from fieldedge_utilities.path import clean_path
 
 FORMAT_CSV = (&#39;%(asctime)s.%(msecs)03dZ,[%(levelname)s],(%(threadName)s),&#39;
               &#39;%(module)s.%(funcName)s:%(lineno)d,%(message)s&#39;)
@@ -84,17 +84,20 @@ FORMAT_JSON = (&#39;{&#39;
                 &#39;,&#34;line&#34;:%(lineno)d&#39;
                 &#39;,&#34;message&#34;:&#34;%(message)s&#34;&#39;
                 &#39;}&#39;)
+DATEFMT = &#39;%Y-%m-%dT%H:%M:%S&#39;
 
 
-# Logging to STDOUT or STDERR
-class _LessThanFilter(logging.Filter):
-    &#34;&#34;&#34;Filters logs below a specified level for routing to a given handler.&#34;&#34;&#34;
+class LogFilterLessThan(logging.Filter):
+    &#34;&#34;&#34;Filters logs below a specified level for routing to a given handler.
+    
+    Intended to route `WARNING` and higher to `STDERR` and lower to `STDOUT`.
+
+    &#34;&#34;&#34;
     def __init__(self,
                  exclusive_maximum: int = logging.WARNING,
                  name: str = None):
         if name is None:
             name = f&#39;LessThan{logging.getLevelName(exclusive_maximum)}&#39;
-        # super(_LessThanFilter, self).__init__(name)
         super().__init__(name)
         self.max_level = exclusive_maximum
 
@@ -103,15 +106,15 @@ class _LessThanFilter(logging.Filter):
         return 1 if record.levelno &lt; self.max_level else 0
 
 
-class _OneLineExceptionFormatter(logging.Formatter):
-    &#34;&#34;&#34;Formats exceptions into a single line stack trace.&#34;&#34;&#34;
+class LogFormatterOneLineException(logging.Formatter):
+    &#34;&#34;&#34;Formats exceptions into a single line stack trace.
+    
+    Also replaces the record message with the error type.
+
+    &#34;&#34;&#34;
     def formatException(self, exc_info):
         original = super().formatException(exc_info)
-        lines = original.splitlines()
-        result = &#39;&#39;
-        for i, line in enumerate(lines):
-            result += (&#39; -&gt; &#39; if i &gt; 0 else &#39;&#39;) + line.strip()
-        return result
+        return &#39; -&gt; &#39;.join([x.strip() for x in original.splitlines()])
 
     def format(self, record):
         result = super().format(record)
@@ -122,29 +125,131 @@ class _OneLineExceptionFormatter(logging.Formatter):
 
 
 def get_logfile_name(logger: logging.Logger) -&gt; str:
-    &#34;&#34;&#34;Returns the logger&#39;s RotatingFileHandler name.&#34;&#34;&#34;
-    for h in logger.handlers:
-        if isinstance(h, RotatingFileHandler):
-            return h.baseFilename
-    return None
-
-
-def _is_log_handler(logger: logging.Logger, handler: object) -&gt; bool:
-    &#34;&#34;&#34;Returns true if the handler is found in the logger.
+    &#34;&#34;&#34;Returns the logger&#39;s RotatingFileHandler name.
     
     Args:
-        logger (logging.Logger)
-        handler (logging handler)
-    
-    Returns:
-        True if the handler is in the logger.
+        logger: The Logger to retrieve its file name from.
+
+    Raises:
+        TypeError if Logger is invalid
 
     &#34;&#34;&#34;
     if not isinstance(logger, logging.Logger):
-        return False
+        raise TypeError(&#39;Invalid Logger&#39;)
+    for h in logger.handlers:
+        if isinstance(h, RotatingFileHandler):
+            return h.baseFilename
+
+
+def add_handler(logger: logging.Logger, handler: logging.Handler) -&gt; None:
+    &#34;&#34;&#34;Adds a handler to a logger if one of the same name is not present.
+    
+    Args:
+        logger: The logger to add the handler to.
+        handler: The handler to add to the logger.
+    
+    Raises:
+        TypeError if Logger or Handler are invalid
+        ValueError if a handler with the same name is already in the logger.
+
+    &#34;&#34;&#34;
+    if not isinstance(logger, logging.Logger):
+        raise TypeError(&#39;Invalid Logger&#39;)
+    if not isinstance(handler, logging.Handler):
+        raise TypeError(&#39;Invalid Handler&#39;)
     for h in logger.handlers:
         if h.name == handler.name:
-            return True
+            raise ValueError(f&#39;Logger already has a handler named {h.name}&#39;)
+    logger.addHandler(handler)
+
+
+def apply_formatter(logger: logging.Logger,
+                    formatter: logging.Formatter) -&gt; None:
+    &#34;&#34;&#34;Applies the log formatter to all handlers in the logger.
+    
+    Args:
+        logger: The logger with the handler targets.
+        formatter: The formatter to apply.
+
+    Raises:
+        TypeError if Logger or Handler are invalid
+    
+    &#34;&#34;&#34;
+    if not isinstance(logger, logging.Logger):
+        raise TypeError(&#39;Invalid Logger&#39;)
+    if not isinstance(formatter, logging.Formatter):
+        raise TypeError(&#39;Invalid Formatter&#39;)
+    for h in logger.handlers:
+        h.setFormatter(formatter)
+
+
+def apply_loglevel(logger: logging.Logger, level: int) -&gt; None:
+    &#34;&#34;&#34;Sets the log level on all handlers except stderr (always WARNING).
+    
+    Args:
+        logger: The logger whose handlers to apply the level to.
+        level: The logging level to apply
+
+    Raises:
+        TypeError if Logger is invalid
+    
+    &#34;&#34;&#34;
+    if not isinstance(logger, logging.Logger):
+        raise TypeError(&#39;Invalid Logger&#39;)
+    for h in logger.handlers:
+        if &#39;stderr&#39; not in h.name:
+            h.setLevel(level)
+
+
+def get_formatter(format: str = &#39;csv&#39;) -&gt; logging.Formatter:
+    &#34;&#34;&#34;Returns a standardized log formatter.
+    
+    Args:
+        format: `csv` or `json` are supported.
+    
+    Returns:
+        A logging.Formatter
+
+    &#34;&#34;&#34;
+    fmt = FORMAT_JSON if format == &#39;json&#39; else FORMAT_CSV
+    log_formatter = LogFormatterOneLineException(fmt, DATEFMT)
+    log_formatter.converter = gmtime
+    return log_formatter
+
+
+def get_handler_file(filename: str,
+                     file_size: int = 5,
+                     **kwargs) -&gt; RotatingFileHandler:
+    if not filename:
+        raise ValueError(&#39;Missing filename&#39;)
+    filename = clean_path(filename)
+    if not os.path.isdir(os.path.dirname(filename)):
+        raise FileNotFoundError(&#39;Invalid logfile path&#39;
+            f&#39; {os.path.dirname(filename)}&#39;)
+    handler = RotatingFileHandler(
+        filename=filename,
+        mode=kwargs.pop(&#39;mode&#39;, &#39;a&#39;),
+        maxBytes=kwargs.pop(&#39;maxBytes&#39;, int(file_size * 1024 * 1024)),
+        backupCount=kwargs.pop(&#39;backupCount&#39;, 2),
+        encoding=kwargs.pop(&#39;encoding&#39;, None),
+        delay=kwargs.pop(&#39;delay&#39;, 0),
+    )
+    handler.name = f&#39;{kwargs.pop(&#34;name&#34;, __name__)}_file_handler&#39;
+    return handler
+
+
+def get_handler_stdout(**kwargs) -&gt; logging.StreamHandler:
+    handler_stdout = logging.StreamHandler(sys.stdout)
+    handler_stdout.name = f&#39;{kwargs.pop(&#34;name&#34;, __name__)}_stdout_handler&#39;
+    handler_stdout.addFilter(LogFilterLessThan(logging.WARNING))
+    return handler_stdout
+
+
+def get_handler_stderr(**kwargs) -&gt; logging.StreamHandler:
+    handler_stderr = logging.StreamHandler(sys.stderr)
+    handler_stderr.name = f&#39;{kwargs.pop(&#34;name&#34;, __name__)}_stderr_handler&#39;
+    handler_stderr.setLevel(logging.WARNING)
+    return handler_stderr
 
 
 def get_wrapping_logger(name: str = None,
@@ -154,6 +259,8 @@ def get_wrapping_logger(name: str = None,
                         format: str = &#39;csv&#39;,
                         **kwargs) -&gt; logging.Logger:
     &#34;&#34;&#34;Sets up a wrapping logger that writes to console and optionally a file.
+
+    DEPRECATED in favour of get_fieldede_logger
 
     * Default logging level is `INFO`
     * Timestamps are UTC ISO 8601 format
@@ -175,62 +282,79 @@ def get_wrapping_logger(name: str = None,
             backupCount (int): defaults to 2
     
     Returns:
-        A logger with console stream handler and (optional) file handler.
+        A `Logger` with console `StreamHandler` and (optional)
+            `RotatingFileHandler`.
     
     Raises:
-        FileNotFoundError if a logfile name is specified with an invalid
-            directory.
+        `FileNotFoundError` if a logfile name is specified with an invalid path.
     
     &#34;&#34;&#34;
-    if format == &#39;json&#39;:
-        fmt = FORMAT_JSON
-    else:
-        fmt = FORMAT_CSV
-    log_formatter = _OneLineExceptionFormatter(fmt=fmt,
-                                               datefmt=&#39;%Y-%m-%dT%H:%M:%S&#39;)
-    log_formatter.converter = gmtime
-    if name is None:
-        name = get_caller_name()
+    if not name:
+        name = __name__
     logger = logging.getLogger(name)
-    if logger.getEffectiveLevel() == logging.DEBUG:
-        log_level = logging.DEBUG
-    #: Set up log file
     if filename is not None:
-        try:
-            filename = clean_path(filename)
-            if not os.path.isdir(os.path.dirname(filename)):
-                raise FileNotFoundError(&#39;Invalid logfile path&#39;
-                    f&#39; {os.path.dirname(filename)}&#39;)
-            handler_file = RotatingFileHandler(
-                filename=filename,
-                mode=kwargs.pop(&#39;mode&#39;, &#39;a&#39;),
-                maxBytes=kwargs.pop(&#39;maxBytes&#39;, int(file_size * 1024 * 1024)),
-                backupCount=kwargs.pop(&#39;backupCount&#39;, 2),
-                encoding=kwargs.pop(&#39;encoding&#39;, None),
-                delay=kwargs.pop(&#39;delay&#39;, 0))
-            handler_file.name = name + &#39;_file_handler&#39;
-            handler_file.setFormatter(log_formatter)
-            handler_file.setLevel(log_level)
-            if not _is_log_handler(logger, handler_file):
-                logger.addHandler(handler_file)
-        except Exception as e:
-            logger.exception(f&#39;Could not create RotatingFileHandler {filename}&#39;
-                f&#39; ({e})&#39;)
-            raise e
+        filename = clean_path(filename)
+        if not os.path.isdir(os.path.dirname(filename)):
+            raise FileNotFoundError(&#39;Invalid logfile path&#39;
+                f&#39; {os.path.dirname(filename)}&#39;)
+        add_handler(logger, get_handler_file(filename,
+                                             name=name,
+                                             file_size=file_size,
+                                             **kwargs))
+    add_handler(logger, get_handler_stdout(name=name))
+    add_handler(logger, get_handler_stderr(name=name))
+    apply_formatter(logger, get_formatter(format))
     logger.setLevel(log_level)
-    handler_stdout = logging.StreamHandler(sys.stdout)
-    handler_stdout.name = name + &#39;_stdout_handler&#39;
-    handler_stdout.setFormatter(log_formatter)
-    handler_stdout.setLevel(log_level)
-    handler_stdout.addFilter(_LessThanFilter(logging.WARNING))
-    if not _is_log_handler(logger, handler_stdout):
-        logger.addHandler(handler_stdout)
-    handler_stderr = logging.StreamHandler(sys.stderr)
-    handler_stderr.name = name + &#39;_stderr_handler&#39;
-    handler_stderr.setFormatter(log_formatter)
-    handler_stderr.setLevel(logging.WARNING)
-    if not _is_log_handler(logger, handler_stderr):
-        logger.addHandler(handler_stderr)
+    return logger
+
+
+def get_fieldedge_logger(filename: str = None,
+                         file_size: int = 5,
+                         log_level: &#39;int|str&#39; = logging.INFO,
+                         format: str = &#39;csv&#39;,
+                         **kwargs) -&gt; logging.Logger:
+    &#34;&#34;&#34;Sets up a root logger that writes to console and optionally a file.
+
+    * Default logging level is `INFO`
+    * Timestamps are UTC ISO 8601 format
+    * Initializes logging to stdout/stderr, and optionally a CSV or JSON
+    formatted file. Default is CSV.
+    * Wraps files at a given `file_size` in MB, with default 2 backups.
+    
+    Args:
+        name: Name of the logger (if None, uses name of calling module).
+        filename: Name of the file/path if writing to a file.
+        file_size: Max size of the file in megabytes, before wrapping.
+        log_level: the logging level (default INFO)
+        format: `csv` or `json`
+        kwargs: Optional overrides for RotatingFileHandler
+            mode (str): defaults to `a` (append)
+            maxBytes (int): overrides file_size
+            backupCount (int): defaults to 2
+    
+    Returns:
+        A `Logger` with console `StreamHandler` and (optional)
+            `RotatingFileHandler`.
+    
+    Raises:
+        `FileNotFoundError` if a logfile name is specified with an invalid path.
+    
+    &#34;&#34;&#34;
+    logger = logging.getLogger()
+    if isinstance(log_level, str):
+        log_level = log_level.upper()
+    if filename is not None:
+        filename = clean_path(filename)
+        if not os.path.isdir(os.path.dirname(filename)):
+            raise FileNotFoundError(&#39;Invalid logfile path&#39;
+                                    f&#39; {os.path.dirname(filename)}&#39;)
+        add_handler(logger, get_handler_file(filename,
+                                             file_size=file_size,
+                                             **kwargs))
+    add_handler(logger, get_handler_stdout())
+    add_handler(logger, get_handler_stderr())
+    apply_formatter(logger, get_formatter(format))
+    logger.setLevel(log_level)
     return logger</code></pre>
 </details>
 </section>
@@ -241,21 +365,335 @@ def get_wrapping_logger(name: str = None,
 <section>
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
+<dt id="fieldedge_utilities.logger.add_handler"><code class="name flex">
+<span>def <span class="ident">add_handler</span></span>(<span>logger: logging.Logger, handler: logging.Handler) ‑> None</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Adds a handler to a logger if one of the same name is not present.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>logger</code></strong></dt>
+<dd>The logger to add the handler to.</dd>
+<dt><strong><code>handler</code></strong></dt>
+<dd>The handler to add to the logger.</dd>
+</dl>
+<h2 id="raises">Raises</h2>
+<p>TypeError if Logger or Handler are invalid
+ValueError if a handler with the same name is already in the logger.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def add_handler(logger: logging.Logger, handler: logging.Handler) -&gt; None:
+    &#34;&#34;&#34;Adds a handler to a logger if one of the same name is not present.
+    
+    Args:
+        logger: The logger to add the handler to.
+        handler: The handler to add to the logger.
+    
+    Raises:
+        TypeError if Logger or Handler are invalid
+        ValueError if a handler with the same name is already in the logger.
+
+    &#34;&#34;&#34;
+    if not isinstance(logger, logging.Logger):
+        raise TypeError(&#39;Invalid Logger&#39;)
+    if not isinstance(handler, logging.Handler):
+        raise TypeError(&#39;Invalid Handler&#39;)
+    for h in logger.handlers:
+        if h.name == handler.name:
+            raise ValueError(f&#39;Logger already has a handler named {h.name}&#39;)
+    logger.addHandler(handler)</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.logger.apply_formatter"><code class="name flex">
+<span>def <span class="ident">apply_formatter</span></span>(<span>logger: logging.Logger, formatter: logging.Formatter) ‑> None</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Applies the log formatter to all handlers in the logger.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>logger</code></strong></dt>
+<dd>The logger with the handler targets.</dd>
+<dt><strong><code>formatter</code></strong></dt>
+<dd>The formatter to apply.</dd>
+</dl>
+<h2 id="raises">Raises</h2>
+<p>TypeError if Logger or Handler are invalid</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def apply_formatter(logger: logging.Logger,
+                    formatter: logging.Formatter) -&gt; None:
+    &#34;&#34;&#34;Applies the log formatter to all handlers in the logger.
+    
+    Args:
+        logger: The logger with the handler targets.
+        formatter: The formatter to apply.
+
+    Raises:
+        TypeError if Logger or Handler are invalid
+    
+    &#34;&#34;&#34;
+    if not isinstance(logger, logging.Logger):
+        raise TypeError(&#39;Invalid Logger&#39;)
+    if not isinstance(formatter, logging.Formatter):
+        raise TypeError(&#39;Invalid Formatter&#39;)
+    for h in logger.handlers:
+        h.setFormatter(formatter)</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.logger.apply_loglevel"><code class="name flex">
+<span>def <span class="ident">apply_loglevel</span></span>(<span>logger: logging.Logger, level: int) ‑> None</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Sets the log level on all handlers except stderr (always WARNING).</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>logger</code></strong></dt>
+<dd>The logger whose handlers to apply the level to.</dd>
+<dt><strong><code>level</code></strong></dt>
+<dd>The logging level to apply</dd>
+</dl>
+<h2 id="raises">Raises</h2>
+<p>TypeError if Logger is invalid</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def apply_loglevel(logger: logging.Logger, level: int) -&gt; None:
+    &#34;&#34;&#34;Sets the log level on all handlers except stderr (always WARNING).
+    
+    Args:
+        logger: The logger whose handlers to apply the level to.
+        level: The logging level to apply
+
+    Raises:
+        TypeError if Logger is invalid
+    
+    &#34;&#34;&#34;
+    if not isinstance(logger, logging.Logger):
+        raise TypeError(&#39;Invalid Logger&#39;)
+    for h in logger.handlers:
+        if &#39;stderr&#39; not in h.name:
+            h.setLevel(level)</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.logger.get_fieldedge_logger"><code class="name flex">
+<span>def <span class="ident">get_fieldedge_logger</span></span>(<span>filename: str = None, file_size: int = 5, log_level: int|str = 20, format: str = 'csv', **kwargs) ‑> logging.Logger</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Sets up a root logger that writes to console and optionally a file.</p>
+<ul>
+<li>Default logging level is <code>INFO</code></li>
+<li>Timestamps are UTC ISO 8601 format</li>
+<li>Initializes logging to stdout/stderr, and optionally a CSV or JSON
+formatted file. Default is CSV.</li>
+<li>Wraps files at a given <code>file_size</code> in MB, with default 2 backups.</li>
+</ul>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>name</code></strong></dt>
+<dd>Name of the logger (if None, uses name of calling module).</dd>
+<dt><strong><code>filename</code></strong></dt>
+<dd>Name of the file/path if writing to a file.</dd>
+<dt><strong><code>file_size</code></strong></dt>
+<dd>Max size of the file in megabytes, before wrapping.</dd>
+<dt><strong><code>log_level</code></strong></dt>
+<dd>the logging level (default INFO)</dd>
+<dt><strong><code>format</code></strong></dt>
+<dd><code>csv</code> or <code>json</code></dd>
+<dt><strong><code>kwargs</code></strong></dt>
+<dd>Optional overrides for RotatingFileHandler
+mode (str): defaults to <code>a</code> (append)
+maxBytes (int): overrides file_size
+backupCount (int): defaults to 2</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>A <code>Logger</code> with console <code>StreamHandler</code> and (optional)
+<code>RotatingFileHandler</code>.</p>
+<h2 id="raises">Raises</h2>
+<p><code>FileNotFoundError</code> if a logfile name is specified with an invalid path.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_fieldedge_logger(filename: str = None,
+                         file_size: int = 5,
+                         log_level: &#39;int|str&#39; = logging.INFO,
+                         format: str = &#39;csv&#39;,
+                         **kwargs) -&gt; logging.Logger:
+    &#34;&#34;&#34;Sets up a root logger that writes to console and optionally a file.
+
+    * Default logging level is `INFO`
+    * Timestamps are UTC ISO 8601 format
+    * Initializes logging to stdout/stderr, and optionally a CSV or JSON
+    formatted file. Default is CSV.
+    * Wraps files at a given `file_size` in MB, with default 2 backups.
+    
+    Args:
+        name: Name of the logger (if None, uses name of calling module).
+        filename: Name of the file/path if writing to a file.
+        file_size: Max size of the file in megabytes, before wrapping.
+        log_level: the logging level (default INFO)
+        format: `csv` or `json`
+        kwargs: Optional overrides for RotatingFileHandler
+            mode (str): defaults to `a` (append)
+            maxBytes (int): overrides file_size
+            backupCount (int): defaults to 2
+    
+    Returns:
+        A `Logger` with console `StreamHandler` and (optional)
+            `RotatingFileHandler`.
+    
+    Raises:
+        `FileNotFoundError` if a logfile name is specified with an invalid path.
+    
+    &#34;&#34;&#34;
+    logger = logging.getLogger()
+    if isinstance(log_level, str):
+        log_level = log_level.upper()
+    if filename is not None:
+        filename = clean_path(filename)
+        if not os.path.isdir(os.path.dirname(filename)):
+            raise FileNotFoundError(&#39;Invalid logfile path&#39;
+                                    f&#39; {os.path.dirname(filename)}&#39;)
+        add_handler(logger, get_handler_file(filename,
+                                             file_size=file_size,
+                                             **kwargs))
+    add_handler(logger, get_handler_stdout())
+    add_handler(logger, get_handler_stderr())
+    apply_formatter(logger, get_formatter(format))
+    logger.setLevel(log_level)
+    return logger</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.logger.get_formatter"><code class="name flex">
+<span>def <span class="ident">get_formatter</span></span>(<span>format: str = 'csv') ‑> logging.Formatter</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Returns a standardized log formatter.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>format</code></strong></dt>
+<dd><code>csv</code> or <code>json</code> are supported.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>A logging.Formatter</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_formatter(format: str = &#39;csv&#39;) -&gt; logging.Formatter:
+    &#34;&#34;&#34;Returns a standardized log formatter.
+    
+    Args:
+        format: `csv` or `json` are supported.
+    
+    Returns:
+        A logging.Formatter
+
+    &#34;&#34;&#34;
+    fmt = FORMAT_JSON if format == &#39;json&#39; else FORMAT_CSV
+    log_formatter = LogFormatterOneLineException(fmt, DATEFMT)
+    log_formatter.converter = gmtime
+    return log_formatter</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.logger.get_handler_file"><code class="name flex">
+<span>def <span class="ident">get_handler_file</span></span>(<span>filename: str, file_size: int = 5, **kwargs) ‑> logging.handlers.RotatingFileHandler</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_handler_file(filename: str,
+                     file_size: int = 5,
+                     **kwargs) -&gt; RotatingFileHandler:
+    if not filename:
+        raise ValueError(&#39;Missing filename&#39;)
+    filename = clean_path(filename)
+    if not os.path.isdir(os.path.dirname(filename)):
+        raise FileNotFoundError(&#39;Invalid logfile path&#39;
+            f&#39; {os.path.dirname(filename)}&#39;)
+    handler = RotatingFileHandler(
+        filename=filename,
+        mode=kwargs.pop(&#39;mode&#39;, &#39;a&#39;),
+        maxBytes=kwargs.pop(&#39;maxBytes&#39;, int(file_size * 1024 * 1024)),
+        backupCount=kwargs.pop(&#39;backupCount&#39;, 2),
+        encoding=kwargs.pop(&#39;encoding&#39;, None),
+        delay=kwargs.pop(&#39;delay&#39;, 0),
+    )
+    handler.name = f&#39;{kwargs.pop(&#34;name&#34;, __name__)}_file_handler&#39;
+    return handler</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.logger.get_handler_stderr"><code class="name flex">
+<span>def <span class="ident">get_handler_stderr</span></span>(<span>**kwargs) ‑> logging.StreamHandler</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_handler_stderr(**kwargs) -&gt; logging.StreamHandler:
+    handler_stderr = logging.StreamHandler(sys.stderr)
+    handler_stderr.name = f&#39;{kwargs.pop(&#34;name&#34;, __name__)}_stderr_handler&#39;
+    handler_stderr.setLevel(logging.WARNING)
+    return handler_stderr</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.logger.get_handler_stdout"><code class="name flex">
+<span>def <span class="ident">get_handler_stdout</span></span>(<span>**kwargs) ‑> logging.StreamHandler</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_handler_stdout(**kwargs) -&gt; logging.StreamHandler:
+    handler_stdout = logging.StreamHandler(sys.stdout)
+    handler_stdout.name = f&#39;{kwargs.pop(&#34;name&#34;, __name__)}_stdout_handler&#39;
+    handler_stdout.addFilter(LogFilterLessThan(logging.WARNING))
+    return handler_stdout</code></pre>
+</details>
+</dd>
 <dt id="fieldedge_utilities.logger.get_logfile_name"><code class="name flex">
 <span>def <span class="ident">get_logfile_name</span></span>(<span>logger: logging.Logger) ‑> str</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Returns the logger's RotatingFileHandler name.</p></div>
+<div class="desc"><p>Returns the logger's RotatingFileHandler name.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>logger</code></strong></dt>
+<dd>The Logger to retrieve its file name from.</dd>
+</dl>
+<h2 id="raises">Raises</h2>
+<p>TypeError if Logger is invalid</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_logfile_name(logger: logging.Logger) -&gt; str:
-    &#34;&#34;&#34;Returns the logger&#39;s RotatingFileHandler name.&#34;&#34;&#34;
+    &#34;&#34;&#34;Returns the logger&#39;s RotatingFileHandler name.
+    
+    Args:
+        logger: The Logger to retrieve its file name from.
+
+    Raises:
+        TypeError if Logger is invalid
+
+    &#34;&#34;&#34;
+    if not isinstance(logger, logging.Logger):
+        raise TypeError(&#39;Invalid Logger&#39;)
     for h in logger.handlers:
         if isinstance(h, RotatingFileHandler):
-            return h.baseFilename
-    return None</code></pre>
+            return h.baseFilename</code></pre>
 </details>
 </dd>
 <dt id="fieldedge_utilities.logger.get_wrapping_logger"><code class="name flex">
@@ -263,6 +701,7 @@ def get_wrapping_logger(name: str = None,
 </code></dt>
 <dd>
 <div class="desc"><p>Sets up a wrapping logger that writes to console and optionally a file.</p>
+<p>DEPRECATED in favour of get_fieldede_logger</p>
 <ul>
 <li>Default logging level is <code>INFO</code></li>
 <li>Timestamps are UTC ISO 8601 format</li>
@@ -290,10 +729,10 @@ maxBytes (int): overrides file_size
 backupCount (int): defaults to 2</dd>
 </dl>
 <h2 id="returns">Returns</h2>
-<p>A logger with console stream handler and (optional) file handler.</p>
+<p>A <code>Logger</code> with console <code>StreamHandler</code> and (optional)
+<code>RotatingFileHandler</code>.</p>
 <h2 id="raises">Raises</h2>
-<p>FileNotFoundError if a logfile name is specified with an invalid
-directory.</p></div>
+<p><code>FileNotFoundError</code> if a logfile name is specified with an invalid path.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -305,6 +744,8 @@ directory.</p></div>
                         format: str = &#39;csv&#39;,
                         **kwargs) -&gt; logging.Logger:
     &#34;&#34;&#34;Sets up a wrapping logger that writes to console and optionally a file.
+
+    DEPRECATED in favour of get_fieldede_logger
 
     * Default logging level is `INFO`
     * Timestamps are UTC ISO 8601 format
@@ -326,68 +767,184 @@ directory.</p></div>
             backupCount (int): defaults to 2
     
     Returns:
-        A logger with console stream handler and (optional) file handler.
+        A `Logger` with console `StreamHandler` and (optional)
+            `RotatingFileHandler`.
     
     Raises:
-        FileNotFoundError if a logfile name is specified with an invalid
-            directory.
+        `FileNotFoundError` if a logfile name is specified with an invalid path.
     
     &#34;&#34;&#34;
-    if format == &#39;json&#39;:
-        fmt = FORMAT_JSON
-    else:
-        fmt = FORMAT_CSV
-    log_formatter = _OneLineExceptionFormatter(fmt=fmt,
-                                               datefmt=&#39;%Y-%m-%dT%H:%M:%S&#39;)
-    log_formatter.converter = gmtime
-    if name is None:
-        name = get_caller_name()
+    if not name:
+        name = __name__
     logger = logging.getLogger(name)
-    if logger.getEffectiveLevel() == logging.DEBUG:
-        log_level = logging.DEBUG
-    #: Set up log file
     if filename is not None:
-        try:
-            filename = clean_path(filename)
-            if not os.path.isdir(os.path.dirname(filename)):
-                raise FileNotFoundError(&#39;Invalid logfile path&#39;
-                    f&#39; {os.path.dirname(filename)}&#39;)
-            handler_file = RotatingFileHandler(
-                filename=filename,
-                mode=kwargs.pop(&#39;mode&#39;, &#39;a&#39;),
-                maxBytes=kwargs.pop(&#39;maxBytes&#39;, int(file_size * 1024 * 1024)),
-                backupCount=kwargs.pop(&#39;backupCount&#39;, 2),
-                encoding=kwargs.pop(&#39;encoding&#39;, None),
-                delay=kwargs.pop(&#39;delay&#39;, 0))
-            handler_file.name = name + &#39;_file_handler&#39;
-            handler_file.setFormatter(log_formatter)
-            handler_file.setLevel(log_level)
-            if not _is_log_handler(logger, handler_file):
-                logger.addHandler(handler_file)
-        except Exception as e:
-            logger.exception(f&#39;Could not create RotatingFileHandler {filename}&#39;
-                f&#39; ({e})&#39;)
-            raise e
+        filename = clean_path(filename)
+        if not os.path.isdir(os.path.dirname(filename)):
+            raise FileNotFoundError(&#39;Invalid logfile path&#39;
+                f&#39; {os.path.dirname(filename)}&#39;)
+        add_handler(logger, get_handler_file(filename,
+                                             name=name,
+                                             file_size=file_size,
+                                             **kwargs))
+    add_handler(logger, get_handler_stdout(name=name))
+    add_handler(logger, get_handler_stderr(name=name))
+    apply_formatter(logger, get_formatter(format))
     logger.setLevel(log_level)
-    handler_stdout = logging.StreamHandler(sys.stdout)
-    handler_stdout.name = name + &#39;_stdout_handler&#39;
-    handler_stdout.setFormatter(log_formatter)
-    handler_stdout.setLevel(log_level)
-    handler_stdout.addFilter(_LessThanFilter(logging.WARNING))
-    if not _is_log_handler(logger, handler_stdout):
-        logger.addHandler(handler_stdout)
-    handler_stderr = logging.StreamHandler(sys.stderr)
-    handler_stderr.name = name + &#39;_stderr_handler&#39;
-    handler_stderr.setFormatter(log_formatter)
-    handler_stderr.setLevel(logging.WARNING)
-    if not _is_log_handler(logger, handler_stderr):
-        logger.addHandler(handler_stderr)
     return logger</code></pre>
 </details>
 </dd>
 </dl>
 </section>
 <section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="fieldedge_utilities.logger.LogFilterLessThan"><code class="flex name class">
+<span>class <span class="ident">LogFilterLessThan</span></span>
+<span>(</span><span>exclusive_maximum: int = 30, name: str = None)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Filters logs below a specified level for routing to a given handler.</p>
+<p>Intended to route <code>WARNING</code> and higher to <code>STDERR</code> and lower to <code>STDOUT</code>.</p>
+<p>Initialize a filter.</p>
+<p>Initialize with the name of the logger which, together with its
+children, will have its events allowed through the filter. If no
+name is specified, allow every event.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class LogFilterLessThan(logging.Filter):
+    &#34;&#34;&#34;Filters logs below a specified level for routing to a given handler.
+    
+    Intended to route `WARNING` and higher to `STDERR` and lower to `STDOUT`.
+
+    &#34;&#34;&#34;
+    def __init__(self,
+                 exclusive_maximum: int = logging.WARNING,
+                 name: str = None):
+        if name is None:
+            name = f&#39;LessThan{logging.getLevelName(exclusive_maximum)}&#39;
+        super().__init__(name)
+        self.max_level = exclusive_maximum
+
+    def filter(self, record):
+        #non-zero return means we log this message
+        return 1 if record.levelno &lt; self.max_level else 0</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>logging.Filter</li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="fieldedge_utilities.logger.LogFilterLessThan.filter"><code class="name flex">
+<span>def <span class="ident">filter</span></span>(<span>self, record)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Determine if the specified record is to be logged.</p>
+<p>Is the specified record to be logged? Returns 0 for no, nonzero for
+yes. If deemed appropriate, the record may be modified in-place.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def filter(self, record):
+    #non-zero return means we log this message
+    return 1 if record.levelno &lt; self.max_level else 0</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+<dt id="fieldedge_utilities.logger.LogFormatterOneLineException"><code class="flex name class">
+<span>class <span class="ident">LogFormatterOneLineException</span></span>
+<span>(</span><span>fmt=None, datefmt=None, style='%')</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Formats exceptions into a single line stack trace.</p>
+<p>Also replaces the record message with the error type.</p>
+<p>Initialize the formatter with specified format strings.</p>
+<p>Initialize the formatter either with the specified format string, or a
+default as described above. Allow for specialized date formatting with
+the optional datefmt argument. If datefmt is omitted, you get an
+ISO8601-like (or RFC 3339-like) format.</p>
+<p>Use a style parameter of '%', '{' or '$' to specify that you want to
+use one of %-formatting, :meth:<code>str.format</code> (<code>{}</code>) formatting or
+:class:<code>string.Template</code> formatting in your format string.</p>
+<div class="admonition versionchanged">
+<p class="admonition-title">Changed in version:&ensp;3.2</p>
+<p>Added the <code>style</code> parameter.</p>
+</div></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class LogFormatterOneLineException(logging.Formatter):
+    &#34;&#34;&#34;Formats exceptions into a single line stack trace.
+    
+    Also replaces the record message with the error type.
+
+    &#34;&#34;&#34;
+    def formatException(self, exc_info):
+        original = super().formatException(exc_info)
+        return &#39; -&gt; &#39;.join([x.strip() for x in original.splitlines()])
+
+    def format(self, record):
+        result = super().format(record)
+        if record.exc_text:
+            err_type = type(record.msg).__name__
+            result = result.replace(f&#39;{record.msg}\n&#39;, f&#39;{err_type}: &#39;)
+        return result</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>logging.Formatter</li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="fieldedge_utilities.logger.LogFormatterOneLineException.format"><code class="name flex">
+<span>def <span class="ident">format</span></span>(<span>self, record)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Format the specified record as text.</p>
+<p>The record's attribute dictionary is used as the operand to a
+string formatting operation which yields the returned string.
+Before formatting the dictionary, a couple of preparatory steps
+are carried out. The message attribute of the record is computed
+using LogRecord.getMessage(). If the formatting string uses the
+time (as determined by a call to usesTime(), formatTime() is
+called to format the event time. If there is exception information,
+it is formatted using formatException() and appended to the message.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def format(self, record):
+    result = super().format(record)
+    if record.exc_text:
+        err_type = type(record.msg).__name__
+        result = result.replace(f&#39;{record.msg}\n&#39;, f&#39;{err_type}: &#39;)
+    return result</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.logger.LogFormatterOneLineException.formatException"><code class="name flex">
+<span>def <span class="ident">formatException</span></span>(<span>self, exc_info)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Format and return the specified exception information as a string.</p>
+<p>This default implementation just uses
+traceback.print_exception()</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def formatException(self, exc_info):
+    original = super().formatException(exc_info)
+    return &#39; -&gt; &#39;.join([x.strip() for x in original.splitlines()])</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+</dl>
 </section>
 </article>
 <nav id="sidebar">
@@ -403,8 +960,33 @@ directory.</p></div>
 </li>
 <li><h3><a href="#header-functions">Functions</a></h3>
 <ul class="">
+<li><code><a title="fieldedge_utilities.logger.add_handler" href="#fieldedge_utilities.logger.add_handler">add_handler</a></code></li>
+<li><code><a title="fieldedge_utilities.logger.apply_formatter" href="#fieldedge_utilities.logger.apply_formatter">apply_formatter</a></code></li>
+<li><code><a title="fieldedge_utilities.logger.apply_loglevel" href="#fieldedge_utilities.logger.apply_loglevel">apply_loglevel</a></code></li>
+<li><code><a title="fieldedge_utilities.logger.get_fieldedge_logger" href="#fieldedge_utilities.logger.get_fieldedge_logger">get_fieldedge_logger</a></code></li>
+<li><code><a title="fieldedge_utilities.logger.get_formatter" href="#fieldedge_utilities.logger.get_formatter">get_formatter</a></code></li>
+<li><code><a title="fieldedge_utilities.logger.get_handler_file" href="#fieldedge_utilities.logger.get_handler_file">get_handler_file</a></code></li>
+<li><code><a title="fieldedge_utilities.logger.get_handler_stderr" href="#fieldedge_utilities.logger.get_handler_stderr">get_handler_stderr</a></code></li>
+<li><code><a title="fieldedge_utilities.logger.get_handler_stdout" href="#fieldedge_utilities.logger.get_handler_stdout">get_handler_stdout</a></code></li>
 <li><code><a title="fieldedge_utilities.logger.get_logfile_name" href="#fieldedge_utilities.logger.get_logfile_name">get_logfile_name</a></code></li>
 <li><code><a title="fieldedge_utilities.logger.get_wrapping_logger" href="#fieldedge_utilities.logger.get_wrapping_logger">get_wrapping_logger</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="fieldedge_utilities.logger.LogFilterLessThan" href="#fieldedge_utilities.logger.LogFilterLessThan">LogFilterLessThan</a></code></h4>
+<ul class="">
+<li><code><a title="fieldedge_utilities.logger.LogFilterLessThan.filter" href="#fieldedge_utilities.logger.LogFilterLessThan.filter">filter</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="fieldedge_utilities.logger.LogFormatterOneLineException" href="#fieldedge_utilities.logger.LogFormatterOneLineException">LogFormatterOneLineException</a></code></h4>
+<ul class="">
+<li><code><a title="fieldedge_utilities.logger.LogFormatterOneLineException.format" href="#fieldedge_utilities.logger.LogFormatterOneLineException.format">format</a></code></li>
+<li><code><a title="fieldedge_utilities.logger.LogFormatterOneLineException.formatException" href="#fieldedge_utilities.logger.LogFormatterOneLineException.formatException">formatException</a></code></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>

@@ -1,0 +1,2 @@
+2021-11-19T23:23:57.000Z,[INFO],command=runuser -u fieldedge -- systemctl status chrony
+2021-11-19T23:23:57.000Z,[INFO],result=chrony.service could not be found 

@@ -1,0 +1,2 @@
+2021-11-19T23:23:57.000Z,[INFO],command=runuser -u fieldedge -- bash /home/fieldedge/fieldedge/bgan-simulator/mimicbgan.sh status
+2021-11-19T23:23:57.000Z,[INFO],result=BGAN Simulator Disabled on WAN=eth0 and LAN=eth1

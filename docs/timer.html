@@ -29,9 +29,8 @@
 <pre><code class="python">import logging
 import threading
 from time import time
-from typing import Callable, Tuple
 
-from fieldedge_utilities.logger import get_wrapping_logger
+_log = logging.getLogger(__name__)
 
 
 class RepeatingTimer(threading.Thread):
@@ -53,18 +52,16 @@ class RepeatingTimer(threading.Thread):
     &#34;&#34;&#34;
     def __init__(self,
                  seconds: int,
-                 target: Callable,
-                 args: Tuple = (),
+                 target: callable,
+                 args: tuple = (),
                  kwargs: dict = {},
                  name: str = None,
-                 logger: logging.Logger = None,
-                 log_level: int = logging.INFO,
                  sleep_chunk: float = 0.25,
                  max_drift: int = None,
                  auto_start: bool = False,
                  defer: bool = True,
-                 debug: bool = False,
                  daemon: bool = True,
+                 verbose_debug: bool = False,
                  ):
         &#34;&#34;&#34;Sets up a RepeatingTimer thread.
 
@@ -72,14 +69,14 @@ class RepeatingTimer(threading.Thread):
             seconds: Interval for timer repeat.
             target: The function to execute each timer expiry.
             args: Positional arguments required by the target.
+            kwargs: Optional keyword arguments to pass into the target.
             name: Optional thread name.
-            logger: Optional external logger to use.
             sleep_chunk: Tick seconds between expiry checks.
             max_drift: Number of seconds clock drift to tolerate.
             auto_start: Starts the thread and timer when created.
             defer: Set if first target waits for timer expiry.
+            daemon: Set if thread is a daemon (default)
             verbose_debug: verbose logging of tick count
-            kwargs: Optional keyword arguments to pass into the target.
 
         Raises:
             ValueError if seconds is not an integer.
@@ -88,20 +85,17 @@ class RepeatingTimer(threading.Thread):
             err_str = &#39;RepeatingTimer seconds must be integer &gt;= 0&#39;
             raise ValueError(err_str)
         super().__init__(daemon=daemon)
-        self.name = name or &#39;{}_timer_thread&#39;.format(str(target))
-        self._log = logger or get_wrapping_logger(name=self.name,
-                                                  log_level=log_level)
+        self.name = name or f&#39;{target.__name__}_timer_thread&#39;
         self.interval = seconds
         if target is None:
-            self._log.warning(&#39;No target specified for RepeatingTimer {}&#39;
-                              .format(self.name))
+            _log.warning(f&#39;No target specified for RepeatingTimer {self.name}&#39;)
         self.target = target
         self._exception = None
         self.args = args
         self.kwargs = kwargs
         self.sleep_chunk = sleep_chunk
         self._defer = defer
-        self._debug = debug
+        self._verbose_debug = verbose_debug
         self._terminate_event = threading.Event()
         self._start_event = threading.Event()
         self._reset_event = threading.Event()
@@ -113,25 +107,29 @@ class RepeatingTimer(threading.Thread):
             self.start_timer()
 
     @property
-    def sleep_chunk(self):
+    def sleep_chunk(self) -&gt; float:
         return self._sleep_chunk
 
     @sleep_chunk.setter
     def sleep_chunk(self, value: float):
         if 1 % value != 0:
-            raise ValueError(&#39;1 must be a multiple of sleep_chunk&#39;)
+            raise ValueError(&#39;sleep_chunk must evenly divide 1 second&#39;)
         self._sleep_chunk = value
+
+    @property
+    def is_running(self) -&gt; bool:
+        return self._start_event.is_set()
 
     def _resync(self, max_drift: int = None) -&gt; int:
         &#34;&#34;&#34;Used to adjust the next countdown to account for drift.
         
-        Untested.
+        NOTE: Untested.
         &#34;&#34;&#34;
         if max_drift is not None:
             drift = time() - self._timesync % self.interval
             max_drift = 0 if max_drift &lt; 1 else max_drift
             if drift &gt; max_drift:
-                self._log.warning(&#39;Detected drift of {}s&#39;.format(drift))
+                _log.warning(f&#39;Detected drift of {drift}s&#39;)
                 return drift
         return 0
 
@@ -144,16 +142,15 @@ class RepeatingTimer(threading.Thread):
             while (self._count &gt; 0
                    and self._start_event.is_set()
                    and self.interval &gt; 0):
-                if self._debug:
+                if self._verbose_debug:
                     if (self._count * self.sleep_chunk
                         - int(self._count * self.sleep_chunk)
                         == 0.0):
                         #: log debug message at reasonable interval
-                        self._log.debug(&#39;{} countdown: {} ({}s @ step {})&#39;
-                                        .format(self.name,
-                                        self._count,
-                                        self.interval,
-                                        self.sleep_chunk))
+                        _log.debug(f&#39;{self.name} countdown:&#39;
+                                   f&#39; {self._count}&#39;
+                                   f&#39; ({self.interval}s&#39;
+                                   f&#39; @ step {self.sleep_chunk})&#39;)
                 if self._reset_event.wait(self.sleep_chunk):
                     self._reset_event.clear()
                     self._count = self.interval / self.sleep_chunk
@@ -174,17 +171,14 @@ class RepeatingTimer(threading.Thread):
             self.target(*self.args, **self.kwargs)
         self._start_event.set()
         if self.interval &gt; 0:
-            self._log.info(&#39;{} timer started ({} seconds)&#39;.format(
-                           self.name, self.interval))
+            _log.info(f&#39;{self.name} timer started ({self.interval} s)&#39;)
         else:
-            self._log.warning(&#39;{} timer will not trigger (interval 0)&#39;.format(
-                              self.name))
+            _log.warning(f&#39;{self.name} timer cannot trigger (interval=0)&#39;)
 
     def stop_timer(self):
         &#34;&#34;&#34;Stop the repeating timer.&#34;&#34;&#34;
         self._start_event.clear()
-        self._log.info(&#39;{} timer stopped ({} seconds)&#39;
-                       .format(self.name, self.interval))
+        _log.info(f&#39;{self.name} timer stopped ({self.interval} s)&#39;)
         self._count = self.interval / self.sleep_chunk
 
     def restart_timer(self):
@@ -196,11 +190,9 @@ class RepeatingTimer(threading.Thread):
         else:
             self._start_event.set()
         if self.interval &gt; 0:
-            self._log.info(&#39;{} timer restarted ({} seconds)&#39;.format(
-                           self.name, self.interval))
+            _log.info(f&#39;{self.name} timer restarted ({self.interval} s)&#39;)
         else:
-            self._log.warning(&#39;{} timer will not trigger (interval 0)&#39;.format(
-                              self.name))
+            _log.warning(f&#39;{self.name} timer cannot trigger (interval=0)&#39;)
 
     def change_interval(self, seconds: int):
         &#34;&#34;&#34;Change the timer interval and restart it.
@@ -213,21 +205,21 @@ class RepeatingTimer(threading.Thread):
 
         &#34;&#34;&#34;
         if (isinstance(seconds, int) and seconds &gt;= 0):
-            self._log.info(&#39;{} timer interval changed (old:{} s new:{} s)&#39;
-                           .format(self.name, self.interval, seconds))
+            _log.info(f&#39;{self.name} timer interval changed&#39;
+                      f&#39; (old:{self.interval} s new:{seconds} s)&#39;)
             self.interval = seconds
             self._count = self.interval / self.sleep_chunk
             self.restart_timer()
         else:
             err_str = &#39;RepeatingTimer seconds must be integer &gt;= 0&#39;
-            self._log.error(err_str)
+            _log.error(err_str)
             raise ValueError(err_str)
 
     def terminate(self):
         &#34;&#34;&#34;Terminate the timer. (Cannot be restarted)&#34;&#34;&#34;
         self.stop_timer()
         self._terminate_event.set()
-        self._log.info(&#39;{} timer terminated&#39;.format(self.name))
+        _log.info(f&#39;{self.name} timer terminated&#39;)
     
     def join(self):
         super(RepeatingTimer, self).join()
@@ -247,7 +239,7 @@ class RepeatingTimer(threading.Thread):
 <dl>
 <dt id="fieldedge_utilities.timer.RepeatingTimer"><code class="flex name class">
 <span>class <span class="ident">RepeatingTimer</span></span>
-<span>(</span><span>seconds: int, target: Callable, args: Tuple[] = (), kwargs: dict = {}, name: str = None, logger: logging.Logger = None, log_level: int = 20, sleep_chunk: float = 0.25, max_drift: int = None, auto_start: bool = False, defer: bool = True, debug: bool = False, daemon: bool = True)</span>
+<span>(</span><span>seconds: int, target: <built-in function callable>, args: tuple = (), kwargs: dict = {}, name: str = None, sleep_chunk: float = 0.25, max_drift: int = None, auto_start: bool = False, defer: bool = True, daemon: bool = True, verbose_debug: bool = False)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>A repeating thread to call a function, can be stopped/restarted/changed.</p>
@@ -276,10 +268,10 @@ the user doesn't need to explicitly start() then start_timer().</p>
 <dd>The function to execute each timer expiry.</dd>
 <dt><strong><code>args</code></strong></dt>
 <dd>Positional arguments required by the target.</dd>
+<dt><strong><code>kwargs</code></strong></dt>
+<dd>Optional keyword arguments to pass into the target.</dd>
 <dt><strong><code>name</code></strong></dt>
 <dd>Optional thread name.</dd>
-<dt><strong><code>logger</code></strong></dt>
-<dd>Optional external logger to use.</dd>
 <dt><strong><code>sleep_chunk</code></strong></dt>
 <dd>Tick seconds between expiry checks.</dd>
 <dt><strong><code>max_drift</code></strong></dt>
@@ -288,10 +280,10 @@ the user doesn't need to explicitly start() then start_timer().</p>
 <dd>Starts the thread and timer when created.</dd>
 <dt><strong><code>defer</code></strong></dt>
 <dd>Set if first target waits for timer expiry.</dd>
+<dt><strong><code>daemon</code></strong></dt>
+<dd>Set if thread is a daemon (default)</dd>
 <dt><strong><code>verbose_debug</code></strong></dt>
 <dd>verbose logging of tick count</dd>
-<dt><strong><code>kwargs</code></strong></dt>
-<dd>Optional keyword arguments to pass into the target.</dd>
 </dl>
 <h2 id="raises">Raises</h2>
 <p>ValueError if seconds is not an integer.</p></div>
@@ -318,18 +310,16 @@ the user doesn't need to explicitly start() then start_timer().</p>
     &#34;&#34;&#34;
     def __init__(self,
                  seconds: int,
-                 target: Callable,
-                 args: Tuple = (),
+                 target: callable,
+                 args: tuple = (),
                  kwargs: dict = {},
                  name: str = None,
-                 logger: logging.Logger = None,
-                 log_level: int = logging.INFO,
                  sleep_chunk: float = 0.25,
                  max_drift: int = None,
                  auto_start: bool = False,
                  defer: bool = True,
-                 debug: bool = False,
                  daemon: bool = True,
+                 verbose_debug: bool = False,
                  ):
         &#34;&#34;&#34;Sets up a RepeatingTimer thread.
 
@@ -337,14 +327,14 @@ the user doesn't need to explicitly start() then start_timer().</p>
             seconds: Interval for timer repeat.
             target: The function to execute each timer expiry.
             args: Positional arguments required by the target.
+            kwargs: Optional keyword arguments to pass into the target.
             name: Optional thread name.
-            logger: Optional external logger to use.
             sleep_chunk: Tick seconds between expiry checks.
             max_drift: Number of seconds clock drift to tolerate.
             auto_start: Starts the thread and timer when created.
             defer: Set if first target waits for timer expiry.
+            daemon: Set if thread is a daemon (default)
             verbose_debug: verbose logging of tick count
-            kwargs: Optional keyword arguments to pass into the target.
 
         Raises:
             ValueError if seconds is not an integer.
@@ -353,20 +343,17 @@ the user doesn't need to explicitly start() then start_timer().</p>
             err_str = &#39;RepeatingTimer seconds must be integer &gt;= 0&#39;
             raise ValueError(err_str)
         super().__init__(daemon=daemon)
-        self.name = name or &#39;{}_timer_thread&#39;.format(str(target))
-        self._log = logger or get_wrapping_logger(name=self.name,
-                                                  log_level=log_level)
+        self.name = name or f&#39;{target.__name__}_timer_thread&#39;
         self.interval = seconds
         if target is None:
-            self._log.warning(&#39;No target specified for RepeatingTimer {}&#39;
-                              .format(self.name))
+            _log.warning(f&#39;No target specified for RepeatingTimer {self.name}&#39;)
         self.target = target
         self._exception = None
         self.args = args
         self.kwargs = kwargs
         self.sleep_chunk = sleep_chunk
         self._defer = defer
-        self._debug = debug
+        self._verbose_debug = verbose_debug
         self._terminate_event = threading.Event()
         self._start_event = threading.Event()
         self._reset_event = threading.Event()
@@ -378,25 +365,29 @@ the user doesn't need to explicitly start() then start_timer().</p>
             self.start_timer()
 
     @property
-    def sleep_chunk(self):
+    def sleep_chunk(self) -&gt; float:
         return self._sleep_chunk
 
     @sleep_chunk.setter
     def sleep_chunk(self, value: float):
         if 1 % value != 0:
-            raise ValueError(&#39;1 must be a multiple of sleep_chunk&#39;)
+            raise ValueError(&#39;sleep_chunk must evenly divide 1 second&#39;)
         self._sleep_chunk = value
+
+    @property
+    def is_running(self) -&gt; bool:
+        return self._start_event.is_set()
 
     def _resync(self, max_drift: int = None) -&gt; int:
         &#34;&#34;&#34;Used to adjust the next countdown to account for drift.
         
-        Untested.
+        NOTE: Untested.
         &#34;&#34;&#34;
         if max_drift is not None:
             drift = time() - self._timesync % self.interval
             max_drift = 0 if max_drift &lt; 1 else max_drift
             if drift &gt; max_drift:
-                self._log.warning(&#39;Detected drift of {}s&#39;.format(drift))
+                _log.warning(f&#39;Detected drift of {drift}s&#39;)
                 return drift
         return 0
 
@@ -409,16 +400,15 @@ the user doesn't need to explicitly start() then start_timer().</p>
             while (self._count &gt; 0
                    and self._start_event.is_set()
                    and self.interval &gt; 0):
-                if self._debug:
+                if self._verbose_debug:
                     if (self._count * self.sleep_chunk
                         - int(self._count * self.sleep_chunk)
                         == 0.0):
                         #: log debug message at reasonable interval
-                        self._log.debug(&#39;{} countdown: {} ({}s @ step {})&#39;
-                                        .format(self.name,
-                                        self._count,
-                                        self.interval,
-                                        self.sleep_chunk))
+                        _log.debug(f&#39;{self.name} countdown:&#39;
+                                   f&#39; {self._count}&#39;
+                                   f&#39; ({self.interval}s&#39;
+                                   f&#39; @ step {self.sleep_chunk})&#39;)
                 if self._reset_event.wait(self.sleep_chunk):
                     self._reset_event.clear()
                     self._count = self.interval / self.sleep_chunk
@@ -439,17 +429,14 @@ the user doesn't need to explicitly start() then start_timer().</p>
             self.target(*self.args, **self.kwargs)
         self._start_event.set()
         if self.interval &gt; 0:
-            self._log.info(&#39;{} timer started ({} seconds)&#39;.format(
-                           self.name, self.interval))
+            _log.info(f&#39;{self.name} timer started ({self.interval} s)&#39;)
         else:
-            self._log.warning(&#39;{} timer will not trigger (interval 0)&#39;.format(
-                              self.name))
+            _log.warning(f&#39;{self.name} timer cannot trigger (interval=0)&#39;)
 
     def stop_timer(self):
         &#34;&#34;&#34;Stop the repeating timer.&#34;&#34;&#34;
         self._start_event.clear()
-        self._log.info(&#39;{} timer stopped ({} seconds)&#39;
-                       .format(self.name, self.interval))
+        _log.info(f&#39;{self.name} timer stopped ({self.interval} s)&#39;)
         self._count = self.interval / self.sleep_chunk
 
     def restart_timer(self):
@@ -461,11 +448,9 @@ the user doesn't need to explicitly start() then start_timer().</p>
         else:
             self._start_event.set()
         if self.interval &gt; 0:
-            self._log.info(&#39;{} timer restarted ({} seconds)&#39;.format(
-                           self.name, self.interval))
+            _log.info(f&#39;{self.name} timer restarted ({self.interval} s)&#39;)
         else:
-            self._log.warning(&#39;{} timer will not trigger (interval 0)&#39;.format(
-                              self.name))
+            _log.warning(f&#39;{self.name} timer cannot trigger (interval=0)&#39;)
 
     def change_interval(self, seconds: int):
         &#34;&#34;&#34;Change the timer interval and restart it.
@@ -478,21 +463,21 @@ the user doesn't need to explicitly start() then start_timer().</p>
 
         &#34;&#34;&#34;
         if (isinstance(seconds, int) and seconds &gt;= 0):
-            self._log.info(&#39;{} timer interval changed (old:{} s new:{} s)&#39;
-                           .format(self.name, self.interval, seconds))
+            _log.info(f&#39;{self.name} timer interval changed&#39;
+                      f&#39; (old:{self.interval} s new:{seconds} s)&#39;)
             self.interval = seconds
             self._count = self.interval / self.sleep_chunk
             self.restart_timer()
         else:
             err_str = &#39;RepeatingTimer seconds must be integer &gt;= 0&#39;
-            self._log.error(err_str)
+            _log.error(err_str)
             raise ValueError(err_str)
 
     def terminate(self):
         &#34;&#34;&#34;Terminate the timer. (Cannot be restarted)&#34;&#34;&#34;
         self.stop_timer()
         self._terminate_event.set()
-        self._log.info(&#39;{} timer terminated&#39;.format(self.name))
+        _log.info(f&#39;{self.name} timer terminated&#39;)
     
     def join(self):
         super(RepeatingTimer, self).join()
@@ -506,7 +491,7 @@ the user doesn't need to explicitly start() then start_timer().</p>
 </ul>
 <h3>Instance variables</h3>
 <dl>
-<dt id="fieldedge_utilities.timer.RepeatingTimer.sleep_chunk"><code class="name">var <span class="ident">sleep_chunk</span></code></dt>
+<dt id="fieldedge_utilities.timer.RepeatingTimer.is_running"><code class="name">var <span class="ident">is_running</span> : bool</code></dt>
 <dd>
 <div class="desc"></div>
 <details class="source">
@@ -514,7 +499,19 @@ the user doesn't need to explicitly start() then start_timer().</p>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@property
-def sleep_chunk(self):
+def is_running(self) -&gt; bool:
+    return self._start_event.is_set()</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.timer.RepeatingTimer.sleep_chunk"><code class="name">var <span class="ident">sleep_chunk</span> : float</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def sleep_chunk(self) -&gt; float:
     return self._sleep_chunk</code></pre>
 </details>
 </dd>
@@ -548,14 +545,14 @@ def sleep_chunk(self):
 
     &#34;&#34;&#34;
     if (isinstance(seconds, int) and seconds &gt;= 0):
-        self._log.info(&#39;{} timer interval changed (old:{} s new:{} s)&#39;
-                       .format(self.name, self.interval, seconds))
+        _log.info(f&#39;{self.name} timer interval changed&#39;
+                  f&#39; (old:{self.interval} s new:{seconds} s)&#39;)
         self.interval = seconds
         self._count = self.interval / self.sleep_chunk
         self.restart_timer()
     else:
         err_str = &#39;RepeatingTimer seconds must be integer &gt;= 0&#39;
-        self._log.error(err_str)
+        _log.error(err_str)
         raise ValueError(err_str)</code></pre>
 </details>
 </dd>
@@ -608,11 +605,9 @@ exception.</p></div>
     else:
         self._start_event.set()
     if self.interval &gt; 0:
-        self._log.info(&#39;{} timer restarted ({} seconds)&#39;.format(
-                       self.name, self.interval))
+        _log.info(f&#39;{self.name} timer restarted ({self.interval} s)&#39;)
     else:
-        self._log.warning(&#39;{} timer will not trigger (interval 0)&#39;.format(
-                          self.name))</code></pre>
+        _log.warning(f&#39;{self.name} timer cannot trigger (interval=0)&#39;)</code></pre>
 </details>
 </dd>
 <dt id="fieldedge_utilities.timer.RepeatingTimer.run"><code class="name flex">
@@ -634,16 +629,15 @@ exception.</p></div>
         while (self._count &gt; 0
                and self._start_event.is_set()
                and self.interval &gt; 0):
-            if self._debug:
+            if self._verbose_debug:
                 if (self._count * self.sleep_chunk
                     - int(self._count * self.sleep_chunk)
                     == 0.0):
                     #: log debug message at reasonable interval
-                    self._log.debug(&#39;{} countdown: {} ({}s @ step {})&#39;
-                                    .format(self.name,
-                                    self._count,
-                                    self.interval,
-                                    self.sleep_chunk))
+                    _log.debug(f&#39;{self.name} countdown:&#39;
+                               f&#39; {self._count}&#39;
+                               f&#39; ({self.interval}s&#39;
+                               f&#39; @ step {self.sleep_chunk})&#39;)
             if self._reset_event.wait(self.sleep_chunk):
                 self._reset_event.clear()
                 self._count = self.interval / self.sleep_chunk
@@ -674,11 +668,9 @@ exception.</p></div>
         self.target(*self.args, **self.kwargs)
     self._start_event.set()
     if self.interval &gt; 0:
-        self._log.info(&#39;{} timer started ({} seconds)&#39;.format(
-                       self.name, self.interval))
+        _log.info(f&#39;{self.name} timer started ({self.interval} s)&#39;)
     else:
-        self._log.warning(&#39;{} timer will not trigger (interval 0)&#39;.format(
-                          self.name))</code></pre>
+        _log.warning(f&#39;{self.name} timer cannot trigger (interval=0)&#39;)</code></pre>
 </details>
 </dd>
 <dt id="fieldedge_utilities.timer.RepeatingTimer.stop_timer"><code class="name flex">
@@ -693,8 +685,7 @@ exception.</p></div>
 <pre><code class="python">def stop_timer(self):
     &#34;&#34;&#34;Stop the repeating timer.&#34;&#34;&#34;
     self._start_event.clear()
-    self._log.info(&#39;{} timer stopped ({} seconds)&#39;
-                   .format(self.name, self.interval))
+    _log.info(f&#39;{self.name} timer stopped ({self.interval} s)&#39;)
     self._count = self.interval / self.sleep_chunk</code></pre>
 </details>
 </dd>
@@ -711,7 +702,7 @@ exception.</p></div>
     &#34;&#34;&#34;Terminate the timer. (Cannot be restarted)&#34;&#34;&#34;
     self.stop_timer()
     self._terminate_event.set()
-    self._log.info(&#39;{} timer terminated&#39;.format(self.name))</code></pre>
+    _log.info(f&#39;{self.name} timer terminated&#39;)</code></pre>
 </details>
 </dd>
 </dl>
@@ -736,6 +727,7 @@ exception.</p></div>
 <h4><code><a title="fieldedge_utilities.timer.RepeatingTimer" href="#fieldedge_utilities.timer.RepeatingTimer">RepeatingTimer</a></code></h4>
 <ul class="two-column">
 <li><code><a title="fieldedge_utilities.timer.RepeatingTimer.change_interval" href="#fieldedge_utilities.timer.RepeatingTimer.change_interval">change_interval</a></code></li>
+<li><code><a title="fieldedge_utilities.timer.RepeatingTimer.is_running" href="#fieldedge_utilities.timer.RepeatingTimer.is_running">is_running</a></code></li>
 <li><code><a title="fieldedge_utilities.timer.RepeatingTimer.join" href="#fieldedge_utilities.timer.RepeatingTimer.join">join</a></code></li>
 <li><code><a title="fieldedge_utilities.timer.RepeatingTimer.restart_timer" href="#fieldedge_utilities.timer.RepeatingTimer.restart_timer">restart_timer</a></code></li>
 <li><code><a title="fieldedge_utilities.timer.RepeatingTimer.run" href="#fieldedge_utilities.timer.RepeatingTimer.run">run</a></code></li>

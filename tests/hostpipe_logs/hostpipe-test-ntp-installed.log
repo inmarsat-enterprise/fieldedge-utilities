@@ -1,0 +1,2 @@
+2022-01-24T22:50:27.000Z,[INFO],command=runuser -u fieldedge -- systemctl | grep chrony | tr -s [:blank:]
+2022-01-24T22:50:27.000Z,[INFO],result= chrony.service loaded active running chrony, an NTP client/server

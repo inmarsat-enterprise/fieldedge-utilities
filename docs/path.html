@@ -53,22 +53,21 @@ def clean_path(pathname: str) -&gt; str:
         pathname = pathname.replace(&#39;$HOME&#39;, str(Path.home()))
     elif pathname.startswith(&#39;~/&#39;):
         pathname = pathname.replace(&#39;~&#39;, str(Path.home()))
-    elif pathname.startswith(&#39;../&#39;):
-        mod_path = Path(__file__).parent
-        src_path = (mod_path / pathname).resolve()
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-        pathname = os.path.join(dir_path, src_path)
-    return pathname
+    if os.path.isdir(os.path.dirname(pathname)):
+        return os.path.realpath(pathname)
+    else:
+        raise ValueError(f&#39;Directory {os.path.dirname(pathname)} not found&#39;)
 
 
 def get_caller_name(depth: int = 2,
                     mod: bool = True,
                     cls: bool =False,
                     mth: bool = False) -&gt; str:
-    &#34;&#34;&#34;Returns the name of the calling function.
+    &#34;&#34;&#34;Returns the name of the calling module/class/function.
 
     Args:
-        depth: Starting depth of stack inspection.
+        depth: Starting depth of stack inspection. Default 2 refers to the
+            prior entry in the stack relative to this function.
         mod: Include module name.
         cls: Include class name.
         mth: Include method name.
@@ -147,23 +146,22 @@ def get_caller_name(depth: int = 2,
         pathname = pathname.replace(&#39;$HOME&#39;, str(Path.home()))
     elif pathname.startswith(&#39;~/&#39;):
         pathname = pathname.replace(&#39;~&#39;, str(Path.home()))
-    elif pathname.startswith(&#39;../&#39;):
-        mod_path = Path(__file__).parent
-        src_path = (mod_path / pathname).resolve()
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-        pathname = os.path.join(dir_path, src_path)
-    return pathname</code></pre>
+    if os.path.isdir(os.path.dirname(pathname)):
+        return os.path.realpath(pathname)
+    else:
+        raise ValueError(f&#39;Directory {os.path.dirname(pathname)} not found&#39;)</code></pre>
 </details>
 </dd>
 <dt id="fieldedge_utilities.path.get_caller_name"><code class="name flex">
 <span>def <span class="ident">get_caller_name</span></span>(<span>depth: int = 2, mod: bool = True, cls: bool = False, mth: bool = False) ‑> str</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Returns the name of the calling function.</p>
+<div class="desc"><p>Returns the name of the calling module/class/function.</p>
 <h2 id="args">Args</h2>
 <dl>
 <dt><strong><code>depth</code></strong></dt>
-<dd>Starting depth of stack inspection.</dd>
+<dd>Starting depth of stack inspection. Default 2 refers to the
+prior entry in the stack relative to this function.</dd>
 <dt><strong><code>mod</code></strong></dt>
 <dd>Include module name.</dd>
 <dt><strong><code>cls</code></strong></dt>
@@ -181,10 +179,11 @@ def get_caller_name(depth: int = 2,
                     mod: bool = True,
                     cls: bool =False,
                     mth: bool = False) -&gt; str:
-    &#34;&#34;&#34;Returns the name of the calling function.
+    &#34;&#34;&#34;Returns the name of the calling module/class/function.
 
     Args:
-        depth: Starting depth of stack inspection.
+        depth: Starting depth of stack inspection. Default 2 refers to the
+            prior entry in the stack relative to this function.
         mod: Include module name.
         cls: Include class name.
         mth: Include method name.

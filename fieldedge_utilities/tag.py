@@ -2,7 +2,10 @@
 
 """
 import json
+import logging
 import re
+
+_log = logging.getLogger(__name__)
 
 
 def snake_to_camel(snake_str: str) -> str:
@@ -138,28 +141,26 @@ def json_compatible(obj: object, camel_keys: bool = True) -> dict:
 
     """
     res = obj
-    if camel_keys and isinstance(res, dict):
-        changed_keys = []
-        for key in res:
-            camel_key = snake_to_camel(key)
-            if camel_key == key:
-                continue
-            changed_keys.append(key)
-            res[camel_key] = res.get(key)
-        for old_key in changed_keys:
-            del res[old_key]
+    if camel_keys and isinstance(obj, dict):
+        res = {}
+        for k, v in obj.items():
+            camel_key = snake_to_camel(str(k))
+            res[camel_key] = v
     try:
-        json.dumps(obj)
+        json.dumps(res)
     except TypeError:
-        if isinstance(res, list):
-            _temp = []
-            for element in res:
-                _temp.append(json_compatible(element, camel_keys))
-            res = _temp
-        if hasattr(res, '__dict__'):
-            res = vars(res)
-        if isinstance(res, dict):
-            for k, v in res.items():
-                res[k] = json_compatible(v, camel_keys)
+        try:
+            if isinstance(res, list):
+                _temp = []
+                for element in res:
+                    _temp.append(json_compatible(element, camel_keys))
+                res = _temp
+            if hasattr(res, '__dict__'):
+                res = vars(res)
+            if isinstance(res, dict):
+                for k, v in res.items():
+                    res[k] = json_compatible(v, camel_keys)
+        except Exception as err:
+            _log.error(err)
     finally:
         return res

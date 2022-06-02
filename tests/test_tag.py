@@ -187,3 +187,27 @@ def test_json_compatible(test_obj):
     }
     jsonable = tag.json_compatible(specific)
     assert isinstance(json.dumps(jsonable), str)
+
+
+class PdpContext:
+    """Enapsulates PDP Context metadata.
+    
+    Attributes:
+        number (int): The context number within the BGAN terminal.
+        service (str): The context type e.g. background IP.
+        apn (str): The Access Point Name used for the context.
+        ip_address (str): The IPv4 address of the terminal for the context.
+
+    """
+    def __init__(self, **kwargs) -> None:
+        self.id: int = kwargs.get('id', None)
+        self.service: str = kwargs.get('service', None)
+        self.apn: str = kwargs.get('apn', None)
+        self.ip_address: str = kwargs.get('ip_address', None)
+
+
+def test_pdp():
+    pdp = PdpContext(id=1, service='IP', apn='www.inmarsat.com', ip_address='1.2.3.4')
+    thing = {'imsi': '123', 'previous': {1: pdp}}
+    jsonable = tag.json_compatible(thing)
+    assert isinstance(json.dumps(jsonable), str)

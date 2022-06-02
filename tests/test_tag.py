@@ -206,8 +206,29 @@ class PdpContext:
         self.ip_address: str = kwargs.get('ip_address', None)
 
 
+class PdpContextEquivalent:
+    def __init__(self, **kwargs) -> None:
+        self.id: int = kwargs.get('id', None)
+        self.service: str = kwargs.get('service', None)
+        self.apn: str = kwargs.get('apn', None)
+        self.ip_address: str = kwargs.get('ip_address', None)
+    
+    def __eq__(self, __o: object) -> bool:
+        return tag.equivalent_attributes(self, __o)
+
+
 def test_pdp():
     pdp = PdpContext(id=1, service='IP', apn='www.inmarsat.com', ip_address='1.2.3.4')
     thing = {'imsi': '123', 'previous': {1: pdp}}
     jsonable = tag.json_compatible(thing)
     assert isinstance(json.dumps(jsonable), str)
+
+
+def test_obj_eq():
+    pdp_1 = PdpContext(id=1, service='IP', apn='www.apn.com', ip_address='1.2.3.4')
+    pdp_2 = PdpContext(id=1, service='IP', apn='www.apn.com', ip_address='1.2.3.4')
+    assert pdp_1 != pdp_2
+    assert tag.equivalent_attributes(pdp_1, pdp_2)
+    pdp_3 = PdpContextEquivalent(id=1, service='IP', apn='www.apn.com', ip_address='1.2.3.4')
+    pdp_4 = PdpContextEquivalent(id=1, service='IP', apn='www.apn.com', ip_address='1.2.3.4')
+    assert pdp_3 == pdp_4

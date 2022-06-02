@@ -1,9 +1,12 @@
 """Helper functions for converting tags between PEP and JSON styles.
 
+Also provides a function for comparing object attributes for equivalence.
+
 """
 import json
 import logging
 import re
+from typing import Type
 
 _log = logging.getLogger(__name__)
 
@@ -164,3 +167,30 @@ def json_compatible(obj: object, camel_keys: bool = True) -> dict:
             _log.error(err)
     finally:
         return res
+
+
+def equivalent_attributes(reference: object,
+                          other: object,
+                          exclude: 'list[str]' = None,
+                          ) -> bool:
+    """Confirms attribute equivalence between objects of the same type.
+    
+    Args:
+        reference: The reference object being compared to.
+        other: The object comparing against the reference.
+        exclude: Optional list of attribute names to exclude from comparison.
+    
+    Returns:
+        True if all (non-excluded) attribute name/values match.
+
+    """
+    if type(reference) != type(other):
+        return False
+    if not hasattr(reference, '__dict__') or not hasattr(other, '__dict__'):
+        return reference == other
+    for attr, val in vars(reference).items():
+        if exclude is not None and attr in exclude:
+            continue
+        if not hasattr(other, attr) or val != vars(other)[attr]:
+            return False
+    return True

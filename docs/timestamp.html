@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
 <meta name="generator" content="pdoc 0.10.0" />
 <title>fieldedge_utilities.timestamp API documentation</title>
-<meta name="description" content="" />
+<meta name="description" content="Helpers for managing unambiguous timestamps and date representation." />
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
 <link rel="stylesheet preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/github.min.css" crossorigin>
@@ -22,14 +22,28 @@
 <h1 class="title">Module <code>fieldedge_utilities.timestamp</code></h1>
 </header>
 <section id="section-intro">
+<p>Helpers for managing unambiguous timestamps and date representation.</p>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">from datetime import datetime, timezone
+<pre><code class="python">&#34;&#34;&#34;Helpers for managing unambiguous timestamps and date representation.
+
+&#34;&#34;&#34;
+from datetime import datetime, timezone
 
 
 def ts_to_iso(timestamp: &#39;float|int&#39;, ms: bool = False) -&gt; str:
+    &#34;&#34;&#34;Converts a unix timestamp (UTC) to ISO 8601 format.
+    
+    Args:
+        timestamp: A unix timestamp in UTC timezone.
+        ms: Flag indicating whether to include milliseconds in response
+    
+    Returns:
+        ISO 8601 format e.g. `YYYY-MM-DDThh:mm:ss[.sss]Z`
+
+    &#34;&#34;&#34;
     iso_time = datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
     if not ms:
         return f&#39;{iso_time[:19]}Z&#39;
@@ -37,6 +51,16 @@ def ts_to_iso(timestamp: &#39;float|int&#39;, ms: bool = False) -&gt; str:
 
 
 def iso_to_ts(iso_time: str, ms: bool = False) -&gt; int:
+    &#34;&#34;&#34;Converts a ISO 8601 timestamp (UTC) to unix timestamp.
+    
+    Args:
+        iso_time: An ISO 8601 UTC datetime `YYYY-MM-DDThh:mm:ss[.sss]Z`
+        ms: Flag indicating whether to include milliseconds in response
+    
+    Returns:
+        Unix UTC timestamp as an integer, or float if `ms` flag is set.
+
+    &#34;&#34;&#34;
     if &#39;.&#39; not in iso_time:
         iso_time = iso_time.replace(&#39;Z&#39;, &#39;.000Z&#39;)
     utc_dt = datetime.strptime(iso_time, &#39;%Y-%m-%dT%H:%M:%S.%fZ&#39;)
@@ -57,12 +81,31 @@ def iso_to_ts(iso_time: str, ms: bool = False) -&gt; int:
 <span>def <span class="ident">iso_to_ts</span></span>(<span>iso_time: str, ms: bool = False) ‑> int</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Converts a ISO 8601 timestamp (UTC) to unix timestamp.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>iso_time</code></strong></dt>
+<dd>An ISO 8601 UTC datetime <code>YYYY-MM-DDThh:mm:ss[.sss]Z</code></dd>
+<dt><strong><code>ms</code></strong></dt>
+<dd>Flag indicating whether to include milliseconds in response</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>Unix UTC timestamp as an integer, or float if <code>ms</code> flag is set.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def iso_to_ts(iso_time: str, ms: bool = False) -&gt; int:
+    &#34;&#34;&#34;Converts a ISO 8601 timestamp (UTC) to unix timestamp.
+    
+    Args:
+        iso_time: An ISO 8601 UTC datetime `YYYY-MM-DDThh:mm:ss[.sss]Z`
+        ms: Flag indicating whether to include milliseconds in response
+    
+    Returns:
+        Unix UTC timestamp as an integer, or float if `ms` flag is set.
+
+    &#34;&#34;&#34;
     if &#39;.&#39; not in iso_time:
         iso_time = iso_time.replace(&#39;Z&#39;, &#39;.000Z&#39;)
     utc_dt = datetime.strptime(iso_time, &#39;%Y-%m-%dT%H:%M:%S.%fZ&#39;)
@@ -76,12 +119,31 @@ def iso_to_ts(iso_time: str, ms: bool = False) -&gt; int:
 <span>def <span class="ident">ts_to_iso</span></span>(<span>timestamp: float|int, ms: bool = False) ‑> str</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Converts a unix timestamp (UTC) to ISO 8601 format.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>timestamp</code></strong></dt>
+<dd>A unix timestamp in UTC timezone.</dd>
+<dt><strong><code>ms</code></strong></dt>
+<dd>Flag indicating whether to include milliseconds in response</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>ISO 8601 format e.g. <code>YYYY-MM-DDThh:mm:ss[.sss]Z</code></p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def ts_to_iso(timestamp: &#39;float|int&#39;, ms: bool = False) -&gt; str:
+    &#34;&#34;&#34;Converts a unix timestamp (UTC) to ISO 8601 format.
+    
+    Args:
+        timestamp: A unix timestamp in UTC timezone.
+        ms: Flag indicating whether to include milliseconds in response
+    
+    Returns:
+        ISO 8601 format e.g. `YYYY-MM-DDThh:mm:ss[.sss]Z`
+
+    &#34;&#34;&#34;
     iso_time = datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
     if not ms:
         return f&#39;{iso_time[:19]}Z&#39;

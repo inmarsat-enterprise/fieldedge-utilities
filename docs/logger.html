@@ -842,8 +842,8 @@ name is specified, allow every event.</p></div>
 </code></dt>
 <dd>
 <div class="desc"><p>Determine if the specified record is to be logged.</p>
-<p>Is the specified record to be logged? Returns 0 for no, nonzero for
-yes. If deemed appropriate, the record may be modified in-place.</p></div>
+<p>Returns True if the record should be logged, or False otherwise.
+If deemed appropriate, the record may be modified in-place.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -857,7 +857,7 @@ yes. If deemed appropriate, the record may be modified in-place.</p></div>
 </dd>
 <dt id="fieldedge_utilities.logger.LogFormatterOneLineException"><code class="flex name class">
 <span>class <span class="ident">LogFormatterOneLineException</span></span>
-<span>(</span><span>fmt=None, datefmt=None, style='%')</span>
+<span>(</span><span>fmt=None, datefmt=None, style='%', validate=True, *, defaults=None)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Formats exceptions into a single line stack trace.</p>

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
 <meta name="generator" content="pdoc 0.10.0" />
 <title>fieldedge_utilities.tag API documentation</title>
-<meta name="description" content="Helper functions for converting tags between PEP and JSON styles." />
+<meta name="description" content="Helper functions for converting tags between PEP and JSON styles …" />
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
 <link rel="stylesheet preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/github.min.css" crossorigin>
@@ -23,13 +23,22 @@
 </header>
 <section id="section-intro">
 <p>Helper functions for converting tags between PEP and JSON styles.</p>
+<p>Also provides a function for comparing object attributes for equivalence.</p>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">&#34;&#34;&#34;Helper functions for converting tags between PEP and JSON styles.&#34;&#34;&#34;
+<pre><code class="python">&#34;&#34;&#34;Helper functions for converting tags between PEP and JSON styles.
+
+Also provides a function for comparing object attributes for equivalence.
+
+&#34;&#34;&#34;
 import json
+import logging
 import re
+from typing import Type
+
+_log = logging.getLogger(__name__)
 
 
 def snake_to_camel(snake_str: str) -&gt; str:
@@ -130,7 +139,16 @@ def untag_property(tagged_property: str,
     return (prop, tag)
 
 
-def tag_merge(*dicts: dict):
+def tag_merge(*dicts: dict) -&gt; dict:
+    &#34;&#34;&#34;Merge multiple tagged property dictionaries.
+    
+    Args:
+        *dicts: A set of dictionaries
+    
+    Returns:
+        Merged dictionary with: `{&#39;config&#39;:[], &#39;readOnly&#39;: []}`
+
+    &#34;&#34;&#34;
     merged = { &#39;config&#39;: [], &#39;readOnly&#39;: [] }
     for d in dicts:
         if not isinstance(d, dict) or &#39;config&#39; not in d or &#39;readOnly&#39; not in d:
@@ -140,33 +158,72 @@ def tag_merge(*dicts: dict):
     return merged
 
 
-def json_compatible(obj: object, camel_keys: bool = True):
+def json_compatible(obj: object, camel_keys: bool = True) -&gt; dict:
+    &#34;&#34;&#34;Returns a dictionary compatible with `json.dumps` function.
+
+    Nested objects are converted to dictionaries.
+    
+    Args:
+        obj: The source object.
+        camel_keys: Flag indicating whether to convert all nested dictionary
+            keys to `camelCase`.
+        
+    Returns:
+        A dictionary with nested arrays, dictionaries and other compatible with
+            `json.dumps`.
+
+    &#34;&#34;&#34;
     res = obj
-    if camel_keys and isinstance(res, dict):
-        changed_keys = []
-        for key in res:
-            camel_key = snake_to_camel(key)
-            if camel_key == key:
-                continue
-            changed_keys.append(key)
-            res[camel_key] = res.get(key)
-        for old_key in changed_keys:
-            del res[old_key]
+    if camel_keys and isinstance(obj, dict):
+        res = {}
+        for k, v in obj.items():
+            camel_key = snake_to_camel(str(k))
+            res[camel_key] = v
     try:
-        json.dumps(obj)
+        json.dumps(res)
     except TypeError:
-        if isinstance(res, list):
-            _temp = []
-            for element in res:
-                _temp.append(json_compatible(element, camel_keys))
-            res = _temp
-        if hasattr(res, &#39;__dict__&#39;):
-            res = vars(res)
-        if isinstance(res, dict):
-            for k, v in res.items():
-                res[k] = json_compatible(v, camel_keys)
+        try:
+            if isinstance(res, list):
+                _temp = []
+                for element in res:
+                    _temp.append(json_compatible(element, camel_keys))
+                res = _temp
+            if hasattr(res, &#39;__dict__&#39;):
+                res = vars(res)
+            if isinstance(res, dict):
+                for k, v in res.items():
+                    res[k] = json_compatible(v, camel_keys)
+        except Exception as err:
+            _log.error(err)
     finally:
-        return res</code></pre>
+        return res
+
+
+def equivalent_attributes(reference: object,
+                          other: object,
+                          exclude: &#39;list[str]&#39; = None,
+                          ) -&gt; bool:
+    &#34;&#34;&#34;Confirms attribute equivalence between objects of the same type.
+    
+    Args:
+        reference: The reference object being compared to.
+        other: The object comparing against the reference.
+        exclude: Optional list of attribute names to exclude from comparison.
+    
+    Returns:
+        True if all (non-excluded) attribute name/values match.
+
+    &#34;&#34;&#34;
+    if type(reference) != type(other):
+        return False
+    if not hasattr(reference, &#39;__dict__&#39;) or not hasattr(other, &#39;__dict__&#39;):
+        return reference == other
+    for attr, val in vars(reference).items():
+        if exclude is not None and attr in exclude:
+            continue
+        if not hasattr(other, attr) or val != vars(other)[attr]:
+            return False
+    return True</code></pre>
 </details>
 </section>
 <section>
@@ -191,40 +248,111 @@ def json_compatible(obj: object, camel_keys: bool = True):
     return pattern.sub(&#39;_&#39;, camel_str).lower()</code></pre>
 </details>
 </dd>
-<dt id="fieldedge_utilities.tag.json_compatible"><code class="name flex">
-<span>def <span class="ident">json_compatible</span></span>(<span>obj: object, camel_keys: bool = True)</span>
+<dt id="fieldedge_utilities.tag.equivalent_attributes"><code class="name flex">
+<span>def <span class="ident">equivalent_attributes</span></span>(<span>reference: object, other: object, exclude: list[str] = None) ‑> bool</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Confirms attribute equivalence between objects of the same type.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>reference</code></strong></dt>
+<dd>The reference object being compared to.</dd>
+<dt><strong><code>other</code></strong></dt>
+<dd>The object comparing against the reference.</dd>
+<dt><strong><code>exclude</code></strong></dt>
+<dd>Optional list of attribute names to exclude from comparison.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>True if all (non-excluded) attribute name/values match.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def json_compatible(obj: object, camel_keys: bool = True):
+<pre><code class="python">def equivalent_attributes(reference: object,
+                          other: object,
+                          exclude: &#39;list[str]&#39; = None,
+                          ) -&gt; bool:
+    &#34;&#34;&#34;Confirms attribute equivalence between objects of the same type.
+    
+    Args:
+        reference: The reference object being compared to.
+        other: The object comparing against the reference.
+        exclude: Optional list of attribute names to exclude from comparison.
+    
+    Returns:
+        True if all (non-excluded) attribute name/values match.
+
+    &#34;&#34;&#34;
+    if type(reference) != type(other):
+        return False
+    if not hasattr(reference, &#39;__dict__&#39;) or not hasattr(other, &#39;__dict__&#39;):
+        return reference == other
+    for attr, val in vars(reference).items():
+        if exclude is not None and attr in exclude:
+            continue
+        if not hasattr(other, attr) or val != vars(other)[attr]:
+            return False
+    return True</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.tag.json_compatible"><code class="name flex">
+<span>def <span class="ident">json_compatible</span></span>(<span>obj: object, camel_keys: bool = True) ‑> dict</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Returns a dictionary compatible with <code>json.dumps</code> function.</p>
+<p>Nested objects are converted to dictionaries.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>obj</code></strong></dt>
+<dd>The source object.</dd>
+<dt><strong><code>camel_keys</code></strong></dt>
+<dd>Flag indicating whether to convert all nested dictionary
+keys to <code>camelCase</code>.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>A dictionary with nested arrays, dictionaries and other compatible with
+<code>json.dumps</code>.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def json_compatible(obj: object, camel_keys: bool = True) -&gt; dict:
+    &#34;&#34;&#34;Returns a dictionary compatible with `json.dumps` function.
+
+    Nested objects are converted to dictionaries.
+    
+    Args:
+        obj: The source object.
+        camel_keys: Flag indicating whether to convert all nested dictionary
+            keys to `camelCase`.
+        
+    Returns:
+        A dictionary with nested arrays, dictionaries and other compatible with
+            `json.dumps`.
+
+    &#34;&#34;&#34;
     res = obj
-    if camel_keys and isinstance(res, dict):
-        changed_keys = []
-        for key in res:
-            camel_key = snake_to_camel(key)
-            if camel_key == key:
-                continue
-            changed_keys.append(key)
-            res[camel_key] = res.get(key)
-        for old_key in changed_keys:
-            del res[old_key]
+    if camel_keys and isinstance(obj, dict):
+        res = {}
+        for k, v in obj.items():
+            camel_key = snake_to_camel(str(k))
+            res[camel_key] = v
     try:
-        json.dumps(obj)
+        json.dumps(res)
     except TypeError:
-        if isinstance(res, list):
-            _temp = []
-            for element in res:
-                _temp.append(json_compatible(element, camel_keys))
-            res = _temp
-        if hasattr(res, &#39;__dict__&#39;):
-            res = vars(res)
-        if isinstance(res, dict):
-            for k, v in res.items():
-                res[k] = json_compatible(v, camel_keys)
+        try:
+            if isinstance(res, list):
+                _temp = []
+                for element in res:
+                    _temp.append(json_compatible(element, camel_keys))
+                res = _temp
+            if hasattr(res, &#39;__dict__&#39;):
+                res = vars(res)
+            if isinstance(res, dict):
+                for k, v in res.items():
+                    res[k] = json_compatible(v, camel_keys)
+        except Exception as err:
+            _log.error(err)
     finally:
         return res</code></pre>
 </details>
@@ -325,15 +453,34 @@ values to ignore is supported.</p>
 </details>
 </dd>
 <dt id="fieldedge_utilities.tag.tag_merge"><code class="name flex">
-<span>def <span class="ident">tag_merge</span></span>(<span>*dicts: dict)</span>
+<span>def <span class="ident">tag_merge</span></span>(<span>*dicts: dict) ‑> dict</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Merge multiple tagged property dictionaries.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>*dicts</code></strong></dt>
+<dd>A set of dictionaries</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>Merged dictionary with</code></dt>
+<dd><code>{'config':[], 'readOnly': []}</code></dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def tag_merge(*dicts: dict):
+<pre><code class="python">def tag_merge(*dicts: dict) -&gt; dict:
+    &#34;&#34;&#34;Merge multiple tagged property dictionaries.
+    
+    Args:
+        *dicts: A set of dictionaries
+    
+    Returns:
+        Merged dictionary with: `{&#39;config&#39;:[], &#39;readOnly&#39;: []}`
+
+    &#34;&#34;&#34;
     merged = { &#39;config&#39;: [], &#39;readOnly&#39;: [] }
     for d in dicts:
         if not isinstance(d, dict) or &#39;config&#39; not in d or &#39;readOnly&#39; not in d:
@@ -344,7 +491,7 @@ values to ignore is supported.</p>
 </details>
 </dd>
 <dt id="fieldedge_utilities.tag.untag_property"><code class="name flex">
-<span>def <span class="ident">untag_property</span></span>(<span>tagged_property: str, tag: str = None, include_tag: bool = False) ‑> str|tuple[str, str]</span>
+<span>def <span class="ident">untag_property</span></span>(<span>tagged_property: str, tag: str = None, include_tag: bool = False) ‑> str | tuple[str, str]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Reverts a JSON-format tagged property to its PEP representation.</p>
@@ -421,6 +568,7 @@ property value in snake_case, and the tag</p></div>
 <li><h3><a href="#header-functions">Functions</a></h3>
 <ul class="">
 <li><code><a title="fieldedge_utilities.tag.camel_to_snake" href="#fieldedge_utilities.tag.camel_to_snake">camel_to_snake</a></code></li>
+<li><code><a title="fieldedge_utilities.tag.equivalent_attributes" href="#fieldedge_utilities.tag.equivalent_attributes">equivalent_attributes</a></code></li>
 <li><code><a title="fieldedge_utilities.tag.json_compatible" href="#fieldedge_utilities.tag.json_compatible">json_compatible</a></code></li>
 <li><code><a title="fieldedge_utilities.tag.snake_to_camel" href="#fieldedge_utilities.tag.snake_to_camel">snake_to_camel</a></code></li>
 <li><code><a title="fieldedge_utilities.tag.tag_class_properties" href="#fieldedge_utilities.tag.tag_class_properties">tag_class_properties</a></code></li>

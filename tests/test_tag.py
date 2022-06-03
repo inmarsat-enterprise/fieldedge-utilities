@@ -105,8 +105,8 @@ def test_tag_merge():
 
 class TestNestedObj:
     def __init__(self) -> None:
-        self.one = 1
-        self.two = ['element']
+        self.one_int = 1
+        self.two_list = ['element']
 
 
 class TestEnum(IntEnum):
@@ -116,10 +116,10 @@ class TestEnum(IntEnum):
 
 class TestObj:
     def __init__(self) -> None:
-        self.one = 1
-        self.two = TestNestedObj()
-        self.three = None
-        self.four = TestEnum.FIRST
+        self.one_int = 1
+        self.two_object = TestNestedObj()
+        self.three_none = None
+        self.four_enum = TestEnum.FIRST
 
 
 @pytest.fixture

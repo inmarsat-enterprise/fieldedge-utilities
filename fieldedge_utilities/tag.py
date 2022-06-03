@@ -148,7 +148,7 @@ def json_compatible(obj: object, camel_keys: bool = True) -> dict:
         res = {}
         for k, v in obj.items():
             camel_key = snake_to_camel(str(k))
-            res[camel_key] = v
+            res[camel_key] = json_compatible(v, camel_keys)
     try:
         json.dumps(res)
     except TypeError:
@@ -161,8 +161,7 @@ def json_compatible(obj: object, camel_keys: bool = True) -> dict:
             if hasattr(res, '__dict__'):
                 res = vars(res)
             if isinstance(res, dict):
-                for k, v in res.items():
-                    res[k] = json_compatible(v, camel_keys)
+                res = json_compatible(res, camel_keys)
         except Exception as err:
             _log.error(err)
     finally:

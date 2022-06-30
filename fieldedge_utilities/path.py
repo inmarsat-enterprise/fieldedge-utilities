@@ -21,6 +21,8 @@ def clean_path(pathname: str) -> str:
     Returns:
         A clean file/path name for the current OS and directory structure.
     """
+    if '/' not in pathname:
+        return pathname
     if pathname.startswith('$HOME/'):
         pathname = pathname.replace('$HOME', str(Path.home()))
     elif pathname.startswith('~/'):
@@ -28,7 +30,7 @@ def clean_path(pathname: str) -> str:
     if os.path.isdir(os.path.dirname(pathname)):
         return os.path.realpath(pathname)
     else:
-        raise ValueError(f'Directory {os.path.dirname(pathname)} not found')
+        raise ValueError(f'Path {pathname} not found')
 
 
 def get_caller_name(depth: int = 2,

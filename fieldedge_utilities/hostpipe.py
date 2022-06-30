@@ -35,6 +35,7 @@ RESPONSE_PREFIX = f'{TIMESTAMP_FMT},[INFO],result='
 DEFAULT_TIMEOUT = float(os.getenv('HOSTPIPE_TIMEOUT', 0.25))
 MAX_FILE_SIZE = int(os.getenv('HOSTPIPE_LOGFILE_SIZE', 2)) * 1024 * 1024
 HOSTPIPE_LOG_ITERATION_MAX = int(os.getenv('HOSTPIPE_LOG_ITERATION_MAX', 15))
+VERBOSE_DEBUG = str(os.getenv('VERBOSE_DEBUG', False)).lower() == 'true'
 
 
 def host_command(command: str,
@@ -167,14 +168,15 @@ def host_get_response(command: str,
         # test_mode assumes manual step through will usually violate timeout
         if not test_mode and time() > calltime + timeout:
             _log.warning(f'Response to {command} timed out'
-                        f' after {timeout} seconds')
+                         f' after {timeout} seconds')
             break
         filepass += 1
         if filepass > HOSTPIPE_LOG_ITERATION_MAX:
             _log.warning(f'Exceeded max={HOSTPIPE_LOG_ITERATION_MAX}'
                         ' iterations on hostpipe log')
             break
-        _log.debug(f'{pipelog} read iteration {filepass}')
+        if VERBOSE_DEBUG:
+            _log.debug(f'{pipelog} read iteration {filepass}')
         lines = open(pipelog, 'r').readlines()
         for line in reversed(lines):
             if (not test_mode and
@@ -185,9 +187,10 @@ def host_get_response(command: str,
                 break
             if ',command=' in line:
                 logged_command = line.split(',command=')[1].strip()
-                _log.debug(f'Found command {logged_command} in {pipelog}'
-                          f'({_get_line_ts(line)})'
-                          f' with {len(response)} response lines')
+                if VERBOSE_DEBUG:
+                    _log.debug(f'Found command {logged_command} in {pipelog}'
+                               f'({_get_line_ts(line)})'
+                               f' with {len(response)} response lines')
                 if logged_command != modcommand:
                     # wrong command/response so dump parsed lines so far
                     cts = _get_line_ts(line)
@@ -196,13 +199,15 @@ def host_get_response(command: str,
                         rts = _get_line_ts(resline)
                         if rts == cts:
                             to_remove.append(resline)
-                    _log.debug(f'Mismatch: {logged_command} != {modcommand}'
-                              f' -> dropping {len(to_remove)} response lines')
+                    if VERBOSE_DEBUG:
+                        _log.debug(f'Mismatch: {logged_command} != {modcommand}'
+                                   f' -> dropping {len(to_remove)} response lines')
                     response = [l for l in response if l not in to_remove]
                 else:
                     # we reached the original command so can stop parsing response
-                    _log.debug(f'Found target {modcommand}'
-                              f' with {len(response)} response lines')
+                    if VERBOSE_DEBUG:
+                        _log.debug(f'Found target {modcommand}'
+                                   f' with {len(response)} response lines')
                     response = [l[len(RESPONSE_PREFIX):] for l in response]
                     break
             elif ',result=' in line:

@@ -27,7 +27,7 @@ from dotenv import load_dotenv
 from paho.mqtt.client import Client as PahoClient
 from paho.mqtt.client import MQTTMessage as PahoMessage
 
-from fieldedge_utilities import tag
+from .property import json_compatible
 
 MQTT_HOST = os.getenv('MQTT_HOST', 'fieldedge-broker')
 MQTT_USER = os.getenv('MQTT_USER')
@@ -111,7 +111,7 @@ class MqttClient:
                 or reconnect after disconnection.
             **kwargs: includes advanced feature overrides such as:
             
-            * `unique_client_id` defaults to True, appends a timestamp to the
+            * `client_uid` defaults to True, appends a timestamp to the
             client_id to avoid being rejected by the host.
             * `bind_address` to bind to a specific IP
             * `on_connect`, `on_disconnect`, `on_log` callbacks
@@ -143,12 +143,13 @@ class MqttClient:
         self.on_connect = kwargs.get('on_connect', None)
         self.on_disconnect = kwargs.get('on_disconnect', None)
         self._qos = kwargs.get('qos', 0)
-        self._client_id = client_id
+        self._client_base_id = client_id
+        self._client_id = None
         self._client_uid = kwargs.get('client_uid', True)
         if self._host.endswith('azure-devices.net'):
             _log.debug('Using static Azure IoT Device ID as client_id')
             self._client_uid = False
-        if self._client_uid:
+        else:
             self.client_id = client_id
         self._clean_session = kwargs.get('clean_session', True)
         self._mqtt = PahoClient(clean_session=self._clean_session)
@@ -174,12 +175,9 @@ class MqttClient:
         if not self._client_uid:
             self._client_id = id
         else:
-            try:
-                if isinstance(int(id.split('_')[1]), int):
-                    # previously made unique, could be a bouncing connection
-                    id = id.split('_')[0]
-            except (ValueError, IndexError):
-                pass   #: new id will be made unique
+            if id != self._client_base_id:
+                _log.debug(f'Updating client_id {id} with new timestamp')
+                id = self._client_base_id
             self._client_id = f'{id}_{int(time())}'
 
     @property
@@ -236,7 +234,7 @@ class MqttClient:
         """Attempts to establish a connection to the broker and re-subscribe."""
         try:
             _log.debug(f'Attempting MQTT broker connection to {self._host}'
-                       f' as {self._client_id}')
+                       f' as {self.client_id}')
             self._mqtt.reinitialise(client_id=self.client_id)
             self._mqtt.user_data_set(None)
             self._mqtt.on_connect = self._mqtt_on_connect
@@ -308,7 +306,7 @@ class MqttClient:
     def _mqtt_subscribe(self, topic: str, qos: int = 0):
         """Internal subscription handler assigns id indicating *subscribed*."""
         (result, mid) = self._mqtt.subscribe(topic=topic, qos=qos)
-        _log.debug(f'{self._client_id} subscribing to {topic}'
+        _log.debug(f'{self.client_id} subscribing to {topic}'
                    f' (qos={qos}, mid={mid})')
         if result == MqttResultCode.SUCCESS:
             if mid == 0:
@@ -373,7 +371,7 @@ class MqttClient:
         self.on_message(message.topic, payload)
 
     def _mqtt_unsubscribe(self, topic: str):
-        _log.debug(f'{self._client_id} unsubscribing to {topic}')
+        _log.debug(f'{self.client_id} unsubscribing to {topic}')
         (result, mid) = self._mqtt.unsubscribe(topic)
         if result != MqttResultCode.SUCCESS:
             _log.error(f'MQTT Error {result} unsubscribing to {topic}'
@@ -438,7 +436,7 @@ class MqttClient:
                 _log.warning('Applying Azure device-to-cloud topic prefix')
                 topic = f'{device_to_cloud}{topic}'
         if isinstance(message, dict):
-            message = json.dumps(tag.json_compatible(message, camel_keys),
+            message = json.dumps(json_compatible(message, camel_keys),
                                  skipkeys=True)
         if not isinstance(qos, int) or qos not in range(0, 3):
             _log.warning(f'Invalid MQTT QoS {qos} - using QoS 1')

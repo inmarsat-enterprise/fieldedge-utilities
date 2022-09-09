@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "fieldedge-utilities"
-version = "0.13.2"
+version = "0.14.0"
 description = "Utilities package for the FieldEdge project."
 authors = ["geoffbrucepayne <geoff.bruce-payne@inmarsat.com>"]
 license = "Apache2.0"

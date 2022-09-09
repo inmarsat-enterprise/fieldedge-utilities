@@ -6,7 +6,6 @@ Also provides a function for comparing object attributes for equivalence.
 import json
 import logging
 import re
-from typing import Type
 
 _log = logging.getLogger(__name__)
 

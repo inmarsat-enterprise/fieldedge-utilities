@@ -4,10 +4,12 @@
 import json
 import logging
 import os
+import re
 from time import time
 
+from .logger import verbose_logging
+
 PROPERTY_CACHE_DEFAULT = int(os.getenv('PROPERTY_CACHE_DEFAULT', 5))
-VERBOSE_DEBUG = str(os.getenv('VERBOSE_DEBUG', False)).lower() == 'true'
 
 _log = logging.getLogger(__name__)
 
@@ -48,14 +50,14 @@ def cache_valid(ref_time: int,
 
     """
     if not isinstance(ref_time, int):
-        if VERBOSE_DEBUG:
+        if _vlog():
             _log.debug(f'No cached timestamp for {tag}')
         return False
     cache_age = int(time()) - ref_time
     if cache_age > max_age:
-        if VERBOSE_DEBUG:
+        if _vlog():
             _log.debug(f'Cached {tag} only {cache_age} seconds old'
-                        f' (cache = {max_age}s)')
+                       f' (cache = {max_age}s)')
         return False
     _log.debug(f'Using cached {tag} ({cache_age} seconds)')
     return True
@@ -255,3 +257,7 @@ def equivalent_attributes(reference: object,
         if not hasattr(other, attr) or val != vars(other)[attr]:
             return False
     return True
+
+
+def _vlog() -> bool:
+    return verbose_logging('property')

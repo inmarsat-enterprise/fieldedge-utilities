@@ -5,6 +5,8 @@ import logging
 import threading
 from time import time
 
+from .logger import verbose_logging
+
 _log = logging.getLogger(__name__)
 
 
@@ -36,7 +38,6 @@ class RepeatingTimer(threading.Thread):
                  auto_start: bool = False,
                  defer: bool = True,
                  daemon: bool = True,
-                 verbose_debug: bool = False,
                  ):
         """Sets up a RepeatingTimer thread.
 
@@ -51,7 +52,6 @@ class RepeatingTimer(threading.Thread):
             auto_start: Starts the thread and timer when created.
             defer: Set if first target waits for timer expiry.
             daemon: Set if thread is a daemon (default)
-            verbose_debug: verbose logging of tick count
 
         Raises:
             ValueError if seconds is not an integer.
@@ -70,7 +70,6 @@ class RepeatingTimer(threading.Thread):
         self.kwargs = kwargs
         self.sleep_chunk = sleep_chunk
         self._defer = defer
-        self._verbose_debug = verbose_debug
         self._terminate_event = threading.Event()
         self._start_event = threading.Event()
         self._reset_event = threading.Event()
@@ -117,7 +116,7 @@ class RepeatingTimer(threading.Thread):
             while (self._count > 0
                    and self._start_event.is_set()
                    and self.interval > 0):
-                if self._verbose_debug:
+                if _vlog():
                     if (self._count * self.sleep_chunk
                         - int(self._count * self.sleep_chunk)
                         == 0.0):
@@ -201,3 +200,7 @@ class RepeatingTimer(threading.Thread):
         if self._exception:
             raise self._exception
         return self.target
+
+
+def _vlog() -> bool:
+    return verbose_logging('timer')

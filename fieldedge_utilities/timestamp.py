@@ -5,14 +5,14 @@ from datetime import datetime, timezone
 
 
 def ts_to_iso(timestamp: 'float|int', ms: bool = False) -> str:
-    """Converts a unix timestamp (UTC) to ISO 8601 format.
+    """Converts a unix timestamp to ISO 8601 format (UTC).
     
     Args:
-        timestamp: A unix timestamp in UTC timezone.
+        timestamp: A unix timestamp.
         ms: Flag indicating whether to include milliseconds in response
     
     Returns:
-        ISO 8601 format e.g. `YYYY-MM-DDThh:mm:ss[.sss]Z`
+        ISO 8601 UTC format e.g. `YYYY-MM-DDThh:mm:ss[.sss]Z`
 
     """
     iso_time = datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()

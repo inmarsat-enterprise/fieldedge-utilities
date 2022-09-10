@@ -28,6 +28,7 @@ from paho.mqtt.client import Client as PahoClient
 from paho.mqtt.client import MQTTMessage as PahoMessage
 
 from .property import json_compatible
+from .logger import verbose_logging
 
 MQTT_HOST = os.getenv('MQTT_HOST', 'fieldedge-broker')
 MQTT_USER = os.getenv('MQTT_USER')
@@ -147,7 +148,7 @@ class MqttClient:
         self._client_id = None
         self._client_uid = kwargs.get('client_uid', True)
         if self._host.endswith('azure-devices.net'):
-            _log.debug('Using static Azure IoT Device ID as client_id')
+            _log.debug('Assuming client_id is the Azure IoT Device ID')
             self._client_uid = False
         else:
             self.client_id = client_id
@@ -176,7 +177,8 @@ class MqttClient:
             self._client_id = id
         else:
             if id != self._client_base_id:
-                _log.debug(f'Updating client_id {id} with new timestamp')
+                if verbose_logging('mqtt'):
+                    _log.debug(f'Updating client_id {id} with new timestamp')
                 id = self._client_base_id
             self._client_id = f'{id}_{int(time())}'
 
@@ -223,9 +225,10 @@ class MqttClient:
 
     def _cleanup(self, *args):
         # TODO: logging raises an error since the log file was closed
-        # for arg in args:
-        #     _log.debug(f'mqtt cleanup called with arg = {arg}')
-        # _log.debug('Terminating MQTT connection')
+        # if _vlog():
+        #     for arg in args:
+        #         _log.debug(f'mqtt cleanup called with arg = {arg}')
+        #     _log.debug('Terminating MQTT connection')
         self._mqtt.user_data_set('terminate')
         self._mqtt.loop_stop()
         self._mqtt.disconnect()
@@ -233,8 +236,9 @@ class MqttClient:
     def connect(self):
         """Attempts to establish a connection to the broker and re-subscribe."""
         try:
-            _log.debug(f'Attempting MQTT broker connection to {self._host}'
-                       f' as {self.client_id}')
+            if _vlog():
+                _log.debug(f'Attempting MQTT broker connection to {self._host}'
+                           f' as {self.client_id}')
             self._mqtt.reinitialise(client_id=self.client_id)
             self._mqtt.user_data_set(None)
             self._mqtt.on_connect = self._mqtt_on_connect
@@ -264,7 +268,8 @@ class MqttClient:
                         number += 1
                         name = f'MqttThread-{number}'
                     continue
-                _log.debug(f'Naming new MQTT client thread: {name}')
+                if _vlog():
+                    _log.debug(f'Naming new MQTT client thread: {name}')
                 thread.name = name
                 break
         except (ConnectionError, timeout, TimeoutError) as err:
@@ -292,7 +297,8 @@ class MqttClient:
         """Internal callback re-subscribes on (re)connection."""
         self._failed_connect_attempts = 0
         if rc == MqttResultCode.SUCCESS:
-            _log.debug(f'Established MQTT connection to {self._host}')
+            if _vlog():
+                _log.debug(f'Established MQTT connection to {self._host}')
             if not self.is_connected:
                 for sub in self.subscriptions:
                     self._mqtt_subscribe(sub, self.subscriptions[sub]['qos'])
@@ -306,8 +312,9 @@ class MqttClient:
     def _mqtt_subscribe(self, topic: str, qos: int = 0):
         """Internal subscription handler assigns id indicating *subscribed*."""
         (result, mid) = self._mqtt.subscribe(topic=topic, qos=qos)
-        _log.debug(f'{self.client_id} subscribing to {topic}'
-                   f' (qos={qos}, mid={mid})')
+        if _vlog():
+            _log.debug(f'{self.client_id} subscribing to {topic}'
+                       f' (qos={qos}, mid={mid})')
         if result == MqttResultCode.SUCCESS:
             if mid == 0:
                 _log.warning(f'Received mid={mid} expected > 0')
@@ -326,7 +333,8 @@ class MqttClient:
             qos (int): The MQTT qos 0..2
 
         """
-        _log.debug(f'Adding subscription {topic} (qos={qos})')
+        if _vlog():
+            _log.debug(f'Adding subscription {topic} (qos={qos})')
         self._subscriptions[topic] = {'qos': qos, 'mid': 0}
         if self.is_connected:
             self._mqtt_subscribe(topic, qos)
@@ -363,15 +371,18 @@ class MqttClient:
         try:
             payload = json.loads(payload)
         except json.JSONDecodeError as e:
-            _log.debug(f'MQTT message payload non-JSON ({e})')
-        _log.debug(f'MQTT received message "{payload}"'
-                   f' on topic "{message.topic}" with QoS {message.qos}')
-        if userdata:
-            _log.debug(f'MQTT client userdata: {userdata}')
+            if _vlog():
+                _log.debug(f'MQTT message payload non-JSON ({e})')
+        if _vlog():
+            _log.debug(f'MQTT received message "{payload}"'
+                       f' on topic "{message.topic}" with QoS {message.qos}')
+            if userdata:
+                _log.debug(f'MQTT client userdata: {userdata}')
         self.on_message(message.topic, payload)
 
     def _mqtt_unsubscribe(self, topic: str):
-        _log.debug(f'{self.client_id} unsubscribing to {topic}')
+        if _vlog():
+            _log.debug(f'{self.client_id} unsubscribing to {topic}')
         (result, mid) = self._mqtt.unsubscribe(topic)
         if result != MqttResultCode.SUCCESS:
             _log.error(f'MQTT Error {result} unsubscribing to {topic}'
@@ -384,7 +395,8 @@ class MqttClient:
             topic (str): The MQTT topic to unsubscribe
 
         """
-        _log.debug(f'Removing subscription {topic}')
+        if _vlog():
+            _log.debug(f'Removing subscription {topic}')
         if topic in self._subscriptions:
             del self._subscriptions[topic]
         if self.is_connected:
@@ -442,9 +454,14 @@ class MqttClient:
             _log.warning(f'Invalid MQTT QoS {qos} - using QoS 1')
             qos = 1
         (rc, mid) = self._mqtt.publish(topic=topic, payload=message, qos=qos)
-        _log.debug(f'MQTT published (mid={mid}) {topic} {message}')
+        if _vlog():
+            _log.debug(f'MQTT published (mid={mid}) {topic} {message}')
         if rc != MqttResultCode.SUCCESS:
             errmsg = f'Publishing error {rc} ({_get_mqtt_result(rc)})'
             _log.error(errmsg)
             return False
         return True
+
+
+def _vlog() -> bool:
+    return verbose_logging('mqtt')

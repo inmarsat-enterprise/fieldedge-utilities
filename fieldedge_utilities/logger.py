@@ -41,6 +41,7 @@ FORMAT_JSON = ('{'
                 ',"message":"%(message)s"'
                 '}')
 DATEFMT = '%Y-%m-%dT%H:%M:%S'
+LOG_VERBOSE = os.getenv('LOG_VERBOSE')
 
 
 class LogFilterLessThan(logging.Filter):
@@ -312,3 +313,23 @@ def get_fieldedge_logger(filename: str = None,
     apply_formatter(logger, get_formatter(format))
     logger.setLevel(log_level)
     return logger
+
+
+def verbose_logging(filter: 'str' = '') -> bool:
+    """Indicates if verbose logging is configured, with an optional filter.
+    
+    Args:
+        filter: An optional filter e.g. the package+module name
+    
+    Returns:
+        True if `LOG_VERBOSE` environment variable is set
+            and includes the filter.
+            
+    """
+    if LOG_VERBOSE:
+        if filter:
+            if filter in LOG_VERBOSE:
+                return True
+            return False
+        return True
+    return False

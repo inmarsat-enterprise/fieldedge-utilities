@@ -11,16 +11,18 @@ References environment variables:
 
 * `HOST_USER` (default: fieldedge)
 * `TIMESTAMP_FMT` str (default: YYYY-mm-ddTHH:MM:SS.NNNZ)
-* `DEFAULT_TIMEOUT` float (default: 0.25)
+* `HOSTPIPE_TIMEOUT` float (default: 0.25)
 * `MAX_FILE_SIZE` int MegaBytes (default 2)
 
 """
 import logging
 import os
 from datetime import datetime
-from logging import DEBUG, Logger
+from logging import DEBUG
 from subprocess import TimeoutExpired, run
 from time import sleep, time
+
+from .logger import verbose_logging
 
 _log = logging.getLogger(__name__)
 
@@ -32,15 +34,14 @@ TIMESTAMP_FMT = os.getenv('HOSTPIPE_TS_FMT', 'YYYY-mm-ddTHH:MM:SS.SSSZ')
 COMMAND_PREFIX = f'{TIMESTAMP_FMT},[INFO],command='
 RESPONSE_PREFIX = f'{TIMESTAMP_FMT},[INFO],result='
 
-DEFAULT_TIMEOUT = float(os.getenv('HOSTPIPE_TIMEOUT', 0.25))
+HOSTPIPE_TIMEOUT = float(os.getenv('HOSTPIPE_TIMEOUT', 0.25))
 MAX_FILE_SIZE = int(os.getenv('HOSTPIPE_LOGFILE_SIZE', 2)) * 1024 * 1024
 HOSTPIPE_LOG_ITERATION_MAX = int(os.getenv('HOSTPIPE_LOG_ITERATION_MAX', 15))
-VERBOSE_DEBUG = str(os.getenv('VERBOSE_DEBUG', False)).lower() == 'true'
 
 
 def host_command(command: str,
                  noresponse: bool = False,
-                 timeout: float = DEFAULT_TIMEOUT,
+                 timeout: float = HOSTPIPE_TIMEOUT,
                  pipelog: str = None,
                  test_mode: bool = False,
                  ) -> str:
@@ -50,6 +51,8 @@ def host_command(command: str,
     script is in place to echo command and response into a log.
     Care should be taken to ensure the timeout is sufficient for the response,
     and the calling function must handle an empty string response.
+    
+    `HOSTPIPE_TIMEOUT` is 0.25 seconds by default, configurable via environment.
 
     Args:
         command: The command to be executed on the host.
@@ -139,10 +142,12 @@ def _get_line_ts(line: str) -> float:
 def host_get_response(command: str,
                       command_time: float = None,
                       pipelog: str = None,
-                      timeout: float = DEFAULT_TIMEOUT,
+                      timeout: float = HOSTPIPE_TIMEOUT,
                       test_mode: bool = False,
                       ) -> str:
     """Retrieves the response to the command from the host pipe _log.
+    
+    `HOSTPIPE_TIMEOUT` is 0.25 seconds by default, configurable via environment.
     
     Args:
         command: The host command sent previously.
@@ -172,10 +177,10 @@ def host_get_response(command: str,
             break
         filepass += 1
         if filepass > HOSTPIPE_LOG_ITERATION_MAX:
-            _log.warning(f'Exceeded max={HOSTPIPE_LOG_ITERATION_MAX}'
-                        ' iterations on hostpipe log')
+            _log.warning(f'Exceeded max={HOSTPIPE_LOG_ITERATION_MAX} iterations'
+                         ' on hostpipe log')
             break
-        if VERBOSE_DEBUG:
+        if _vlog():
             _log.debug(f'{pipelog} read iteration {filepass}')
         lines = open(pipelog, 'r').readlines()
         for line in reversed(lines):
@@ -187,7 +192,7 @@ def host_get_response(command: str,
                 break
             if ',command=' in line:
                 logged_command = line.split(',command=')[1].strip()
-                if VERBOSE_DEBUG:
+                if _vlog():
                     _log.debug(f'Found command {logged_command} in {pipelog}'
                                f'({_get_line_ts(line)})'
                                f' with {len(response)} response lines')
@@ -199,13 +204,13 @@ def host_get_response(command: str,
                         rts = _get_line_ts(resline)
                         if rts == cts:
                             to_remove.append(resline)
-                    if VERBOSE_DEBUG:
+                    if _vlog():
                         _log.debug(f'Mismatch: {logged_command} != {modcommand}'
-                                   f' -> dropping {len(to_remove)} response lines')
+                                   f' -> drop {len(to_remove)} response lines')
                     response = [l for l in response if l not in to_remove]
                 else:
                     # we reached the original command so can stop parsing response
-                    if VERBOSE_DEBUG:
+                    if _vlog():
                         _log.debug(f'Found target {modcommand}'
                                    f' with {len(response)} response lines')
                     response = [l[len(RESPONSE_PREFIX):] for l in response]
@@ -251,3 +256,7 @@ def _maintain_pipelog(pipelog: str,
             with open(pipelog, 'w') as f:
                 f.writelines(lines)
     return len(to_delete)
+
+
+def _vlog() -> bool:
+    return verbose_logging('hostpipe')

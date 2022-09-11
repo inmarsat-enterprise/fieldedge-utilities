@@ -74,7 +74,7 @@ class RepeatingTimer(threading.Thread):
         self._start_event = threading.Event()
         self._reset_event = threading.Event()
         self._count = self.interval / self.sleep_chunk
-        self._timesync = time()
+        self._timesync: int = None
         self.max_drift = max_drift
         if auto_start:
             self.start()
@@ -100,7 +100,7 @@ class RepeatingTimer(threading.Thread):
         NOTE: Untested.
         """
         if max_drift is not None:
-            drift = time() - self._timesync % self.interval
+            drift = (int(time()) - self._timesync) % self.interval
             max_drift = 0 if max_drift < 1 else max_drift
             if drift > max_drift:
                 _log.warning(f'Detected drift of {drift}s')
@@ -140,7 +140,7 @@ class RepeatingTimer(threading.Thread):
 
     def start_timer(self):
         """Initially start the repeating timer."""
-        self._timesync = time()
+        self._timesync = int(time())
         if not self._defer and self.interval > 0:
             self.target(*self.args, **self.kwargs)
         self._start_event.set()

@@ -4,9 +4,11 @@ from fieldedge_utilities import timer
 
 call_count = 0
 
+
 def trigger_function(arg = None, kwarg = None):
     global call_count
     call_count += 1
+
 
 def test_timer_basic():
     global call_count
@@ -64,6 +66,21 @@ def test_change_interval():
     end_time = time()
     run_time = int(end_time - start_time)
     assert run_time == initial_interval + new_interval * test_cycles
+
+
+def sim_delay(delay: int = 3):
+    global call_count
+    sleep(delay)
+    call_count += 1
+
+
+def test_drift():
+    t = timer.RepeatingTimer(seconds=10, target=sim_delay, max_drift=0)
+    t.start()
+    t.start_timer()
+    while call_count < 3:
+        pass
+
 
 # def test_start_timer_previously_started():
 #     pass

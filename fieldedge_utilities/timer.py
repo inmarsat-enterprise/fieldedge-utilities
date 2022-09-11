@@ -75,6 +75,7 @@ class RepeatingTimer(threading.Thread):
         self._reset_event = threading.Event()
         self._count = self.interval / self.sleep_chunk
         self._timesync: int = None
+        self._max_drift = None
         self.max_drift = max_drift
         if auto_start:
             self.start()
@@ -94,16 +95,22 @@ class RepeatingTimer(threading.Thread):
     def is_running(self) -> bool:
         return self._start_event.is_set()
 
-    def _resync(self, max_drift: int = None) -> int:
-        """Used to adjust the next countdown to account for drift.
+    @property
+    def max_drift(self) -> 'int|None':
+        return self._max_drift
+    
+    @max_drift.setter
+    def max_drift(self, val: 'int|None'):
+        if val is not None or not isinstance(val, int) or val < 0:
+            raise ValueError('max_drift must be None or an integer >= 0')
+        self._max_drift = val
         
-        NOTE: Untested.
-        """
-        if max_drift is not None:
+    def _resync(self) -> int:
+        """Used to adjust the next countdown to account for drift."""
+        if self.max_drift is not None:
             drift = (int(time()) - self._timesync) % self.interval
-            max_drift = 0 if max_drift < 1 else max_drift
-            if drift > max_drift:
-                _log.warning(f'Detected drift of {drift}s')
+            if drift > self.max_drift:
+                _log.debug(f'Compensating for drift of {drift}s')
                 return drift
         return 0
 
@@ -119,7 +126,7 @@ class RepeatingTimer(threading.Thread):
                 if _vlog():
                     if (self._count * self.sleep_chunk
                         - int(self._count * self.sleep_chunk)
-                        == 0.0):
+                        <= 0.0):
                         #: log debug message at reasonable interval
                         _log.debug(f'{self.name} countdown:'
                                    f' {self._count}'
@@ -130,10 +137,9 @@ class RepeatingTimer(threading.Thread):
                     self._count = self.interval / self.sleep_chunk
                 self._count -= 1
                 if self._count <= 0:
-                    try:
+                    try:   # countdown expired, trigger function and restart
                         self.target(*self.args, **self.kwargs)
-                        drift_adjust = (self.interval
-                                        - self._resync(self.max_drift))
+                        drift_adjust = self.interval - self._resync()
                         self._count = drift_adjust / self.sleep_chunk
                     except BaseException as e:
                         self._exception = e

@@ -2,7 +2,7 @@ import json
 import pytest
 from enum import IntEnum
 
-from fieldedge_utilities import tag
+from fieldedge_utilities.property import *
 
 
 class TestTag:
@@ -49,54 +49,55 @@ class TestTagToo:
 def test_camel_to_snake():
     camel = 'thisIsCamelCase'
     snake = 'this_is_camel_case'
-    assert tag.camel_to_snake(camel) == snake
-    assert tag.camel_to_snake(snake) == snake
+    assert camel_to_snake(camel) == snake
+    assert camel_to_snake(snake) == snake
 
 
 def test_snake_to_camel():
     snake = 'this_is_snake_case'
     camel = 'thisIsSnakeCase'
-    assert tag.snake_to_camel(snake) == camel
-    assert tag.snake_to_camel(camel) == camel
+    assert snake_to_camel(snake) == camel
+    assert snake_to_camel(camel) == camel
 
 
 def test_tag_class_properties():
     test_tag = 'test'
-    tagged_props = tag.tag_class_properties(TestTag, test_tag)
+    tagged_props = tag_class_properties(TestTag, test_tag)
     assert 'config' in tagged_props
     assert isinstance(tagged_props['config'], list)
     assert len(tagged_props['config']) == 1
     for item in tagged_props['config']:
         assert isinstance(item, str)
         assert item.startswith(test_tag)
-        assert hasattr(TestTag, tag.camel_to_snake(item.replace(test_tag, '')))
+        assert hasattr(TestTag, camel_to_snake(item.replace(test_tag, '')))
     assert 'readOnly' in tagged_props
     assert isinstance(tagged_props['readOnly'], list)
     assert len(tagged_props['readOnly']) == 1
     for item in tagged_props['readOnly']:
         assert isinstance(item, str)
         assert item.startswith(test_tag)
-        assert hasattr(TestTag, tag.camel_to_snake(item.replace(test_tag, '')))
+        assert hasattr(TestTag, camel_to_snake(item.replace(test_tag, '')))
 
 
 def test_untag():
     test_tag = 'test'
-    tagged_props = tag.tag_class_properties(TestTag, test_tag)
+    tagged_props = tag_class_properties(TestTag, test_tag)
     for key, value in tagged_props.items():
         for item in value:
-            orig_prop, extracted_tag = tag.untag_property(item, True)
+            orig_prop, extracted_tag = untag_class_property(item,
+                                                            include_tag=True)
             assert hasattr(TestTag, orig_prop)
             assert extracted_tag == test_tag
-            orig_prop_alone = tag.untag_property(item)
+            orig_prop_alone = untag_class_property(item)
             assert hasattr(TestTag, orig_prop_alone)
 
 
 def test_tag_merge():
     test_tag1 = 'test_one'
     test_tag2 = 'test_too'
-    tagged1 = tag.tag_class_properties(TestTag, test_tag1)
-    tagged2 = tag.tag_class_properties(TestTagToo, test_tag2)
-    merged = tag.tag_merge(tagged1, tagged2)
+    tagged1 = tag_class_properties(TestTag, test_tag1)
+    tagged2 = tag_class_properties(TestTagToo, test_tag2)
+    merged = tag_merge(tagged1, tagged2)
     assert 'config' in merged
     assert len(merged['config']) == 2
     assert 'readOnly' in merged
@@ -128,16 +129,16 @@ def test_obj():
 
 
 def test_json_compatible(test_obj):
-    jsonable = tag.json_compatible(test_obj)
+    jsonable = json_compatible(test_obj)
     assert isinstance(json.dumps(jsonable), str)
     wrapped = { 'key': test_obj }
-    jsonable = tag.json_compatible(wrapped)
+    jsonable = json_compatible(wrapped)
     assert isinstance(json.dumps(jsonable), str)
     with_list = { 'key': [test_obj] }
-    jsonable = tag.json_compatible(with_list)
+    jsonable = json_compatible(with_list)
     assert isinstance(json.dumps(jsonable), str)
     with_complex = { 'key': [{ 'nkey': [test_obj] }] }
-    jsonable = tag.json_compatible(with_complex)
+    jsonable = json_compatible(with_complex)
     assert isinstance(json.dumps(jsonable), str)
     specific = {
         'properties': {
@@ -185,7 +186,7 @@ def test_json_compatible(test_obj):
         'uid': None,
         'ts': 1653964306656
     }
-    jsonable = tag.json_compatible(specific)
+    jsonable = json_compatible(specific)
     assert isinstance(json.dumps(jsonable), str)
 
 
@@ -214,13 +215,13 @@ class PdpContextEquivalent:
         self.ip_address: str = kwargs.get('ip_address', None)
     
     def __eq__(self, __o: object) -> bool:
-        return tag.equivalent_attributes(self, __o)
+        return equivalent_attributes(self, __o)
 
 
 def test_pdp():
     pdp = PdpContext(id=1, service='IP', apn='www.inmarsat.com', ip_address='1.2.3.4')
     thing = {'imsi': '123', 'previous': {1: pdp}}
-    jsonable = tag.json_compatible(thing)
+    jsonable = json_compatible(thing)
     assert isinstance(json.dumps(jsonable), str)
 
 
@@ -228,7 +229,7 @@ def test_obj_eq():
     pdp_1 = PdpContext(id=1, service='IP', apn='www.apn.com', ip_address='1.2.3.4')
     pdp_2 = PdpContext(id=1, service='IP', apn='www.apn.com', ip_address='1.2.3.4')
     assert pdp_1 != pdp_2
-    assert tag.equivalent_attributes(pdp_1, pdp_2)
+    assert equivalent_attributes(pdp_1, pdp_2)
     pdp_3 = PdpContextEquivalent(id=1, service='IP', apn='www.apn.com', ip_address='1.2.3.4')
     pdp_4 = PdpContextEquivalent(id=1, service='IP', apn='www.apn.com', ip_address='1.2.3.4')
     assert pdp_3 == pdp_4

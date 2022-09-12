@@ -1,3 +1,4 @@
+import logging
 from time import sleep, time
 
 from fieldedge_utilities import timer
@@ -28,7 +29,7 @@ def test_timer_basic():
                              auto_start=auto_start,
                              defer=defer,
                              daemon=daemon,
-                             verbose_debug=False)
+                             )
     if not auto_start:
         t.start()
         t.start_timer()
@@ -70,16 +71,26 @@ def test_change_interval():
 
 def sim_delay(delay: int = 3):
     global call_count
+    log = logging.getLogger()
+    log.info('Delay called')
     sleep(delay)
+    log.info('Delay complete')
     call_count += 1
 
 
-def test_drift():
-    t = timer.RepeatingTimer(seconds=10, target=sim_delay, max_drift=0)
+def test_drift(caplog):
+    t = timer.RepeatingTimer(seconds=5,
+                             target=sim_delay,
+                             args=(0,),
+                             defer=False,
+                             max_drift=0)
     t.start()
     t.start_timer()
-    while call_count < 3:
+    while call_count < 5:
         pass
+    # for record in caplog.records:
+    #     if record.levelname == 'DEBUG':
+    #         assert 'Compensating' in record.message
 
 
 # def test_start_timer_previously_started():

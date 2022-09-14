@@ -2,7 +2,7 @@ import json
 import pytest
 from enum import IntEnum
 
-from fieldedge_utilities.property import *
+from fieldedge_utilities.classes import *
 
 
 class TestTag:

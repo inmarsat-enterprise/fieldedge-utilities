@@ -1,4 +1,9 @@
+import logging
+import pytest
+
 from fieldedge_utilities.entity import *
+
+_log = logging.getLogger()
 
 
 class EntitySubclass(FieldEdgeEntity):
@@ -24,7 +29,21 @@ class EntitySubclass(FieldEdgeEntity):
         print(f'{kwargs}')
 
 
+@pytest.fixture
 def test_entity():
-    entity = EntitySubclass(tag_name='test')
+    return EntitySubclass(tag_name='test')
+
+
+def test_entity_subclassing(test_entity):
+    entity: EntitySubclass = test_entity
+    _log.info(f'Properties: {entity.properties}')
     assert isinstance(entity, FieldEdgeEntity)
     assert isinstance(entity, EntitySubclass)
+
+
+def test_property_cache(test_entity):
+    entity: EntitySubclass = test_entity
+    assert entity.property_cache == {}
+    entity.cache_update('visible_prop')
+    assert entity.cache_valid('visible_prop')
+    

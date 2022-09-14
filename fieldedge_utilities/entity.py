@@ -16,6 +16,7 @@ class FieldEdgeEntity(object):
     PROPERTY_CACHE_DEFAULT = int(os.getenv('PROPERTY_CACHE_DEFAULT', 5))
     
     def __init__(self, tag_name: str) -> None:
+        raise NotImplementedError
         if not tag_name:
             raise ValueError('Missing tag_name')
         self.tag_name: str = tag_name
@@ -29,11 +30,13 @@ class FieldEdgeEntity(object):
         """"""
         if not dir(self):
             raise ValueError(f'Invalid Type - must have dir method')
-        ignore_startswith = ('_', 'properties', 'property_cache')
+        ignore_startswith = ('_', 'properties', 'property_cache',
+                             'cache_update', 'cache_valid',
+                             'merge_exposed_properties')
         props = {}
         props_list = [a for a in dir(self)
-                    if not a.startswith(ignore_startswith) and
-                    not callable(getattr(self, a))]
+                      if not a.startswith(ignore_startswith) and
+                      not callable(getattr(self, a))]
         for prop in props_list:
             props[prop] = getattr(self, prop)
         return props
@@ -63,19 +66,26 @@ class FieldEdgeEntity(object):
     
     @property
     def exposed_properties(self) -> dict:
-        if not self._exposed_properties:
-            self._exposed_properties = self._expose_properties()
         return self._exposed_properties
     
-    def _expose_properties(self,
-                           tag: str = None,
-                           ignore: 'list[str]' = [],
-                           json: bool = False,
-                           ) -> dict:
+    def expose_properties(self,
+                          tag: str = None,
+                          ignore: 'list[str]' = [],
+                          json: bool = False,
+                          ) -> dict:
         """Gets a dictionary of properties exposed for MQTT-ISC interaction.
         
         Properties are grouped by entity `tag_name` then by `config` or
         `read_only`.
+        
+        Args:
+            tag: the tag prefix to use
+                e.g. modem location becomes `modemLocation`
+            ignore: any properties to explicitly ignore
+            json: if set, will camelCase all dictionary keys
+        
+        Returns:
+            A dictionary of tagged and grouped properties
         
         """
         rw = []
@@ -100,7 +110,7 @@ class FieldEdgeEntity(object):
             return json_compatible(tagged, True)
         return tagged
     
-    def merge_exposed_properties(self, tagged_properties: dict) -> None:
+    def extend_exposed_properties(self, tagged_properties: dict) -> dict:
         """Merges another FieldEdge set of tagged properties with this entity.
         
         Args:

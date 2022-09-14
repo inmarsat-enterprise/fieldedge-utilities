@@ -27,7 +27,7 @@ from dotenv import load_dotenv
 from paho.mqtt.client import Client as PahoClient
 from paho.mqtt.client import MQTTMessage as PahoMessage
 
-from .property import json_compatible
+from .classes import json_compatible
 from .logger import verbose_logging
 
 MQTT_HOST = os.getenv('MQTT_HOST', 'fieldedge-broker')
@@ -148,10 +148,9 @@ class MqttClient:
         self._client_id = None
         self._client_uid = kwargs.get('client_uid', True)
         if self._host.endswith('azure-devices.net'):
-            _log.debug('Assuming client_id is the Azure IoT Device ID')
+            _log.debug(f'Assuming {client_id} is the Azure IoT Device ID')
             self._client_uid = False
-        else:
-            self.client_id = client_id
+        self.client_id = client_id
         self._clean_session = kwargs.get('clean_session', True)
         self._mqtt = PahoClient(clean_session=self._clean_session)
         self.is_connected = False

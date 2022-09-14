@@ -27,7 +27,7 @@ from dotenv import load_dotenv
 from paho.mqtt.client import Client as PahoClient
 from paho.mqtt.client import MQTTMessage as PahoMessage
 
-from .classes import json_compatible
+from .class_properties import json_compatible
 from .logger import verbose_logging
 
 MQTT_HOST = os.getenv('MQTT_HOST', 'fieldedge-broker')
@@ -422,7 +422,7 @@ class MqttClient:
                 topic: str,
                 message: 'str|dict|None',
                 qos: int = 1,
-                camel_keys: bool = True,
+                camel_keys: bool = False,
                 ) -> bool:
         """Publishes a message to a MQTT topic.
 

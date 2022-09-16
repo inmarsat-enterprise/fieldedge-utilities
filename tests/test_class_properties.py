@@ -5,6 +5,47 @@ from enum import IntEnum
 from fieldedge_utilities.class_properties import *
 
 
+class BganBaseAttribute:
+    """Generic base attribute for BGAN modems."""
+    def __eq__(self, __o: object) -> bool:
+        return equivalent_attributes(self, __o)
+
+
+class Location(BganBaseAttribute):
+    """The modem's location derived from internal GNSS.
+    
+    Attributes:
+        timestamp (int): The unix timestamp of the fix.
+        latitude (float): Latitude in decimal degrees, signed (+ North).
+        longitude (float): Longiutde in decimal degrees, signed (+ East).
+        altitude (float): Height above sea level in meters.
+        speed (float): Speed in knots
+        heading (float): Course over ground, degrees from true North.
+        gnss_satellites (int): Number of satellites used for the fix.
+        pdop (int): Probability Dilution of Precision
+        hdop (int): Horizontal Dilution of Precision
+        vdop (int): Vertical Dilution of Precision
+        fix_type (str): The fix type e.g. 2D, 3D
+        fix_allowed (str): The fix allowed status
+        fix_time (str): ISO UTC time of the fix
+
+    """
+    def __init__(self, **kwargs) -> None:
+        self.timestamp: int = kwargs.get('timestamp', None)
+        self.latitude: float = kwargs.get('latitude', None)
+        self.longitude: float = kwargs.get('longitude', None)
+        self.altitude: float = kwargs.get('altitude', None)
+        self.speed: float = kwargs.get('speed', None)
+        self.heading: float = kwargs.get('heading', None)
+        self.gnss_satellites: int = kwargs.get('gnss_satellites', None)
+        self.pdop: int = kwargs.get('pdop', None)
+        self.hdop: int = kwargs.get('hdop', None)
+        self.vdop: int = kwargs.get('vdop', None)
+        self.fix_type: str = kwargs.get('fix_type', None)
+        self.fix_allowed: str = kwargs.get('fix_allowed', None)
+        self.fix_time: str = kwargs.get('')
+
+
 class TestTag:
     def __init__(self) -> None:
         self._prop_config_one = 1
@@ -233,3 +274,10 @@ def test_obj_eq():
     pdp_3 = PdpContextEquivalent(id=1, service='IP', apn='www.apn.com', ip_address='1.2.3.4')
     pdp_4 = PdpContextEquivalent(id=1, service='IP', apn='www.apn.com', ip_address='1.2.3.4')
     assert pdp_3 == pdp_4
+
+
+def test_bgan_location():
+    location = Location()
+    jsonable = json_compatible(location)
+    assert isinstance(json.dumps(jsonable), str)
+    

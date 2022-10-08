@@ -271,20 +271,17 @@ class MqttClient:
                         number += 1
                         name = f'{basename}-{number}'
                     continue
-                if _vlog():
-                    _log.debug(f'Naming new MQTT client thread: {name}')
+                _log.debug(f'Naming new MQTT client thread: {name}')
                 thread.name = name
                 break
         except (ConnectionError, timeout, TimeoutError) as err:
             self._failed_connect_attempts += 1
+            _log.warning(f'Failed to connect to {self._host} ({err})'
+                         f'(attempt {self._failed_connect_attempts})')
             if self.connect_retry_interval > 0:
-                _log.warning(f'Unable to connect to {self._host} ({err})'
-                             f' - retrying in {self.connect_retry_interval} s')
+                _log.debug(f'Retrying in {self.connect_retry_interval} s')
                 sleep(self.connect_retry_interval)
                 self.connect()
-            else:
-                _log.warning(f'Failed to connect to {self._host}'
-                             ' but retry disabled - call connect() to retry')
 
     def disconnect(self):
         """Attempts to disconnect from the broker."""

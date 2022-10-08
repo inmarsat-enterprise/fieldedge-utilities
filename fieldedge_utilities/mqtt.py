@@ -276,8 +276,9 @@ class MqttClient:
                 break
         except (ConnectionError, timeout, TimeoutError) as err:
             self._failed_connect_attempts += 1
-            _log.warning(f'Failed to connect to {self._host} ({err})'
-                         f'(attempt {self._failed_connect_attempts})')
+            _log.error(f'Failed to connect to {self._host} ({err})'
+                         f'(attempt {self._failed_connect_attempts})',
+                         exc_info=True)
             if self.connect_retry_interval > 0:
                 _log.debug(f'Retrying in {self.connect_retry_interval} s')
                 sleep(self.connect_retry_interval)

@@ -144,6 +144,7 @@ class MqttClient:
         self.on_connect = kwargs.get('on_connect', None)
         self.on_disconnect = kwargs.get('on_disconnect', None)
         self._qos = kwargs.get('qos', 0)
+        self._thread_name: str = kwargs.get('thread_name', None)
         self._client_base_id = client_id
         self._client_id = None
         self._client_uid = kwargs.get('client_uid', True)
@@ -259,13 +260,16 @@ class MqttClient:
             threads_before = enumerate_threads()
             self._mqtt.loop_start()
             threads_after = enumerate_threads()
-            name = 'MqttThread'
+            basename = 'MqttThread'
+            if self._thread_name:
+                basename += f'-{self._thread_name}'
+            name = basename
             number = 1
             for thread in threads_after:
                 if thread in threads_before:
-                    if thread.name.startswith('MqttThread'):
+                    if thread.name.startswith(basename):
                         number += 1
-                        name = f'MqttThread-{number}'
+                        name = f'{basename}-{number}'
                     continue
                 if _vlog():
                     _log.debug(f'Naming new MQTT client thread: {name}')

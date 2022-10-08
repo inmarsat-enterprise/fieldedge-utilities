@@ -63,11 +63,14 @@ def cache_valid(ref_time: int,
     return True
 
 
-def get_class_properties(cls_instance: object) -> dict:
+def get_class_properties(cls_instance: object,
+                         ignore: 'list[str]' = [],
+                         ) -> dict:
     """Returns non-hidden, non-callable properties/values of a Class instance.
     
     Args:
         cls_instance: The Class instance whose properties/values will be derived
+        ignore: A list of names to ignore
     
     Returns:
         A dictionary as { 'property_name': 'property_value' }
@@ -77,10 +80,11 @@ def get_class_properties(cls_instance: object) -> dict:
         
     """
     if not dir(cls_instance):
-        raise ValueError('Invalid cls_instanceect must have dir method')
+        raise ValueError('Invalid cls_instance - must have dir() method')
     props = {}
     props_list = [a for a in dir(cls_instance)
                   if not a.startswith(('_', 'properties')) and
+                  a not in ignore and
                   not callable(getattr(cls_instance, a))]
     for prop in props_list:
         props[prop] = getattr(cls_instance, prop)

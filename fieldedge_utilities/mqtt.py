@@ -16,10 +16,10 @@ in a **Docker** container listening on port 1883 for authenticated connections.
 import json
 import logging
 import os
+import threading
 from atexit import register as on_exit
 from enum import IntEnum
 from socket import timeout  # : for Python < 3.10 compatibility vs TimeoutError
-from threading import enumerate as enumerate_threads
 from time import sleep, time
 from typing import Callable
 
@@ -145,6 +145,7 @@ class MqttClient:
         self.on_disconnect = kwargs.get('on_disconnect', None)
         self._qos = kwargs.get('qos', 0)
         self._thread_name: str = kwargs.get('thread_name', None)
+        self._connect_timeout = float(kwargs.get('connect_timeout', 5.0))
         self._client_base_id = client_id
         self._client_id = None
         self._client_uid = kwargs.get('client_uid', True)
@@ -153,7 +154,9 @@ class MqttClient:
             self._client_uid = False
         self.client_id = client_id
         self._clean_session = kwargs.get('clean_session', True)
-        self._mqtt = PahoClient(clean_session=self._clean_session)
+        self._mqtt = PahoClient(clean_session=self._clean_session,
+                                reconnect_on_failure=False)
+        self._mqtt._connect_timeout = self._connect_timeout
         self.is_connected = False
         self._subscriptions = {}
         self.connect_retry_interval = connect_retry_interval
@@ -233,6 +236,18 @@ class MqttClient:
         self._mqtt.loop_stop()
         self._mqtt.disconnect()
     
+    def _unique_thread_name(self, before_names: 'list[str]') -> str:
+        basename = 'MqttThread'
+        if self._thread_name:
+            basename += f'-{self._thread_name}'
+        name = basename
+        number = 1
+        for n in before_names:
+            if n.startswith(basename):
+                number += 1
+                name = f'{basename}-{number}'
+        return name
+    
     def connect(self):
         """Attempts to establish a connection to the broker and re-subscribe."""
         try:
@@ -257,23 +272,13 @@ class MqttClient:
                                port=self._port,
                                keepalive=self._keepalive,
                                bind_address=self._bind_address)
-            threads_before = enumerate_threads()
+            threads_before = threading.enumerate()
             self._mqtt.loop_start()
-            threads_after = enumerate_threads()
-            basename = 'MqttThread'
-            if self._thread_name:
-                basename += f'-{self._thread_name}'
-            name = basename
-            number = 1
-            for thread in threads_after:
-                if thread in threads_before:
-                    if thread.name.startswith(basename):
-                        number += 1
-                        name = f'{basename}-{number}'
-                    continue
-                _log.debug(f'Naming new MQTT client thread: {name}')
-                thread.name = name
-                break
+            threads_after = threading.enumerate()
+            new_thread = list(set(threads_after) - set(threads_before))[0]
+            before_names = [t.name for t in threads_before]
+            new_thread.name = self._unique_thread_name(before_names)
+            _log.debug(f'New MQTT client thread: {new_thread.name}')
         except (ConnectionError, timeout, TimeoutError) as err:
             self._failed_connect_attempts += 1
             _log.error(f'Failed to connect to {self._host} ({err})'

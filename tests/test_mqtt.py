@@ -12,6 +12,13 @@ TEST_PAYLOAD = 'payload'
 message_received = ''
 
 
+@pytest.fixture
+def client():
+    TEST_SERVER = 'test.mosquitto.org'
+    return mqtt.MqttClient(client_id='test_client',
+                           host=TEST_SERVER)
+
+    
 def on_message(topic, payload):
     """Called during test of (subscribed) message received."""
     global message_received
@@ -120,5 +127,3 @@ def test_aws(capsys):
         sleep(0.5)
     captured = capsys.readouterr()
     assert message_received == f'{TEST_TOPIC}: {TEST_PAYLOAD}'
-
-

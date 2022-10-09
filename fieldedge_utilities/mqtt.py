@@ -155,6 +155,7 @@ class MqttClient:
         self._clean_session = kwargs.get('clean_session', True)
         self._mqtt = PahoClient(clean_session=self._clean_session,
                                 reconnect_on_failure=False)
+        self._connect_timeout = 5
         self.connect_timeout = int(kwargs.get('connect_timeout', 5))
         self.is_connected = False
         self._subscriptions = {}
@@ -215,10 +216,11 @@ class MqttClient:
 
     @connect_timeout.setter
     def connect_timeout(self, value: 'int|float'):
-        if ((not isinstance(value, int) and not isinstance(value, float)) or
+        if (not(isinstance(value, (int, float))) or
             not (0 < value <= 120)):
             # invalid value
             raise ValueError('Connect timeout must be 1..120 seconds')
+        self._connect_timeout = value
         self._mqtt._connect_timeout = float(value)
 
     def _cleanup(self, *args):
@@ -250,6 +252,7 @@ class MqttClient:
                 _log.debug(f'Attempting MQTT broker connection to {self._host}'
                            f' as {self.client_id}')
             self._mqtt.reinitialise(client_id=self.client_id)
+            self.connect_timeout = self._connect_timeout
             self._mqtt.user_data_set(None)
             self._mqtt.on_connect = self._mqtt_on_connect
             self._mqtt.on_disconnect = self._mqtt_on_disconnect

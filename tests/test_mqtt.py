@@ -39,16 +39,19 @@ def test_basic_pubsub(capsys):
         'test.mosquitto.org',
         'broker.hivemq.com',
     ]
+    connect_timeout = 6.0
     for test_server in TEST_SERVERS:
         try:
             mqttc = mqtt.MqttClient(client_id='test_client',
                                     host=test_server,
                                     on_message=on_message,
                                     subscribe_default=TEST_TOPIC + '/#',
-                                    connect_retry_interval=0)
+                                    connect_retry_interval=0,
+                                    connect_timeout=connect_timeout)
             break
         except mqtt.MqttError as err:
             assert 'timed out' in err.args[0]
+    assert mqttc._mqtt._connect_timeout == connect_timeout
     captured = capsys.readouterr()
     assert isinstance(mqttc, mqtt.MqttClient)
     while not mqttc.is_connected:

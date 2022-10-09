@@ -215,8 +215,7 @@ class MqttClient:
 
     @connect_timeout.setter
     def connect_timeout(self, value: 'int|float'):
-        if (not isinstance(value, int) or
-            not isinstance(value, float) or
+        if ((not isinstance(value, int) and not isinstance(value, float)) or
             not (0 < value <= 120)):
             # invalid value
             raise ValueError('Connect timeout must be 1..120 seconds')

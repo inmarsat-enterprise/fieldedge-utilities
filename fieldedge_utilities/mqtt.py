@@ -145,7 +145,6 @@ class MqttClient:
         self.on_disconnect = kwargs.get('on_disconnect', None)
         self._qos = kwargs.get('qos', 0)
         self._thread_name: str = kwargs.get('thread_name', None)
-        self._connect_timeout = float(kwargs.get('connect_timeout', 5.0))
         self._client_base_id = client_id
         self._client_id = None
         self._client_uid = kwargs.get('client_uid', True)
@@ -156,7 +155,7 @@ class MqttClient:
         self._clean_session = kwargs.get('clean_session', True)
         self._mqtt = PahoClient(clean_session=self._clean_session,
                                 reconnect_on_failure=False)
-        self._mqtt._connect_timeout = self._connect_timeout
+        self.connect_timeout = float(kwargs.get('connect_timeout', 5))
         self.is_connected = False
         self._subscriptions = {}
         self.connect_retry_interval = connect_retry_interval
@@ -211,20 +210,14 @@ class MqttClient:
         self._mqtt.on_log = callback
 
     @property
-    def socket_timeout(self) -> int:
-        read_timeout = int(self._mqtt._sockpairR.gettimeout())
-        write_timeout = int(self._mqtt._sockpairW.gettimeout())
-        if read_timeout != write_timeout:
-            _log.warning(f'Read timeout ({read_timeout})'
-                         f' != Write timeout ({write_timeout})')
-        return write_timeout
+    def connect_timeout(self) -> int:
+        return int(self._mqtt._connect_timeout)
 
-    @socket_timeout.setter
-    def socket_timeout(self, value: int):
-        if not (0 < value <= 120):
-            raise ValueError('Socket timeout must be 1..120 seconds')
-        self._mqtt._sockpairR.settimeout(float(value))
-        self._mqtt._sockpairW.settimeout(float(value))
+    @connect_timeout.setter
+    def connect_timeout(self, value: int):
+        if not isinstance(value, int) or not (0 < value <= 120):
+            raise ValueError('Connect timeout must be 1..120 seconds')
+        self._mqtt._connect_timeout = float(value)
 
     def _cleanup(self, *args):
         # TODO: logging raises an error since the log file was closed

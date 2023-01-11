@@ -231,6 +231,37 @@ def test_json_compatible(test_obj):
     assert isinstance(json.dumps(jsonable), str)
 
 
+def test_json_camel():
+    TEST_1 = {
+        'in': { 'key_a': 'value' },
+        'out': { 'keyA': 'value' }
+    }
+    TEST_2 = {
+        'in': { 'CAP_KEY': 'value' },
+        'out': { 'CAP_KEY': 'value' }
+    }
+    TEST_3 = {
+        'in': { 'key_a': [{ 'key_b': 'value_b' }, { 'key_c': 'value_c' }] },
+        'out': { 'keyA': [{ 'keyB': 'value_b'}, { 'keyC': 'value_c' }] }
+    }
+    TEST_4 = {
+        'in': { 1: 'value_1' },
+        'out': { 1: 'value_1' }
+    }
+    TEST_5 = {
+        'in': 'string',
+        'out': 'string'
+    }
+    TEST_6 = {
+        'in': 1,
+        'out': 1
+    }
+    tests = [TEST_1, TEST_2, TEST_3, TEST_4, TEST_5, TEST_6]
+    for test in tests:
+        assert test['out'] == json_compatible(test['in'])
+        assert isinstance(json.dumps(json_compatible(test)), str)
+
+
 class PdpContext:
     """Enapsulates PDP Context metadata.
     

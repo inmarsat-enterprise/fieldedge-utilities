@@ -218,13 +218,23 @@ def json_compatible(obj: object,
 
     """
     res = obj
-    if camel_keys and isinstance(obj, dict):
-        res = {}
-        for k, v in obj.items():
-            if isinstance(k, str) and k.isupper() and skip_caps:
-                continue
-            camel_key = snake_to_camel(str(k))
-            res[camel_key] = json_compatible(v, camel_keys, skip_caps)
+    if camel_keys:
+        if isinstance(obj, dict):
+            res = {}
+            for k, v in obj.items():
+                if ((isinstance(k, str) and k.isupper() and skip_caps) or
+                    not isinstance(k, str)):
+                    # no change
+                    camel_key = k
+                else:
+                    camel_key = snake_to_camel(str(k))
+                if camel_key != k:
+                    _log.debug(f'Changed {k} to {camel_key}')
+                res[camel_key] = json_compatible(v, camel_keys, skip_caps)
+        elif isinstance(obj, list):
+            res = []
+            for item in obj:
+                res.append(json_compatible(item, camel_keys, skip_caps))
     try:
         json.dumps(res)
     except TypeError:

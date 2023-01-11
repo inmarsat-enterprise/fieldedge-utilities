@@ -28,7 +28,7 @@ def camel_to_snake(camel_str: str) -> str:
 
 def cache_valid(ref_time: int,
                 max_age: int = PROPERTY_CACHE_DEFAULT,
-                tag: str = 'value',
+                tag: str = None,
                 ) -> bool:
     """Determines if cached property value is younger than the threshold.
     
@@ -51,15 +51,18 @@ def cache_valid(ref_time: int,
     """
     if not isinstance(ref_time, int):
         if _vlog():
+            tag = tag or '?'
             _log.debug(f'No cached timestamp for {tag}')
         return False
     cache_age = int(time()) - ref_time
     if cache_age > max_age:
         if _vlog():
+            tag = tag or '?'
             _log.debug(f'Cached {tag} only {cache_age} seconds old'
                        f' (cache = {max_age}s)')
         return False
-    _log.debug(f'Using cached {tag} ({cache_age} seconds)')
+    if tag:
+        _log.debug(f'Using cached {tag} ({cache_age} seconds)')
     return True
 
 
@@ -196,7 +199,9 @@ def tag_merge(*dicts: dict) -> dict:
     return merged
 
 
-def json_compatible(obj: object, camel_keys: bool = True) -> dict:
+def json_compatible(obj: object,
+                    camel_keys: bool = True,
+                    skip_caps: bool = True) -> dict:
     """Returns a dictionary compatible with `json.dumps` function.
 
     Nested objects are converted to dictionaries.
@@ -205,6 +210,7 @@ def json_compatible(obj: object, camel_keys: bool = True) -> dict:
         obj: The source object.
         camel_keys: Flag indicating whether to convert all nested dictionary
             keys to `camelCase`.
+        skip_caps: Preserves `CAPITAL_CASE` keys if True
         
     Returns:
         A dictionary with nested arrays, dictionaries and other compatible with
@@ -215,8 +221,10 @@ def json_compatible(obj: object, camel_keys: bool = True) -> dict:
     if camel_keys and isinstance(obj, dict):
         res = {}
         for k, v in obj.items():
+            if isinstance(k, str) and k.isupper() and skip_caps:
+                continue
             camel_key = snake_to_camel(str(k))
-            res[camel_key] = json_compatible(v, camel_keys)
+            res[camel_key] = json_compatible(v, camel_keys, skip_caps)
     try:
         json.dumps(res)
     except TypeError:
@@ -224,12 +232,14 @@ def json_compatible(obj: object, camel_keys: bool = True) -> dict:
             if isinstance(res, list):
                 _temp = []
                 for element in res:
-                    _temp.append(json_compatible(element, camel_keys))
+                    _temp.append(json_compatible(element,
+                                                 camel_keys,
+                                                 skip_caps))
                 res = _temp
             if hasattr(res, '__dict__'):
                 res = vars(res)
             if isinstance(res, dict):
-                res = json_compatible(res, camel_keys)
+                res = json_compatible(res, camel_keys, skip_caps)
         except Exception as err:
             _log.error(err)
     finally:

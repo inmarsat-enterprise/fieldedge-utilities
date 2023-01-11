@@ -85,6 +85,7 @@ FORMAT_JSON = (&#39;{&#39;
                 &#39;,&#34;message&#34;:&#34;%(message)s&#34;&#39;
                 &#39;}&#39;)
 DATEFMT = &#39;%Y-%m-%dT%H:%M:%S&#39;
+LOG_VERBOSE = os.getenv(&#39;LOG_VERBOSE&#39;)
 
 
 class LogFilterLessThan(logging.Filter):
@@ -355,7 +356,27 @@ def get_fieldedge_logger(filename: str = None,
     add_handler(logger, get_handler_stderr())
     apply_formatter(logger, get_formatter(format))
     logger.setLevel(log_level)
-    return logger</code></pre>
+    return logger
+
+
+def verbose_logging(filter: &#39;str&#39; = &#39;&#39;) -&gt; bool:
+    &#34;&#34;&#34;Indicates if verbose logging is configured, with an optional filter.
+    
+    Args:
+        filter: An optional filter e.g. the package+module name
+    
+    Returns:
+        True if `LOG_VERBOSE` environment variable is set
+            and includes the filter.
+            
+    &#34;&#34;&#34;
+    if LOG_VERBOSE:
+        if filter:
+            if filter in LOG_VERBOSE:
+                return True
+            return False
+        return True
+    return False</code></pre>
 </details>
 </section>
 <section>
@@ -793,6 +814,43 @@ backupCount (int): defaults to 2</dd>
     return logger</code></pre>
 </details>
 </dd>
+<dt id="fieldedge_utilities.logger.verbose_logging"><code class="name flex">
+<span>def <span class="ident">verbose_logging</span></span>(<span>filter: str = '') ‑> bool</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Indicates if verbose logging is configured, with an optional filter.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>filter</code></strong></dt>
+<dd>An optional filter e.g. the package+module name</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>True if <code>LOG_VERBOSE</code> environment variable is set
+and includes the filter.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def verbose_logging(filter: &#39;str&#39; = &#39;&#39;) -&gt; bool:
+    &#34;&#34;&#34;Indicates if verbose logging is configured, with an optional filter.
+    
+    Args:
+        filter: An optional filter e.g. the package+module name
+    
+    Returns:
+        True if `LOG_VERBOSE` environment variable is set
+            and includes the filter.
+            
+    &#34;&#34;&#34;
+    if LOG_VERBOSE:
+        if filter:
+            if filter in LOG_VERBOSE:
+                return True
+            return False
+        return True
+    return False</code></pre>
+</details>
+</dd>
 </dl>
 </section>
 <section>
@@ -970,6 +1028,7 @@ traceback.print_exception()</p></div>
 <li><code><a title="fieldedge_utilities.logger.get_handler_stdout" href="#fieldedge_utilities.logger.get_handler_stdout">get_handler_stdout</a></code></li>
 <li><code><a title="fieldedge_utilities.logger.get_logfile_name" href="#fieldedge_utilities.logger.get_logfile_name">get_logfile_name</a></code></li>
 <li><code><a title="fieldedge_utilities.logger.get_wrapping_logger" href="#fieldedge_utilities.logger.get_wrapping_logger">get_wrapping_logger</a></code></li>
+<li><code><a title="fieldedge_utilities.logger.verbose_logging" href="#fieldedge_utilities.logger.verbose_logging">verbose_logging</a></code></li>
 </ul>
 </li>
 <li><h3><a href="#header-classes">Classes</a></h3>

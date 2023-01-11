@@ -34,14 +34,14 @@ from datetime import datetime, timezone
 
 
 def ts_to_iso(timestamp: &#39;float|int&#39;, ms: bool = False) -&gt; str:
-    &#34;&#34;&#34;Converts a unix timestamp (UTC) to ISO 8601 format.
+    &#34;&#34;&#34;Converts a unix timestamp to ISO 8601 format (UTC).
     
     Args:
-        timestamp: A unix timestamp in UTC timezone.
+        timestamp: A unix timestamp.
         ms: Flag indicating whether to include milliseconds in response
     
     Returns:
-        ISO 8601 format e.g. `YYYY-MM-DDThh:mm:ss[.sss]Z`
+        ISO 8601 UTC format e.g. `YYYY-MM-DDThh:mm:ss[.sss]Z`
 
     &#34;&#34;&#34;
     iso_time = datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
@@ -119,29 +119,29 @@ def iso_to_ts(iso_time: str, ms: bool = False) -&gt; int:
 <span>def <span class="ident">ts_to_iso</span></span>(<span>timestamp: float|int, ms: bool = False) ‑> str</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Converts a unix timestamp (UTC) to ISO 8601 format.</p>
+<div class="desc"><p>Converts a unix timestamp to ISO 8601 format (UTC).</p>
 <h2 id="args">Args</h2>
 <dl>
 <dt><strong><code>timestamp</code></strong></dt>
-<dd>A unix timestamp in UTC timezone.</dd>
+<dd>A unix timestamp.</dd>
 <dt><strong><code>ms</code></strong></dt>
 <dd>Flag indicating whether to include milliseconds in response</dd>
 </dl>
 <h2 id="returns">Returns</h2>
-<p>ISO 8601 format e.g. <code>YYYY-MM-DDThh:mm:ss[.sss]Z</code></p></div>
+<p>ISO 8601 UTC format e.g. <code>YYYY-MM-DDThh:mm:ss[.sss]Z</code></p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def ts_to_iso(timestamp: &#39;float|int&#39;, ms: bool = False) -&gt; str:
-    &#34;&#34;&#34;Converts a unix timestamp (UTC) to ISO 8601 format.
+    &#34;&#34;&#34;Converts a unix timestamp to ISO 8601 format (UTC).
     
     Args:
-        timestamp: A unix timestamp in UTC timezone.
+        timestamp: A unix timestamp.
         ms: Flag indicating whether to include milliseconds in response
     
     Returns:
-        ISO 8601 format e.g. `YYYY-MM-DDThh:mm:ss[.sss]Z`
+        ISO 8601 UTC format e.g. `YYYY-MM-DDThh:mm:ss[.sss]Z`
 
     &#34;&#34;&#34;
     iso_time = datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()

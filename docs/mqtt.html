@@ -55,10 +55,10 @@ in a **Docker** container listening on port 1883 for authenticated connections.
 import json
 import logging
 import os
+import threading
 from atexit import register as on_exit
 from enum import IntEnum
 from socket import timeout  # : for Python &lt; 3.10 compatibility vs TimeoutError
-from threading import enumerate as enumerate_threads
 from time import sleep, time
 from typing import Callable
 
@@ -66,7 +66,8 @@ from dotenv import load_dotenv
 from paho.mqtt.client import Client as PahoClient
 from paho.mqtt.client import MQTTMessage as PahoMessage
 
-from fieldedge_utilities import tag
+from .class_properties import json_compatible
+from .logger import verbose_logging
 
 MQTT_HOST = os.getenv(&#39;MQTT_HOST&#39;, &#39;fieldedge-broker&#39;)
 MQTT_USER = os.getenv(&#39;MQTT_USER&#39;)
@@ -150,7 +151,7 @@ class MqttClient:
                 or reconnect after disconnection.
             **kwargs: includes advanced feature overrides such as:
             
-            * `unique_client_id` defaults to True, appends a timestamp to the
+            * `client_uid` defaults to True, appends a timestamp to the
             client_id to avoid being rejected by the host.
             * `bind_address` to bind to a specific IP
             * `on_connect`, `on_disconnect`, `on_log` callbacks
@@ -182,15 +183,19 @@ class MqttClient:
         self.on_connect = kwargs.get(&#39;on_connect&#39;, None)
         self.on_disconnect = kwargs.get(&#39;on_disconnect&#39;, None)
         self._qos = kwargs.get(&#39;qos&#39;, 0)
-        self._client_id = client_id
+        self._thread_name: str = kwargs.get(&#39;thread_name&#39;, None)
+        self._client_base_id = client_id
+        self._client_id = None
         self._client_uid = kwargs.get(&#39;client_uid&#39;, True)
         if self._host.endswith(&#39;azure-devices.net&#39;):
-            _log.debug(&#39;Using static Azure IoT Device ID as client_id&#39;)
+            _log.debug(f&#39;Assuming {client_id} is the Azure IoT Device ID&#39;)
             self._client_uid = False
-        if self._client_uid:
-            self.client_id = client_id
+        self.client_id = client_id
         self._clean_session = kwargs.get(&#39;clean_session&#39;, True)
-        self._mqtt = PahoClient(clean_session=self._clean_session)
+        self._mqtt = PahoClient(clean_session=self._clean_session,
+                                reconnect_on_failure=False)
+        self._connect_timeout = 5
+        self.connect_timeout = int(kwargs.get(&#39;connect_timeout&#39;, 5))
         self.is_connected = False
         self._subscriptions = {}
         self.connect_retry_interval = connect_retry_interval
@@ -213,12 +218,10 @@ class MqttClient:
         if not self._client_uid:
             self._client_id = id
         else:
-            try:
-                if isinstance(int(id.split(&#39;_&#39;)[1]), int):
-                    # previously made unique, could be a bouncing connection
-                    id = id.split(&#39;_&#39;)[0]
-            except (ValueError, IndexError):
-                pass   #: new id will be made unique
+            if id != self._client_base_id:
+                if verbose_logging(&#39;mqtt&#39;):
+                    _log.debug(f&#39;Updating client_id {id} with new timestamp&#39;)
+                id = self._client_base_id
             self._client_id = f&#39;{id}_{int(time())}&#39;
 
     @property
@@ -247,36 +250,48 @@ class MqttClient:
         self._mqtt.on_log = callback
 
     @property
-    def socket_timeout(self) -&gt; int:
-        read_timeout = int(self._mqtt._sockpairR.gettimeout())
-        write_timeout = int(self._mqtt._sockpairW.gettimeout())
-        if read_timeout != write_timeout:
-            _log.warning(f&#39;Read timeout ({read_timeout})&#39;
-                         f&#39; != Write timeout ({write_timeout})&#39;)
-        return write_timeout
+    def connect_timeout(self) -&gt; int:
+        return int(self._mqtt._connect_timeout)
 
-    @socket_timeout.setter
-    def socket_timeout(self, value: int):
-        if not (0 &lt; value &lt;= 120):
-            raise ValueError(&#39;Socket timeout must be 1..120 seconds&#39;)
-        self._mqtt._sockpairR.settimeout(float(value))
-        self._mqtt._sockpairW.settimeout(float(value))
+    @connect_timeout.setter
+    def connect_timeout(self, value: &#39;int|float&#39;):
+        if (not(isinstance(value, (int, float))) or
+            not (0 &lt; value &lt;= 120)):
+            # invalid value
+            raise ValueError(&#39;Connect timeout must be 1..120 seconds&#39;)
+        self._connect_timeout = value
+        self._mqtt._connect_timeout = float(value)
 
     def _cleanup(self, *args):
         # TODO: logging raises an error since the log file was closed
-        # for arg in args:
-        #     _log.debug(f&#39;mqtt cleanup called with arg = {arg}&#39;)
-        # _log.debug(&#39;Terminating MQTT connection&#39;)
+        # if _vlog():
+        #     for arg in args:
+        #         _log.debug(f&#39;mqtt cleanup called with arg = {arg}&#39;)
+        #     _log.debug(&#39;Terminating MQTT connection&#39;)
         self._mqtt.user_data_set(&#39;terminate&#39;)
         self._mqtt.loop_stop()
         self._mqtt.disconnect()
     
+    def _unique_thread_name(self, before_names: &#39;list[str]&#39;) -&gt; str:
+        basename = &#39;MqttThread&#39;
+        if self._thread_name:
+            basename += f&#39;-{self._thread_name}&#39;
+        name = basename
+        number = 1
+        for n in before_names:
+            if n.startswith(basename):
+                number += 1
+                name = f&#39;{basename}-{number}&#39;
+        return name
+    
     def connect(self):
         &#34;&#34;&#34;Attempts to establish a connection to the broker and re-subscribe.&#34;&#34;&#34;
         try:
-            _log.debug(f&#39;Attempting MQTT broker connection to {self._host}&#39;
-                       f&#39; as {self._client_id}&#39;)
+            if _vlog():
+                _log.debug(f&#39;Attempting MQTT broker connection to {self._host}&#39;
+                           f&#39; as {self.client_id}&#39;)
             self._mqtt.reinitialise(client_id=self.client_id)
+            self.connect_timeout = self._connect_timeout
             self._mqtt.user_data_set(None)
             self._mqtt.on_connect = self._mqtt_on_connect
             self._mqtt.on_disconnect = self._mqtt_on_disconnect
@@ -294,30 +309,22 @@ class MqttClient:
                                port=self._port,
                                keepalive=self._keepalive,
                                bind_address=self._bind_address)
-            threads_before = enumerate_threads()
+            threads_before = threading.enumerate()
             self._mqtt.loop_start()
-            threads_after = enumerate_threads()
-            name = &#39;MqttThread&#39;
-            number = 1
-            for thread in threads_after:
-                if thread in threads_before:
-                    if thread.name.startswith(&#39;MqttThread&#39;):
-                        number += 1
-                        name = f&#39;MqttThread-{number}&#39;
-                    continue
-                _log.debug(f&#39;Naming new MQTT client thread: {name}&#39;)
-                thread.name = name
-                break
+            threads_after = threading.enumerate()
+            new_thread = list(set(threads_after) - set(threads_before))[0]
+            before_names = [t.name for t in threads_before]
+            new_thread.name = self._unique_thread_name(before_names)
+            _log.debug(f&#39;New MQTT client thread: {new_thread.name}&#39;)
         except (ConnectionError, timeout, TimeoutError) as err:
             self._failed_connect_attempts += 1
+            _log.error(f&#39;Failed to connect to {self._host} ({err})&#39;
+                         f&#39;(attempt {self._failed_connect_attempts})&#39;,
+                         exc_info=True)
             if self.connect_retry_interval &gt; 0:
-                _log.warning(f&#39;Unable to connect to {self._host} ({err})&#39;
-                             f&#39; - retrying in {self.connect_retry_interval} s&#39;)
+                _log.debug(f&#39;Retrying in {self.connect_retry_interval} s&#39;)
                 sleep(self.connect_retry_interval)
                 self.connect()
-            else:
-                _log.warning(f&#39;Failed to connect to {self._host}&#39;
-                             &#39; but retry disabled - call connect() to retry&#39;)
 
     def disconnect(self):
         &#34;&#34;&#34;Attempts to disconnect from the broker.&#34;&#34;&#34;
@@ -333,7 +340,8 @@ class MqttClient:
         &#34;&#34;&#34;Internal callback re-subscribes on (re)connection.&#34;&#34;&#34;
         self._failed_connect_attempts = 0
         if rc == MqttResultCode.SUCCESS:
-            _log.debug(f&#39;Established MQTT connection to {self._host}&#39;)
+            if _vlog():
+                _log.debug(f&#39;Established MQTT connection to {self._host}&#39;)
             if not self.is_connected:
                 for sub in self.subscriptions:
                     self._mqtt_subscribe(sub, self.subscriptions[sub][&#39;qos&#39;])
@@ -347,8 +355,9 @@ class MqttClient:
     def _mqtt_subscribe(self, topic: str, qos: int = 0):
         &#34;&#34;&#34;Internal subscription handler assigns id indicating *subscribed*.&#34;&#34;&#34;
         (result, mid) = self._mqtt.subscribe(topic=topic, qos=qos)
-        _log.debug(f&#39;{self._client_id} subscribing to {topic}&#39;
-                   f&#39; (qos={qos}, mid={mid})&#39;)
+        if _vlog():
+            _log.debug(f&#39;{self.client_id} subscribing to {topic}&#39;
+                       f&#39; (qos={qos}, mid={mid})&#39;)
         if result == MqttResultCode.SUCCESS:
             if mid == 0:
                 _log.warning(f&#39;Received mid={mid} expected &gt; 0&#39;)
@@ -367,7 +376,8 @@ class MqttClient:
             qos (int): The MQTT qos 0..2
 
         &#34;&#34;&#34;
-        _log.debug(f&#39;Adding subscription {topic} (qos={qos})&#39;)
+        if _vlog():
+            _log.debug(f&#39;Adding subscription {topic} (qos={qos})&#39;)
         self._subscriptions[topic] = {&#39;qos&#39;: qos, &#39;mid&#39;: 0}
         if self.is_connected:
             self._mqtt_subscribe(topic, qos)
@@ -404,15 +414,18 @@ class MqttClient:
         try:
             payload = json.loads(payload)
         except json.JSONDecodeError as e:
-            _log.debug(f&#39;MQTT message payload non-JSON ({e})&#39;)
-        _log.debug(f&#39;MQTT received message &#34;{payload}&#34;&#39;
-                   f&#39; on topic &#34;{message.topic}&#34; with QoS {message.qos}&#39;)
-        if userdata:
-            _log.debug(f&#39;MQTT client userdata: {userdata}&#39;)
+            if _vlog():
+                _log.debug(f&#39;MQTT message payload non-JSON ({e})&#39;)
+        if _vlog():
+            _log.debug(f&#39;MQTT received message &#34;{payload}&#34;&#39;
+                       f&#39; on topic &#34;{message.topic}&#34; with QoS {message.qos}&#39;)
+            if userdata:
+                _log.debug(f&#39;MQTT client userdata: {userdata}&#39;)
         self.on_message(message.topic, payload)
 
     def _mqtt_unsubscribe(self, topic: str):
-        _log.debug(f&#39;{self._client_id} unsubscribing to {topic}&#39;)
+        if _vlog():
+            _log.debug(f&#39;{self.client_id} unsubscribing to {topic}&#39;)
         (result, mid) = self._mqtt.unsubscribe(topic)
         if result != MqttResultCode.SUCCESS:
             _log.error(f&#39;MQTT Error {result} unsubscribing to {topic}&#39;
@@ -425,7 +438,8 @@ class MqttClient:
             topic (str): The MQTT topic to unsubscribe
 
         &#34;&#34;&#34;
-        _log.debug(f&#39;Removing subscription {topic}&#39;)
+        if _vlog():
+            _log.debug(f&#39;Removing subscription {topic}&#39;)
         if topic in self._subscriptions:
             del self._subscriptions[topic]
         if self.is_connected:
@@ -452,7 +466,7 @@ class MqttClient:
                 topic: str,
                 message: &#39;str|dict|None&#39;,
                 qos: int = 1,
-                camel_keys: bool = True,
+                camel_keys: bool = False,
                 ) -&gt; bool:
         &#34;&#34;&#34;Publishes a message to a MQTT topic.
 
@@ -477,18 +491,23 @@ class MqttClient:
                 _log.warning(&#39;Applying Azure device-to-cloud topic prefix&#39;)
                 topic = f&#39;{device_to_cloud}{topic}&#39;
         if isinstance(message, dict):
-            message = json.dumps(tag.json_compatible(message, camel_keys),
+            message = json.dumps(json_compatible(message, camel_keys),
                                  skipkeys=True)
         if not isinstance(qos, int) or qos not in range(0, 3):
             _log.warning(f&#39;Invalid MQTT QoS {qos} - using QoS 1&#39;)
             qos = 1
         (rc, mid) = self._mqtt.publish(topic=topic, payload=message, qos=qos)
-        _log.debug(f&#39;MQTT published (mid={mid}) {topic} {message}&#39;)
+        if _vlog():
+            _log.debug(f&#39;MQTT published (mid={mid}) {topic} {message}&#39;)
         if rc != MqttResultCode.SUCCESS:
             errmsg = f&#39;Publishing error {rc} ({_get_mqtt_result(rc)})&#39;
             _log.error(errmsg)
             return False
-        return True</code></pre>
+        return True
+
+
+def _vlog() -&gt; bool:
+    return verbose_logging(&#39;mqtt&#39;)</code></pre>
 </details>
 </section>
 <section>
@@ -544,7 +563,7 @@ or reconnect after disconnection.</dd>
 <dd>includes advanced feature overrides such as:</dd>
 </dl>
 <ul>
-<li><code>unique_client_id</code> defaults to True, appends a timestamp to the
+<li><code>client_uid</code> defaults to True, appends a timestamp to the
 client_id to avoid being rejected by the host.</li>
 <li><code>bind_address</code> to bind to a specific IP</li>
 <li><code>on_connect</code>, <code>on_disconnect</code>, <code>on_log</code> callbacks</li>
@@ -596,7 +615,7 @@ client_id to avoid being rejected by the host.</li>
                 or reconnect after disconnection.
             **kwargs: includes advanced feature overrides such as:
             
-            * `unique_client_id` defaults to True, appends a timestamp to the
+            * `client_uid` defaults to True, appends a timestamp to the
             client_id to avoid being rejected by the host.
             * `bind_address` to bind to a specific IP
             * `on_connect`, `on_disconnect`, `on_log` callbacks
@@ -628,15 +647,19 @@ client_id to avoid being rejected by the host.</li>
         self.on_connect = kwargs.get(&#39;on_connect&#39;, None)
         self.on_disconnect = kwargs.get(&#39;on_disconnect&#39;, None)
         self._qos = kwargs.get(&#39;qos&#39;, 0)
-        self._client_id = client_id
+        self._thread_name: str = kwargs.get(&#39;thread_name&#39;, None)
+        self._client_base_id = client_id
+        self._client_id = None
         self._client_uid = kwargs.get(&#39;client_uid&#39;, True)
         if self._host.endswith(&#39;azure-devices.net&#39;):
-            _log.debug(&#39;Using static Azure IoT Device ID as client_id&#39;)
+            _log.debug(f&#39;Assuming {client_id} is the Azure IoT Device ID&#39;)
             self._client_uid = False
-        if self._client_uid:
-            self.client_id = client_id
+        self.client_id = client_id
         self._clean_session = kwargs.get(&#39;clean_session&#39;, True)
-        self._mqtt = PahoClient(clean_session=self._clean_session)
+        self._mqtt = PahoClient(clean_session=self._clean_session,
+                                reconnect_on_failure=False)
+        self._connect_timeout = 5
+        self.connect_timeout = int(kwargs.get(&#39;connect_timeout&#39;, 5))
         self.is_connected = False
         self._subscriptions = {}
         self.connect_retry_interval = connect_retry_interval
@@ -659,12 +682,10 @@ client_id to avoid being rejected by the host.</li>
         if not self._client_uid:
             self._client_id = id
         else:
-            try:
-                if isinstance(int(id.split(&#39;_&#39;)[1]), int):
-                    # previously made unique, could be a bouncing connection
-                    id = id.split(&#39;_&#39;)[0]
-            except (ValueError, IndexError):
-                pass   #: new id will be made unique
+            if id != self._client_base_id:
+                if verbose_logging(&#39;mqtt&#39;):
+                    _log.debug(f&#39;Updating client_id {id} with new timestamp&#39;)
+                id = self._client_base_id
             self._client_id = f&#39;{id}_{int(time())}&#39;
 
     @property
@@ -693,36 +714,48 @@ client_id to avoid being rejected by the host.</li>
         self._mqtt.on_log = callback
 
     @property
-    def socket_timeout(self) -&gt; int:
-        read_timeout = int(self._mqtt._sockpairR.gettimeout())
-        write_timeout = int(self._mqtt._sockpairW.gettimeout())
-        if read_timeout != write_timeout:
-            _log.warning(f&#39;Read timeout ({read_timeout})&#39;
-                         f&#39; != Write timeout ({write_timeout})&#39;)
-        return write_timeout
+    def connect_timeout(self) -&gt; int:
+        return int(self._mqtt._connect_timeout)
 
-    @socket_timeout.setter
-    def socket_timeout(self, value: int):
-        if not (0 &lt; value &lt;= 120):
-            raise ValueError(&#39;Socket timeout must be 1..120 seconds&#39;)
-        self._mqtt._sockpairR.settimeout(float(value))
-        self._mqtt._sockpairW.settimeout(float(value))
+    @connect_timeout.setter
+    def connect_timeout(self, value: &#39;int|float&#39;):
+        if (not(isinstance(value, (int, float))) or
+            not (0 &lt; value &lt;= 120)):
+            # invalid value
+            raise ValueError(&#39;Connect timeout must be 1..120 seconds&#39;)
+        self._connect_timeout = value
+        self._mqtt._connect_timeout = float(value)
 
     def _cleanup(self, *args):
         # TODO: logging raises an error since the log file was closed
-        # for arg in args:
-        #     _log.debug(f&#39;mqtt cleanup called with arg = {arg}&#39;)
-        # _log.debug(&#39;Terminating MQTT connection&#39;)
+        # if _vlog():
+        #     for arg in args:
+        #         _log.debug(f&#39;mqtt cleanup called with arg = {arg}&#39;)
+        #     _log.debug(&#39;Terminating MQTT connection&#39;)
         self._mqtt.user_data_set(&#39;terminate&#39;)
         self._mqtt.loop_stop()
         self._mqtt.disconnect()
     
+    def _unique_thread_name(self, before_names: &#39;list[str]&#39;) -&gt; str:
+        basename = &#39;MqttThread&#39;
+        if self._thread_name:
+            basename += f&#39;-{self._thread_name}&#39;
+        name = basename
+        number = 1
+        for n in before_names:
+            if n.startswith(basename):
+                number += 1
+                name = f&#39;{basename}-{number}&#39;
+        return name
+    
     def connect(self):
         &#34;&#34;&#34;Attempts to establish a connection to the broker and re-subscribe.&#34;&#34;&#34;
         try:
-            _log.debug(f&#39;Attempting MQTT broker connection to {self._host}&#39;
-                       f&#39; as {self._client_id}&#39;)
+            if _vlog():
+                _log.debug(f&#39;Attempting MQTT broker connection to {self._host}&#39;
+                           f&#39; as {self.client_id}&#39;)
             self._mqtt.reinitialise(client_id=self.client_id)
+            self.connect_timeout = self._connect_timeout
             self._mqtt.user_data_set(None)
             self._mqtt.on_connect = self._mqtt_on_connect
             self._mqtt.on_disconnect = self._mqtt_on_disconnect
@@ -740,30 +773,22 @@ client_id to avoid being rejected by the host.</li>
                                port=self._port,
                                keepalive=self._keepalive,
                                bind_address=self._bind_address)
-            threads_before = enumerate_threads()
+            threads_before = threading.enumerate()
             self._mqtt.loop_start()
-            threads_after = enumerate_threads()
-            name = &#39;MqttThread&#39;
-            number = 1
-            for thread in threads_after:
-                if thread in threads_before:
-                    if thread.name.startswith(&#39;MqttThread&#39;):
-                        number += 1
-                        name = f&#39;MqttThread-{number}&#39;
-                    continue
-                _log.debug(f&#39;Naming new MQTT client thread: {name}&#39;)
-                thread.name = name
-                break
+            threads_after = threading.enumerate()
+            new_thread = list(set(threads_after) - set(threads_before))[0]
+            before_names = [t.name for t in threads_before]
+            new_thread.name = self._unique_thread_name(before_names)
+            _log.debug(f&#39;New MQTT client thread: {new_thread.name}&#39;)
         except (ConnectionError, timeout, TimeoutError) as err:
             self._failed_connect_attempts += 1
+            _log.error(f&#39;Failed to connect to {self._host} ({err})&#39;
+                         f&#39;(attempt {self._failed_connect_attempts})&#39;,
+                         exc_info=True)
             if self.connect_retry_interval &gt; 0:
-                _log.warning(f&#39;Unable to connect to {self._host} ({err})&#39;
-                             f&#39; - retrying in {self.connect_retry_interval} s&#39;)
+                _log.debug(f&#39;Retrying in {self.connect_retry_interval} s&#39;)
                 sleep(self.connect_retry_interval)
                 self.connect()
-            else:
-                _log.warning(f&#39;Failed to connect to {self._host}&#39;
-                             &#39; but retry disabled - call connect() to retry&#39;)
 
     def disconnect(self):
         &#34;&#34;&#34;Attempts to disconnect from the broker.&#34;&#34;&#34;
@@ -779,7 +804,8 @@ client_id to avoid being rejected by the host.</li>
         &#34;&#34;&#34;Internal callback re-subscribes on (re)connection.&#34;&#34;&#34;
         self._failed_connect_attempts = 0
         if rc == MqttResultCode.SUCCESS:
-            _log.debug(f&#39;Established MQTT connection to {self._host}&#39;)
+            if _vlog():
+                _log.debug(f&#39;Established MQTT connection to {self._host}&#39;)
             if not self.is_connected:
                 for sub in self.subscriptions:
                     self._mqtt_subscribe(sub, self.subscriptions[sub][&#39;qos&#39;])
@@ -793,8 +819,9 @@ client_id to avoid being rejected by the host.</li>
     def _mqtt_subscribe(self, topic: str, qos: int = 0):
         &#34;&#34;&#34;Internal subscription handler assigns id indicating *subscribed*.&#34;&#34;&#34;
         (result, mid) = self._mqtt.subscribe(topic=topic, qos=qos)
-        _log.debug(f&#39;{self._client_id} subscribing to {topic}&#39;
-                   f&#39; (qos={qos}, mid={mid})&#39;)
+        if _vlog():
+            _log.debug(f&#39;{self.client_id} subscribing to {topic}&#39;
+                       f&#39; (qos={qos}, mid={mid})&#39;)
         if result == MqttResultCode.SUCCESS:
             if mid == 0:
                 _log.warning(f&#39;Received mid={mid} expected &gt; 0&#39;)
@@ -813,7 +840,8 @@ client_id to avoid being rejected by the host.</li>
             qos (int): The MQTT qos 0..2
 
         &#34;&#34;&#34;
-        _log.debug(f&#39;Adding subscription {topic} (qos={qos})&#39;)
+        if _vlog():
+            _log.debug(f&#39;Adding subscription {topic} (qos={qos})&#39;)
         self._subscriptions[topic] = {&#39;qos&#39;: qos, &#39;mid&#39;: 0}
         if self.is_connected:
             self._mqtt_subscribe(topic, qos)
@@ -850,15 +878,18 @@ client_id to avoid being rejected by the host.</li>
         try:
             payload = json.loads(payload)
         except json.JSONDecodeError as e:
-            _log.debug(f&#39;MQTT message payload non-JSON ({e})&#39;)
-        _log.debug(f&#39;MQTT received message &#34;{payload}&#34;&#39;
-                   f&#39; on topic &#34;{message.topic}&#34; with QoS {message.qos}&#39;)
-        if userdata:
-            _log.debug(f&#39;MQTT client userdata: {userdata}&#39;)
+            if _vlog():
+                _log.debug(f&#39;MQTT message payload non-JSON ({e})&#39;)
+        if _vlog():
+            _log.debug(f&#39;MQTT received message &#34;{payload}&#34;&#39;
+                       f&#39; on topic &#34;{message.topic}&#34; with QoS {message.qos}&#39;)
+            if userdata:
+                _log.debug(f&#39;MQTT client userdata: {userdata}&#39;)
         self.on_message(message.topic, payload)
 
     def _mqtt_unsubscribe(self, topic: str):
-        _log.debug(f&#39;{self._client_id} unsubscribing to {topic}&#39;)
+        if _vlog():
+            _log.debug(f&#39;{self.client_id} unsubscribing to {topic}&#39;)
         (result, mid) = self._mqtt.unsubscribe(topic)
         if result != MqttResultCode.SUCCESS:
             _log.error(f&#39;MQTT Error {result} unsubscribing to {topic}&#39;
@@ -871,7 +902,8 @@ client_id to avoid being rejected by the host.</li>
             topic (str): The MQTT topic to unsubscribe
 
         &#34;&#34;&#34;
-        _log.debug(f&#39;Removing subscription {topic}&#39;)
+        if _vlog():
+            _log.debug(f&#39;Removing subscription {topic}&#39;)
         if topic in self._subscriptions:
             del self._subscriptions[topic]
         if self.is_connected:
@@ -898,7 +930,7 @@ client_id to avoid being rejected by the host.</li>
                 topic: str,
                 message: &#39;str|dict|None&#39;,
                 qos: int = 1,
-                camel_keys: bool = True,
+                camel_keys: bool = False,
                 ) -&gt; bool:
         &#34;&#34;&#34;Publishes a message to a MQTT topic.
 
@@ -923,13 +955,14 @@ client_id to avoid being rejected by the host.</li>
                 _log.warning(&#39;Applying Azure device-to-cloud topic prefix&#39;)
                 topic = f&#39;{device_to_cloud}{topic}&#39;
         if isinstance(message, dict):
-            message = json.dumps(tag.json_compatible(message, camel_keys),
+            message = json.dumps(json_compatible(message, camel_keys),
                                  skipkeys=True)
         if not isinstance(qos, int) or qos not in range(0, 3):
             _log.warning(f&#39;Invalid MQTT QoS {qos} - using QoS 1&#39;)
             qos = 1
         (rc, mid) = self._mqtt.publish(topic=topic, payload=message, qos=qos)
-        _log.debug(f&#39;MQTT published (mid={mid}) {topic} {message}&#39;)
+        if _vlog():
+            _log.debug(f&#39;MQTT published (mid={mid}) {topic} {message}&#39;)
         if rc != MqttResultCode.SUCCESS:
             errmsg = f&#39;Publishing error {rc} ({_get_mqtt_result(rc)})&#39;
             _log.error(errmsg)
@@ -948,6 +981,18 @@ client_id to avoid being rejected by the host.</li>
 <pre><code class="python">@property
 def client_id(self):
     return self._client_id</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.mqtt.MqttClient.connect_timeout"><code class="name">var <span class="ident">connect_timeout</span> : int</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def connect_timeout(self) -&gt; int:
+    return int(self._mqtt._connect_timeout)</code></pre>
 </details>
 </dd>
 <dt id="fieldedge_utilities.mqtt.MqttClient.failed_connection_attempts"><code class="name">var <span class="ident">failed_connection_attempts</span> : int</code></dt>
@@ -972,23 +1017,6 @@ def failed_connection_attempts(self) -&gt; int:
 <pre><code class="python">@property
 def on_log(self) -&gt; Callable:
     return self._mqtt.on_log</code></pre>
-</details>
-</dd>
-<dt id="fieldedge_utilities.mqtt.MqttClient.socket_timeout"><code class="name">var <span class="ident">socket_timeout</span> : int</code></dt>
-<dd>
-<div class="desc"></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">@property
-def socket_timeout(self) -&gt; int:
-    read_timeout = int(self._mqtt._sockpairR.gettimeout())
-    write_timeout = int(self._mqtt._sockpairW.gettimeout())
-    if read_timeout != write_timeout:
-        _log.warning(f&#39;Read timeout ({read_timeout})&#39;
-                     f&#39; != Write timeout ({write_timeout})&#39;)
-    return write_timeout</code></pre>
 </details>
 </dd>
 <dt id="fieldedge_utilities.mqtt.MqttClient.subscriptions"><code class="name">var <span class="ident">subscriptions</span> : dict</code></dt>
@@ -1027,9 +1055,11 @@ def subscriptions(self) -&gt; dict:
 <pre><code class="python">def connect(self):
     &#34;&#34;&#34;Attempts to establish a connection to the broker and re-subscribe.&#34;&#34;&#34;
     try:
-        _log.debug(f&#39;Attempting MQTT broker connection to {self._host}&#39;
-                   f&#39; as {self._client_id}&#39;)
+        if _vlog():
+            _log.debug(f&#39;Attempting MQTT broker connection to {self._host}&#39;
+                       f&#39; as {self.client_id}&#39;)
         self._mqtt.reinitialise(client_id=self.client_id)
+        self.connect_timeout = self._connect_timeout
         self._mqtt.user_data_set(None)
         self._mqtt.on_connect = self._mqtt_on_connect
         self._mqtt.on_disconnect = self._mqtt_on_disconnect
@@ -1047,30 +1077,22 @@ def subscriptions(self) -&gt; dict:
                            port=self._port,
                            keepalive=self._keepalive,
                            bind_address=self._bind_address)
-        threads_before = enumerate_threads()
+        threads_before = threading.enumerate()
         self._mqtt.loop_start()
-        threads_after = enumerate_threads()
-        name = &#39;MqttThread&#39;
-        number = 1
-        for thread in threads_after:
-            if thread in threads_before:
-                if thread.name.startswith(&#39;MqttThread&#39;):
-                    number += 1
-                    name = f&#39;MqttThread-{number}&#39;
-                continue
-            _log.debug(f&#39;Naming new MQTT client thread: {name}&#39;)
-            thread.name = name
-            break
+        threads_after = threading.enumerate()
+        new_thread = list(set(threads_after) - set(threads_before))[0]
+        before_names = [t.name for t in threads_before]
+        new_thread.name = self._unique_thread_name(before_names)
+        _log.debug(f&#39;New MQTT client thread: {new_thread.name}&#39;)
     except (ConnectionError, timeout, TimeoutError) as err:
         self._failed_connect_attempts += 1
+        _log.error(f&#39;Failed to connect to {self._host} ({err})&#39;
+                     f&#39;(attempt {self._failed_connect_attempts})&#39;,
+                     exc_info=True)
         if self.connect_retry_interval &gt; 0:
-            _log.warning(f&#39;Unable to connect to {self._host} ({err})&#39;
-                         f&#39; - retrying in {self.connect_retry_interval} s&#39;)
+            _log.debug(f&#39;Retrying in {self.connect_retry_interval} s&#39;)
             sleep(self.connect_retry_interval)
-            self.connect()
-        else:
-            _log.warning(f&#39;Failed to connect to {self._host}&#39;
-                         &#39; but retry disabled - call connect() to retry&#39;)</code></pre>
+            self.connect()</code></pre>
 </details>
 </dd>
 <dt id="fieldedge_utilities.mqtt.MqttClient.disconnect"><code class="name flex">
@@ -1106,7 +1128,7 @@ def subscriptions(self) -&gt; dict:
 </details>
 </dd>
 <dt id="fieldedge_utilities.mqtt.MqttClient.publish"><code class="name flex">
-<span>def <span class="ident">publish</span></span>(<span>self, topic: str, message: str|dict|None, qos: int = 1, camel_keys: bool = True) ‑> bool</span>
+<span>def <span class="ident">publish</span></span>(<span>self, topic: str, message: str|dict|None, qos: int = 1, camel_keys: bool = False) ‑> bool</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Publishes a message to a MQTT topic.</p>
@@ -1133,7 +1155,7 @@ def subscriptions(self) -&gt; dict:
             topic: str,
             message: &#39;str|dict|None&#39;,
             qos: int = 1,
-            camel_keys: bool = True,
+            camel_keys: bool = False,
             ) -&gt; bool:
     &#34;&#34;&#34;Publishes a message to a MQTT topic.
 
@@ -1158,13 +1180,14 @@ def subscriptions(self) -&gt; dict:
             _log.warning(&#39;Applying Azure device-to-cloud topic prefix&#39;)
             topic = f&#39;{device_to_cloud}{topic}&#39;
     if isinstance(message, dict):
-        message = json.dumps(tag.json_compatible(message, camel_keys),
+        message = json.dumps(json_compatible(message, camel_keys),
                              skipkeys=True)
     if not isinstance(qos, int) or qos not in range(0, 3):
         _log.warning(f&#39;Invalid MQTT QoS {qos} - using QoS 1&#39;)
         qos = 1
     (rc, mid) = self._mqtt.publish(topic=topic, payload=message, qos=qos)
-    _log.debug(f&#39;MQTT published (mid={mid}) {topic} {message}&#39;)
+    if _vlog():
+        _log.debug(f&#39;MQTT published (mid={mid}) {topic} {message}&#39;)
     if rc != MqttResultCode.SUCCESS:
         errmsg = f&#39;Publishing error {rc} ({_get_mqtt_result(rc)})&#39;
         _log.error(errmsg)
@@ -1201,7 +1224,8 @@ Message id <code>mid</code> is 0 when not actively subscribed.</p>
         qos (int): The MQTT qos 0..2
 
     &#34;&#34;&#34;
-    _log.debug(f&#39;Adding subscription {topic} (qos={qos})&#39;)
+    if _vlog():
+        _log.debug(f&#39;Adding subscription {topic} (qos={qos})&#39;)
     self._subscriptions[topic] = {&#39;qos&#39;: qos, &#39;mid&#39;: 0}
     if self.is_connected:
         self._mqtt_subscribe(topic, qos)
@@ -1230,7 +1254,8 @@ Message id <code>mid</code> is 0 when not actively subscribed.</p>
         topic (str): The MQTT topic to unsubscribe
 
     &#34;&#34;&#34;
-    _log.debug(f&#39;Removing subscription {topic}&#39;)
+    if _vlog():
+        _log.debug(f&#39;Removing subscription {topic}&#39;)
     if topic in self._subscriptions:
         del self._subscriptions[topic]
     if self.is_connected:
@@ -1407,12 +1432,12 @@ Message id <code>mid</code> is 0 when not actively subscribed.</p>
 <ul class="">
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.client_id" href="#fieldedge_utilities.mqtt.MqttClient.client_id">client_id</a></code></li>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.connect" href="#fieldedge_utilities.mqtt.MqttClient.connect">connect</a></code></li>
+<li><code><a title="fieldedge_utilities.mqtt.MqttClient.connect_timeout" href="#fieldedge_utilities.mqtt.MqttClient.connect_timeout">connect_timeout</a></code></li>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.disconnect" href="#fieldedge_utilities.mqtt.MqttClient.disconnect">disconnect</a></code></li>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.failed_connection_attempts" href="#fieldedge_utilities.mqtt.MqttClient.failed_connection_attempts">failed_connection_attempts</a></code></li>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.is_subscribed" href="#fieldedge_utilities.mqtt.MqttClient.is_subscribed">is_subscribed</a></code></li>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.on_log" href="#fieldedge_utilities.mqtt.MqttClient.on_log">on_log</a></code></li>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.publish" href="#fieldedge_utilities.mqtt.MqttClient.publish">publish</a></code></li>
-<li><code><a title="fieldedge_utilities.mqtt.MqttClient.socket_timeout" href="#fieldedge_utilities.mqtt.MqttClient.socket_timeout">socket_timeout</a></code></li>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.subscribe" href="#fieldedge_utilities.mqtt.MqttClient.subscribe">subscribe</a></code></li>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.subscriptions" href="#fieldedge_utilities.mqtt.MqttClient.subscriptions">subscriptions</a></code></li>
 <li><code><a title="fieldedge_utilities.mqtt.MqttClient.unsubscribe" href="#fieldedge_utilities.mqtt.MqttClient.unsubscribe">unsubscribe</a></code></li>

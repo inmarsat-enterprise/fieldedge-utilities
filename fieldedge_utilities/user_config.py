@@ -25,7 +25,7 @@ def read_user_config(filename: str = USER_CONFIG_FILE) -> dict:
     if os.path.isfile(filename):
         with open(filename) as f:
             for line in f.readlines():
-                if not line.strip():
+                if line.startswith('#') or not line.strip():
                     continue
                 key, value = line.split('=', 1)
                 user_config[key] = value.strip()
@@ -53,7 +53,7 @@ def write_user_config(config: dict, filename: str = USER_CONFIG_FILE) -> None:
     if os.path.isfile(filename):
         with open(filename) as f:
             for line in f.readlines():
-                if not line.strip():
+                if line.startswith('#') or not line.strip():
                     continue
                 file_key, file_value = line.strip().split('=', 1)
                 if file_key in config:

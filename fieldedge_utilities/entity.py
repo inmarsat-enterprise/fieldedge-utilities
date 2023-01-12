@@ -1,3 +1,4 @@
+"""CONCEPTUAL ONLY - NOT WORKING"""
 import logging
 import os
 from time import time
@@ -11,7 +12,10 @@ _log = logging.getLogger(__name__)
 
 
 class FieldEdgeEntity(object):
+    """Concept to baseline objects used in FieldEdge projects.
     
+    BROKEN - DO NOT USE
+    """
     LOG_VERBOSE = os.getenv('LOG_VERBOSE')
     PROPERTY_CACHE_DEFAULT = int(os.getenv('PROPERTY_CACHE_DEFAULT', 5))
     

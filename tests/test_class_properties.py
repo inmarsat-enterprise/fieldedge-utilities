@@ -196,19 +196,32 @@ def test_get_class_properties_ignore(test_obj: TestObj):
     assert not any(prop not in expected for prop in props)
 
 
-def test_tag_properties_basic(test_obj: TestObj):
-    notag_tag = get_tag_class(test_obj)
+def test_tag_properties_basic():
+    notag_tag = get_class_tag(TestObj)
     ignore = ['six', 'seven']
-    tagged_props = tag_class_properties(test_obj, ignore=ignore)
+    tagged_props = tag_class_properties(TestObj, ignore=ignore)
     expected_untagged = ['two', 'three', 'four', 'five', 'one_plus_six']
     expected_tagged = [f'{notag_tag}{x.title().replace("_", "")}'
                        for x in expected_untagged]
     assert all(tp in expected_tagged for tp in tagged_props)
 
 
+def test_tag_properties_categorized():
+    tagged_cat_props = tag_class_properties(TestObj, categorize=True)
+    assert all(k in tagged_cat_props for k in ['readOnly', 'readWrite'])
+    exp_ro_untagged = ['five', 'seven', 'one_plus_six']
+    exp_rw_untagged = ['two', 'three', 'four', 'six']
+    for prop in exp_ro_untagged:
+        expected = tag_property(get_class_tag(TestObj), prop)
+        assert expected in tagged_cat_props['readOnly']
+    for prop in exp_rw_untagged:
+        expected = tag_property(get_class_tag(TestObj), prop)
+        assert expected in tagged_cat_props['readWrite']
+
+
 def test_untag_property(test_obj: TestObj):
     tagged_properties = tag_class_properties(test_obj)
-    tag = get_tag_class(test_obj)
+    tag = get_class_tag(test_obj)
     for prop in tagged_properties:
         untagged, derived_tag = untag_class_property(prop, include_tag=True)
         assert hasattr(test_obj, untagged)

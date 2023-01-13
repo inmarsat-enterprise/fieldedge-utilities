@@ -105,7 +105,8 @@ def cache_valid(ref_time: 'int|float',
 def get_class_properties(cls_instance: object,
                          ignore: 'list[str]' = [],
                          categorize: bool = False,
-                         ) -> 'dict|dict[str, dict]':
+                         include_values: bool = True,
+                         ) -> 'dict|dict[str, dict]|list|dict[str, list]':
     """Returns non-hidden, non-callable properties/values of a Class instance.
     
     Args:
@@ -113,6 +114,7 @@ def get_class_properties(cls_instance: object,
         ignore: A list of names to ignore (optional)
         categorize: If `True` the properties will be grouped as `read_only` or
             `read_write`.
+        include_values: If `False` the properties will be returned as a list.
     
     Returns:
         A dictionary as `{ 'property': <value> }`. If `categorize`
@@ -131,33 +133,38 @@ def get_class_properties(cls_instance: object,
                   if not a.startswith(('_', 'properties')) and
                   a not in ignore and
                   not callable(getattr(cls_instance, a))]
-    for prop in props_list:
-        props[prop] = getattr(cls_instance, prop)
+    if include_values:
+        for prop in props_list:
+            props[prop] = getattr(cls_instance, prop)
     if not categorize:
-        return props
+        return props if include_values else props_list
+    categorized = {}
     ro_props = [attr for attr, val in vars(cls_instance.__class__).items()
                 if isinstance(val, property) and val.fset is None and
                 attr not in ignore]
-    read_only = {}
-    read_write = {}
-    for prop in props:
-        if prop in ro_props:
-            read_only[prop] = props[prop]
-        else:
-            read_write[prop] = props[prop]
-    categorized = {}
+    if include_values:
+        read_only = {}
+        read_write = {}
+        for prop in props:
+            if prop in ro_props:
+                read_only[prop] = props[prop]
+            else:
+                read_write[prop] = props[prop]
+    else:
+        read_only = ro_props
+        read_write = [p for p in props_list if p not in ro_props]
     if read_only:
         categorized['read_only'] = read_only
     if read_write:
         categorized['read_write'] = read_write
     return categorized
+    
 
 
-def tag_class_properties(instance: object,
+def tag_class_properties(cls: type,
                          tag: str = None,
                          json: bool = True,
                          categorize: bool = False,
-                         include_values: bool = False,
                          ignore: 'list[str]' = [],
                          ) -> 'list|dict':
     """Retrieves the class public properties tagged with a routing prefix.
@@ -171,9 +178,7 @@ def tag_class_properties(instance: object,
     If `categorize` is `True` a dictionary is returned of the form
     `{ 'read_only': ['tagProp1Name'], 'read_write': ['tagProp2Name']}` where
     `read_only` or `read_write` are not present if no properties meet the
-    respective criteria. If `include_values` is also `True` each list will be
-    replaced by a nested dictionary
-    `{ 'tagProp1Name': <prop1_value>, 'tagProp2Name': <prop2_value> }`
+    respective criteria.
     
     If `categorize` is `False` and `include_values` is `True` then a simple
     dictionary of tagged names and values will be returned with the form
@@ -183,39 +188,32 @@ def tag_class_properties(instance: object,
     their original case e.g. `tag_prop1_name`
     
     Args:
-        instance: A class instance to tag.
+        cls: A class to tag.
         tag: The name of the routing prefix. If `None`, the calling function's
             module `__name__` will be used.
         json: A flag indicating whether to use camelCase keys.
         categorize: A flag indicating whether to group as `read_only` and
             `read_write`.
-        include_values: A flag indicating whether to return values or just
-            a list of property names.
         ignore: A list of property names to ignore.
     
     Retuns:
         A dictionary or list of strings (see docstring).
         
     """
+    if not isinstance(cls, type):
+        raise ValueError('cls must be a class type')
     if not isinstance(tag, str) or not tag:
-        tag = get_tag_class(instance)
-    class_props = get_class_properties(instance, ignore, categorize)
+        tag = get_class_tag(cls)
+    class_props = get_class_properties(cls(),
+                                       ignore,
+                                       categorize,
+                                       include_values=False)
     if not categorize:
-        if not include_values:
-            return [tag_property(tag, prop, json) for prop in class_props]
-        result = {}
-        for prop, val in class_props.items():
-            result[tag_property(tag, prop, json)] = val
-        return result
+        return [tag_property(tag, prop, json) for prop in class_props]
     result = {}
     for category, props in class_props.items():
-        assert isinstance(props, dict)
-        if not include_values:
-            result[category] = [tag_property(tag, prop, json) for prop in props]
-        else:
-            result[category] = {}
-            for prop, val in props.items():
-                result[category][tag_property(tag, prop, json)] = val
+        cat = snake_to_camel(category) if json else category
+        result[cat] = [tag_property(tag, prop, json) for prop in props]
     return result
 
 
@@ -225,8 +223,10 @@ def tag_property(tag: str, prop: str, json: bool = True):
     return f'{tag}_{prop}'
 
 
-def get_tag_class(instance: object) -> str:
-    return instance.__class__.__name__.lower()
+def get_class_tag(cls: type) -> str:
+    if not isinstance(cls, type):
+        raise ValueError('cls must be a class type')
+    return cls.__name__.lower()
 
 
 def untag_class_property(tagged_property: str,

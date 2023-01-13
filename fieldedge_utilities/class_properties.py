@@ -169,6 +169,7 @@ def tag_class_properties(cls: type,
                          json: bool = True,
                          categorize: bool = False,
                          ignore: 'list[str]' = [],
+                         init_kwargs: dict = None
                          ) -> 'list|dict':
     """Retrieves the class public properties tagged with a routing prefix.
     
@@ -198,6 +199,7 @@ def tag_class_properties(cls: type,
         categorize: A flag indicating whether to group as `read_only` and
             `read_write`.
         ignore: A list of property names to ignore.
+        init_kwargs: Dummy initialization kwargs for the class initialization.
     
     Retuns:
         A dictionary or list of strings (see docstring).
@@ -207,7 +209,11 @@ def tag_class_properties(cls: type,
         raise ValueError('cls must be a class type')
     if not isinstance(tag, str) or not tag:
         tag = get_class_tag(cls)
-    class_props = get_class_properties(cls(),
+    if init_kwargs:
+        dummy_instance = cls(**init_kwargs)
+    else:
+        dummy_instance = cls()
+    class_props = get_class_properties(dummy_instance,
                                        ignore,
                                        categorize,
                                        include_values=False)

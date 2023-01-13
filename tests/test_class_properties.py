@@ -59,8 +59,8 @@ class TestObjToo:
     For example a satellite monitor service could be proxied as a child through
     an IoT demo service.
     """
-    def __init__(self) -> None:
-        self._one: str = '010203'
+    def __init__(self, one: str) -> None:
+        self._one: str = one
         self.two: int = 2
     
     @property
@@ -155,7 +155,7 @@ def test_obj():
 
 @pytest.fixture
 def test_obj_too():
-    return TestObjToo()
+    return TestObjToo('010203')
 
 
 def test_get_class_properties_basic(test_obj: TestObj):
@@ -219,6 +219,15 @@ def test_tag_properties_categorized():
     for prop in exp_rw_untagged:
         expected = tag_property(get_class_tag(TestObj), prop)
         assert expected in tagged_cat_props['readWrite']
+
+
+def test_tag_properties_kwargs():
+    notag_tag = get_class_tag(TestObjToo)
+    tagged_props = tag_class_properties(TestObjToo, init_kwargs={'one': '010203'})
+    expected_untagged = ['one', 'two', 'one_bytes']
+    expected_tagged = [f'{notag_tag}{x.title().replace("_", "")}'
+                       for x in expected_untagged]
+    assert all(tp in expected_tagged for tp in tagged_props)
 
 
 def test_untag_property(test_obj: TestObj):

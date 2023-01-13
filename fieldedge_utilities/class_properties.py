@@ -230,17 +230,15 @@ def get_tag_class(instance: object) -> str:
 
 
 def untag_class_property(tagged_property: str,
-                         tag_or_instance: 'str|object' = None,
                          include_tag: bool = False,
                          ) -> 'str|tuple[str, str]':
     """Reverts a JSON-format tagged property to its PEP representation.
     
     Expects a JSON-format tagged value e.g. `modemUniqueId` would return
-    `(unique_id, modem)`.
+    `(unique_id, modem)` where it assumes the first word is the tag.
 
     Args:
         tagged_property: The tagged property value, allowing for camelCase.
-        tag: Optional to specify the tag, allowing for camelCase tags.
         include_tag: If True, a tuple is returned with the tag as the second
             element.
     
@@ -249,15 +247,9 @@ def untag_class_property(tagged_property: str,
             property value in snake_case, and the tag
 
     """
-    if not isinstance(tag_or_instance, str):
-        if not isinstance(tag_or_instance, object):
-            raise ValueError('Missing tag or class instance to derive tag')
-        tag = get_tag_class(tag_or_instance)
-    else:
-        tag = tag_or_instance
-    if not tagged_property.startswith(tag):
-        raise ValueError(f'{tagged_property} does not start with {tag}')
-    prop = camel_to_snake(tagged_property.replace(tag_or_instance, '', 1))
+    if '_' not in camel_to_snake(tagged_property):
+        raise ValueError(f'Invalid camelCase {tagged_property}')
+    tag, prop = camel_to_snake(tagged_property).split('_', 1)
     if not include_tag:
         return prop
     return (prop, tag)

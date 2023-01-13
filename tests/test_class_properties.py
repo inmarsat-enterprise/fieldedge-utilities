@@ -210,8 +210,9 @@ def test_untag_property(test_obj: TestObj):
     tagged_properties = tag_class_properties(test_obj)
     tag = get_tag_class(test_obj)
     for prop in tagged_properties:
-        untagged = untag_class_property(prop, tag)
+        untagged, derived_tag = untag_class_property(prop, include_tag=True)
         assert hasattr(test_obj, untagged)
+        assert derived_tag == tag
 
 
 def test_tag_merge(test_obj: TestObj, test_obj_too: TestObjToo):

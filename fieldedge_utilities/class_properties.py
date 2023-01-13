@@ -109,6 +109,8 @@ def get_class_properties(cls_instance: object,
                          ) -> 'dict|dict[str, dict]|list|dict[str, list]':
     """Returns non-hidden, non-callable properties/values of a Class instance.
     
+    Also ignores CAPITAL_CASE attributes which are assumed to be constants.
+    
     Args:
         cls_instance: The Class instance whose properties/values will be derived
         ignore: A list of names to ignore (optional)
@@ -132,7 +134,8 @@ def get_class_properties(cls_instance: object,
     props_list = [a for a in dir(cls_instance)
                   if not a.startswith(('_', 'properties')) and
                   a not in ignore and
-                  not callable(getattr(cls_instance, a))]
+                  not callable(getattr(cls_instance, a)) and
+                  not a.isupper()]
     if include_values:
         for prop in props_list:
             props[prop] = getattr(cls_instance, prop)

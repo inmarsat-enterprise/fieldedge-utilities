@@ -20,6 +20,8 @@ class TestEnum(IntEnum):
 
 class TestObj:
     """A class for testing property manipulation for MQTT/JSON-based ISC."""
+    CLASS_CONSTANT = 'a_constant'
+    
     def __init__(self) -> None:
         self._one: int = 1   #: private
         self.two: object = TestNestedObj()

@@ -211,10 +211,10 @@ def test_tag_properties_categorized():
     exp_ro_untagged = ['five', 'seven', 'one_plus_six']
     exp_rw_untagged = ['two', 'three', 'four', 'six']
     for prop in exp_ro_untagged:
-        expected = tag_property(get_class_tag(TestObj), prop)
+        expected = tag_class_property(get_class_tag(TestObj), prop)
         assert expected in tagged_cat_props['readOnly']
     for prop in exp_rw_untagged:
-        expected = tag_property(get_class_tag(TestObj), prop)
+        expected = tag_class_property(get_class_tag(TestObj), prop)
         assert expected in tagged_cat_props['readWrite']
 
 

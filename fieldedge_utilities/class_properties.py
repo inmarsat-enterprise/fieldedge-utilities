@@ -134,12 +134,12 @@ def get_class_properties(cls: type,
         ValueError if `cls` does not have a `dir()` method or is not a `type`.
         
     """
-    if not dir(cls) or not isinstance(cls, type):
+    if not dir(cls):
         raise ValueError('Invalid cls_instance - must have dir() method')
     if '__slots__' not in dir(cls):
         _log.warning('Attributes in __init__ will be missed')
     attrs = [attr for attr in dir(cls)
-             if not attr.startswith(('_', 'properties')) and
+             if not attr.startswith(('_',)) and
              attr not in ignore and
              not callable(inspect.getattr_static(cls, attr)) and
              not attr.isupper()]
@@ -158,17 +158,22 @@ def get_class_properties(cls: type,
 
 def tag_class_properties(cls: type,
                          tag: str = None,
+                         auto_tag: bool = True,
                          json: bool = True,
                          categorize: bool = False,
                          ignore: 'list[str]' = [],
                          ) -> 'list|dict':
     """Retrieves the class public properties tagged with a routing prefix.
     
-    If a `tag` is not provided, the lowercase name of the instance's class will
-    be used e.g. MyClass.property becomes myclassProperty.
+    If a `tag` is not provided and `auto_tag` is `True` then the lowercase name
+    of the instance's class will be used e.g. MyClass.property becomes
+    myclassProperty.
     
     Using the defaults will return a simple list of tagged property names
     with the form `['tagProp1Name', 'tagProp2Name']`
+    
+    If `tag` is `None` and `auto_tag` is `False` then no tag will be applied
+    and the native property names will be returned as JSON if `json` is `True`.
     
     If `categorize` is `True` a dictionary is returned of the form
     `{ 'read_only': ['tagProp1Name'], 'read_write': ['tagProp2Name']}` where
@@ -182,6 +187,7 @@ def tag_class_properties(cls: type,
         cls: A class to tag.
         tag: The name of the routing prefix. If `None`, the calling function's
             module `__name__` will be used.
+        auto_tag: If `True` will use the class name in lowercase.
         json: A flag indicating whether to use camelCase keys.
         categorize: A flag indicating whether to group as `read_only` and
             `read_write`.
@@ -191,25 +197,38 @@ def tag_class_properties(cls: type,
         A dictionary or list of strings (see docstring).
         
     """
-    if not isinstance(cls, type):
-        raise ValueError('cls must be a class type')
-    if not isinstance(tag, str) or not tag:
+    # if not isinstance(cls, type) and not inspect.isclass(cls):
+    #     raise ValueError('cls must be a class type')
+    if auto_tag and not tag:
         tag = get_class_tag(cls)
     class_props = get_class_properties(cls,
                                        ignore,
                                        categorize)
     if not categorize:
-        return [tag_property(tag, prop, json) for prop in class_props]
+        return [tag_class_property(prop, tag, json) for prop in class_props]
     result = {}
     for category, props in class_props.items():
         cat = snake_to_camel(category) if json else category
-        result[cat] = [tag_property(tag, prop, json) for prop in props]
+        result[cat] = [tag_class_property(prop, tag, json) for prop in props]
     return result
 
 
-def tag_property(tag: str, prop: str, json: bool = True):
+def tag_class_property(prop: str,
+                       tag_or_cls: 'str|type' = None,
+                       json: bool = True) -> str:
+    """Converts a property for ISC adding an optional tag."""
+    if tag_or_cls is None:
+        tagged = prop
+    else:
+        if isinstance(tag_or_cls, type):
+            tag = get_class_tag(tag_or_cls)
+        elif isinstance(tag_or_cls, str):
+            tag = tag_or_cls
+        else:
+            raise ValueError('tag_or_cls must be a string or class type')
+        tagged = f'{tag.lower()}_{prop}'
     if json:
-        return snake_to_camel(f'{tag}_{prop}')
+        return snake_to_camel(f'{tagged}')
     return f'{tag}_{prop}'
 
 

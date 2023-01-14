@@ -9,8 +9,8 @@ from fieldedge_utilities.class_properties import *
 
 class TestNestedObj:
     def __init__(self) -> None:
-        self.one_int = 1
-        self.two_list = ['element']
+        self.one = 1
+        self.two = ['element']
 
 
 class TestEnum(IntEnum):
@@ -20,6 +20,8 @@ class TestEnum(IntEnum):
 
 class TestObj:
     """A class for testing property manipulation for MQTT/JSON-based ISC."""
+    __slots__ = ('__dict__', '_one', 'two', 'three', 'four', '_five', '_six')
+    
     CLASS_CONSTANT = 'a_constant'
     
     def __init__(self) -> None:
@@ -51,6 +53,9 @@ class TestObj:
     @property
     def one_plus_six(self) -> int:
         return self._one + self._six
+    
+    def some_callable(self) -> str:
+        return 'called'
 
 
 class TestObjToo:
@@ -158,42 +163,34 @@ def test_obj_too():
     return TestObjToo('010203')
 
 
-def test_get_class_properties_basic(test_obj: TestObj):
-    props = get_class_properties(test_obj)
+def test_get_class_properties_basic():
+    props = get_class_properties(TestObj)
     expected = ['two', 'three', 'four', 'five', 'six', 'seven', 'one_plus_six']
-    assert isinstance(props, dict)
+    assert isinstance(props, list)
     assert all(prop in props for prop in expected)
     assert not any(prop not in expected for prop in props)
-    for prop, val in props.items():
-        assert hasattr(test_obj, prop)
-        assert getattr(test_obj, prop) == val
 
 
-def test_get_class_properties_categorized(test_obj: TestObj):
-    props_c = get_class_properties(test_obj, categorize=True)
+def test_get_class_properties_categorized():
+    cat_props = get_class_properties(TestObj, categorize=True)
     expected_categories = ['read_only', 'read_write']
     expected_ro = ['five', 'seven', 'one_plus_six']
     expected_rw = ['two', 'three', 'four', 'six']
-    assert isinstance(props_c, dict)
-    assert all(cat in props_c for cat in expected_categories)
-    assert not any(cat not in expected_categories for cat in props_c)
-    for k, v in props_c.items():
-        assert isinstance(v, dict)
-    assert all(prop in props_c['read_only'] for prop in expected_ro)
-    assert not any(prop not in expected_ro for prop in props_c['read_only'])
-    assert all(prop in props_c['read_write'] for prop in expected_rw)
-    assert not any(prop not in expected_rw for prop in props_c['read_write'])
-    for cat, props in props_c.items():
-        for prop in props:
-            assert hasattr(test_obj, prop)
-            assert getattr(test_obj, prop) == props[prop]
+    assert isinstance(cat_props, dict)
+    assert all(cat in cat_props for cat in expected_categories)
+    assert not any(cat not in expected_categories for cat in cat_props)
+    for v in cat_props.values():
+        assert isinstance(v, list)
+    assert all(prop in cat_props['read_only'] for prop in expected_ro)
+    assert not any(prop not in expected_ro for prop in cat_props['read_only'])
+    assert all(prop in cat_props['read_write'] for prop in expected_rw)
+    assert not any(prop not in expected_rw for prop in cat_props['read_write'])
 
 
-def test_get_class_properties_ignore(test_obj: TestObj):
+def test_get_class_properties_ignore():
     ignore = ['seven', 'one_plus_six']
-    props = get_class_properties(test_obj, ignore)
+    props = get_class_properties(TestObj, ignore)
     expected = ['two', 'three', 'four', 'five', 'six']
-    assert isinstance(props, dict)
     assert all(prop in props for prop in expected)
     assert not any(prop not in expected for prop in props)
 
@@ -223,19 +220,19 @@ def test_tag_properties_categorized():
 
 def test_tag_properties_kwargs():
     notag_tag = get_class_tag(TestObjToo)
-    tagged_props = tag_class_properties(TestObjToo, init_kwargs={'one': '010203'})
+    tagged_props = tag_class_properties(TestObjToo)
     expected_untagged = ['one', 'two', 'one_bytes']
     expected_tagged = [f'{notag_tag}{x.title().replace("_", "")}'
                        for x in expected_untagged]
     assert all(tp in expected_tagged for tp in tagged_props)
 
 
-def test_untag_property(test_obj: TestObj):
-    tagged_properties = tag_class_properties(test_obj)
-    tag = get_class_tag(test_obj)
+def test_untag_property():
+    tagged_properties = tag_class_properties(TestObj)
+    tag = get_class_tag(TestObj)
     for prop in tagged_properties:
         untagged, derived_tag = untag_class_property(prop, include_tag=True)
-        assert hasattr(test_obj, untagged)
+        assert hasattr(TestObj, untagged)
         assert derived_tag == tag
 
 
@@ -282,10 +279,11 @@ def test_equivalent_attributes_simple():
 
 
 def test_equivalent_attributes_nested_object():
-    # FAILING
     obj_1 = TestObj()
     obj_2 = TestObj()
     assert equivalent_attributes(obj_1, obj_2)
+    obj_1.two.one = 2
+    assert not equivalent_attributes(obj_1, obj_2)
     
 #: More specific test cases for FieldEdge project concepts --------
 class SatModemBaseAttribute:

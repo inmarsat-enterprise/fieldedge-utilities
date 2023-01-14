@@ -34,6 +34,7 @@ import json
 import logging
 import os
 import re
+import inspect
 import itertools
 from time import time
 
@@ -131,63 +132,57 @@ def cache_valid(ref_time: &#39;int|float&#39;,
     return True
 
 
-def get_class_properties(cls_instance: object,
+def hasattr_static(obj: object, name: str) -&gt; bool:
+    try:
+        inspect.getattr_static(obj, name)
+        return True
+    except AttributeError:
+        return False
+
+
+def get_class_properties(cls: type,
                          ignore: &#39;list[str]&#39; = [],
                          categorize: bool = False,
-                         include_values: bool = True,
-                         ) -&gt; &#39;dict|dict[str, dict]|list|dict[str, list]&#39;:
+                         ) -&gt; &#39;list[str]|dict[str, list]&#39;:
     &#34;&#34;&#34;Returns non-hidden, non-callable properties/values of a Class instance.
     
+    Also ignores CAPITAL_CASE attributes which are assumed to be constants.
+    
     Args:
-        cls_instance: The Class instance whose properties/values will be derived
+        cls: The Class whose properties will be derived
         ignore: A list of names to ignore (optional)
         categorize: If `True` the properties will be grouped as `read_only` or
             `read_write`.
-        include_values: If `False` the properties will be returned as a list.
     
     Returns:
-        A dictionary as `{ &#39;property&#39;: &lt;value&gt; }`. If `categorize`
-            flag is set the return dictionary structure is:
-            `{ &#39;read_write&#39;: { &#39;property&#39;: &lt;value&gt; },
-            &#39;read_only&#39;: { &#39;property&#39;: &lt;value&gt; } }`
+        A list of property names or if `categorize` is `True` a dictionary like:
+            `{ &#39;read_write&#39;: [&#39;property_1&#39;, &#39;property_2&#39;],
+            &#39;read_only&#39;: [&#39;property_3&#39;] }`
         
     Raises:
-        ValueError if cls_instance does not have a `dir` method.
+        ValueError if `cls` does not have a `dir()` method or is not a `type`.
         
     &#34;&#34;&#34;
-    if not dir(cls_instance):
+    if not dir(cls) or not isinstance(cls, type):
         raise ValueError(&#39;Invalid cls_instance - must have dir() method&#39;)
-    props = {}
-    props_list = [a for a in dir(cls_instance)
-                  if not a.startswith((&#39;_&#39;, &#39;properties&#39;)) and
-                  a not in ignore and
-                  not callable(getattr(cls_instance, a))]
-    if include_values:
-        for prop in props_list:
-            props[prop] = getattr(cls_instance, prop)
+    if &#39;__slots__&#39; not in dir(cls):
+        _log.warning(&#39;Attributes in __init__ will be missed&#39;)
+    attrs = [attr for attr in dir(cls)
+             if not attr.startswith((&#39;_&#39;, &#39;properties&#39;)) and
+             attr not in ignore and
+             not callable(inspect.getattr_static(cls, attr)) and
+             not attr.isupper()]
     if not categorize:
-        return props if include_values else props_list
+        return attrs
     categorized = {}
-    ro_props = [attr for attr, val in vars(cls_instance.__class__).items()
-                if isinstance(val, property) and val.fset is None and
-                attr not in ignore]
-    if include_values:
-        read_only = {}
-        read_write = {}
-        for prop in props:
-            if prop in ro_props:
-                read_only[prop] = props[prop]
-            else:
-                read_write[prop] = props[prop]
-    else:
-        read_only = ro_props
-        read_write = [p for p in props_list if p not in ro_props]
+    read_only = [attr for attr, val in vars(cls).items() if attr in attrs and
+                 isinstance(val, property) and val.fset is None]
+    read_write = [attr for attr in attrs if attr not in read_only]
     if read_only:
         categorized[&#39;read_only&#39;] = read_only
     if read_write:
         categorized[&#39;read_write&#39;] = read_write
     return categorized
-    
 
 
 def tag_class_properties(cls: type,
@@ -199,7 +194,7 @@ def tag_class_properties(cls: type,
     &#34;&#34;&#34;Retrieves the class public properties tagged with a routing prefix.
     
     If a `tag` is not provided, the lowercase name of the instance&#39;s class will
-    be used.
+    be used e.g. MyClass.property becomes myclassProperty.
     
     Using the defaults will return a simple list of tagged property names
     with the form `[&#39;tagProp1Name&#39;, &#39;tagProp2Name&#39;]`
@@ -208,10 +203,6 @@ def tag_class_properties(cls: type,
     `{ &#39;read_only&#39;: [&#39;tagProp1Name&#39;], &#39;read_write&#39;: [&#39;tagProp2Name&#39;]}` where
     `read_only` or `read_write` are not present if no properties meet the
     respective criteria.
-    
-    If `categorize` is `False` and `include_values` is `True` then a simple
-    dictionary of tagged names and values will be returned with the form
-    `{ &#39;tagProp1Name&#39;: &lt;prop1_value&gt;, &#39;tagProp2Name&#39;: &lt;prop2_value&gt; }`
     
     If `json` is `False` the above applies but property names will use
     their original case e.g. `tag_prop1_name`
@@ -233,10 +224,9 @@ def tag_class_properties(cls: type,
         raise ValueError(&#39;cls must be a class type&#39;)
     if not isinstance(tag, str) or not tag:
         tag = get_class_tag(cls)
-    class_props = get_class_properties(cls(),
+    class_props = get_class_properties(cls,
                                        ignore,
-                                       categorize,
-                                       include_values=False)
+                                       categorize)
     if not categorize:
         return [tag_property(tag, prop, json) for prop in class_props]
     result = {}
@@ -391,14 +381,15 @@ def json_compatible(obj: object,
         return res
 
 
-def equivalent_attributes(reference: object,
+def equivalent_attributes(ref: object,
                           other: object,
-                          exclude: &#39;list[str]&#39; = None,
+                          exclude: &#39;list[str]&#39; = [],
+                          dbg: str = &#39;&#39;,
                           ) -&gt; bool:
     &#34;&#34;&#34;Confirms attribute equivalence between objects of the same type.
     
     Args:
-        reference: The reference object being compared to.
+        ref: The reference object being compared to.
         other: The object comparing against the reference.
         exclude: Optional list of attribute names to exclude from comparison.
     
@@ -406,18 +397,27 @@ def equivalent_attributes(reference: object,
         True if all (non-excluded) attribute name/values match.
 
     &#34;&#34;&#34;
-    if type(reference) != type(other):
+    if type(ref) != type(other):
         return False
-    if not hasattr(reference, &#39;__dict__&#39;) or not hasattr(other, &#39;__dict__&#39;):
-        return reference == other
-    for attr, val in vars(reference).items():
-        if exclude is not None and attr in exclude:
+    if not hasattr(ref, &#39;__dict__&#39;) or not hasattr(other, &#39;__dict__&#39;):
+        return ref == other
+    if dbg:
+        dbg += &#39;.&#39;
+    for attr in dir(ref):
+        if attr.startswith(&#39;__&#39;) or attr in exclude:
             continue
         if not hasattr(other, attr):
-            _log.warning(f&#39;Other missing {attr}&#39;)
+            _log.debug(f&#39;Other missing {dbg}{attr}&#39;)
             return False
-        if val != vars(other)[attr]:
-            _log.warning(f&#39;{val} != {vars(other)[attr]}&#39;)
+        ref_val = getattr(ref, attr)
+        if callable(ref_val):
+            continue
+        other_val = getattr(other, attr)
+        if any(hasattr(ref_val, a) for a in [&#39;__dict__&#39;, &#39;__slots__&#39;]):
+            if not equivalent_attributes(ref_val, other_val, dbg=attr):
+                return False
+        elif ref_val != other_val:
+            _log.debug(f&#39;{dbg}{attr} mismatch&#39;)
             return False
     return True
 
@@ -546,13 +546,13 @@ raw resource.</p></div>
 </details>
 </dd>
 <dt id="fieldedge_utilities.class_properties.equivalent_attributes"><code class="name flex">
-<span>def <span class="ident">equivalent_attributes</span></span>(<span>reference: object, other: object, exclude: list[str] = None) ‑> bool</span>
+<span>def <span class="ident">equivalent_attributes</span></span>(<span>ref: object, other: object, exclude: list[str] = [], dbg: str = '') ‑> bool</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Confirms attribute equivalence between objects of the same type.</p>
 <h2 id="args">Args</h2>
 <dl>
-<dt><strong><code>reference</code></strong></dt>
+<dt><strong><code>ref</code></strong></dt>
 <dd>The reference object being compared to.</dd>
 <dt><strong><code>other</code></strong></dt>
 <dd>The object comparing against the reference.</dd>
@@ -565,14 +565,15 @@ raw resource.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def equivalent_attributes(reference: object,
+<pre><code class="python">def equivalent_attributes(ref: object,
                           other: object,
-                          exclude: &#39;list[str]&#39; = None,
+                          exclude: &#39;list[str]&#39; = [],
+                          dbg: str = &#39;&#39;,
                           ) -&gt; bool:
     &#34;&#34;&#34;Confirms attribute equivalence between objects of the same type.
     
     Args:
-        reference: The reference object being compared to.
+        ref: The reference object being compared to.
         other: The object comparing against the reference.
         exclude: Optional list of attribute names to exclude from comparison.
     
@@ -580,101 +581,95 @@ raw resource.</p></div>
         True if all (non-excluded) attribute name/values match.
 
     &#34;&#34;&#34;
-    if type(reference) != type(other):
+    if type(ref) != type(other):
         return False
-    if not hasattr(reference, &#39;__dict__&#39;) or not hasattr(other, &#39;__dict__&#39;):
-        return reference == other
-    for attr, val in vars(reference).items():
-        if exclude is not None and attr in exclude:
+    if not hasattr(ref, &#39;__dict__&#39;) or not hasattr(other, &#39;__dict__&#39;):
+        return ref == other
+    if dbg:
+        dbg += &#39;.&#39;
+    for attr in dir(ref):
+        if attr.startswith(&#39;__&#39;) or attr in exclude:
             continue
         if not hasattr(other, attr):
-            _log.warning(f&#39;Other missing {attr}&#39;)
+            _log.debug(f&#39;Other missing {dbg}{attr}&#39;)
             return False
-        if val != vars(other)[attr]:
-            _log.warning(f&#39;{val} != {vars(other)[attr]}&#39;)
+        ref_val = getattr(ref, attr)
+        if callable(ref_val):
+            continue
+        other_val = getattr(other, attr)
+        if any(hasattr(ref_val, a) for a in [&#39;__dict__&#39;, &#39;__slots__&#39;]):
+            if not equivalent_attributes(ref_val, other_val, dbg=attr):
+                return False
+        elif ref_val != other_val:
+            _log.debug(f&#39;{dbg}{attr} mismatch&#39;)
             return False
     return True</code></pre>
 </details>
 </dd>
 <dt id="fieldedge_utilities.class_properties.get_class_properties"><code class="name flex">
-<span>def <span class="ident">get_class_properties</span></span>(<span>cls_instance: object, ignore: list[str] = [], categorize: bool = False, include_values: bool = True) ‑> dict | dict[str, dict] | list | dict[str, list]</span>
+<span>def <span class="ident">get_class_properties</span></span>(<span>cls: type, ignore: list[str] = [], categorize: bool = False) ‑> list[str] | dict[str, list]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Returns non-hidden, non-callable properties/values of a Class instance.</p>
+<p>Also ignores CAPITAL_CASE attributes which are assumed to be constants.</p>
 <h2 id="args">Args</h2>
 <dl>
-<dt><strong><code>cls_instance</code></strong></dt>
-<dd>The Class instance whose properties/values will be derived</dd>
+<dt><strong><code>cls</code></strong></dt>
+<dd>The Class whose properties will be derived</dd>
 <dt><strong><code>ignore</code></strong></dt>
 <dd>A list of names to ignore (optional)</dd>
 <dt><strong><code>categorize</code></strong></dt>
 <dd>If <code>True</code> the properties will be grouped as <code>read_only</code> or
 <code>read_write</code>.</dd>
-<dt><strong><code>include_values</code></strong></dt>
-<dd>If <code>False</code> the properties will be returned as a list.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
-<p>A dictionary as <code>{ 'property': &lt;value&gt; }</code>. If <code>categorize</code>
-flag is set the return dictionary structure is:
-<code>{ 'read_write': { 'property': &lt;value&gt; },
-'read_only': { 'property': &lt;value&gt; } }</code></p>
+<p>A list of property names or if <code>categorize</code> is <code>True</code> a dictionary like:
+<code>{ 'read_write': ['property_1', 'property_2'],
+'read_only': ['property_3'] }</code></p>
 <h2 id="raises">Raises</h2>
-<p>ValueError if cls_instance does not have a <code>dir</code> method.</p></div>
+<p>ValueError if <code>cls</code> does not have a <code>dir()</code> method or is not a <code>type</code>.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_class_properties(cls_instance: object,
+<pre><code class="python">def get_class_properties(cls: type,
                          ignore: &#39;list[str]&#39; = [],
                          categorize: bool = False,
-                         include_values: bool = True,
-                         ) -&gt; &#39;dict|dict[str, dict]|list|dict[str, list]&#39;:
+                         ) -&gt; &#39;list[str]|dict[str, list]&#39;:
     &#34;&#34;&#34;Returns non-hidden, non-callable properties/values of a Class instance.
     
+    Also ignores CAPITAL_CASE attributes which are assumed to be constants.
+    
     Args:
-        cls_instance: The Class instance whose properties/values will be derived
+        cls: The Class whose properties will be derived
         ignore: A list of names to ignore (optional)
         categorize: If `True` the properties will be grouped as `read_only` or
             `read_write`.
-        include_values: If `False` the properties will be returned as a list.
     
     Returns:
-        A dictionary as `{ &#39;property&#39;: &lt;value&gt; }`. If `categorize`
-            flag is set the return dictionary structure is:
-            `{ &#39;read_write&#39;: { &#39;property&#39;: &lt;value&gt; },
-            &#39;read_only&#39;: { &#39;property&#39;: &lt;value&gt; } }`
+        A list of property names or if `categorize` is `True` a dictionary like:
+            `{ &#39;read_write&#39;: [&#39;property_1&#39;, &#39;property_2&#39;],
+            &#39;read_only&#39;: [&#39;property_3&#39;] }`
         
     Raises:
-        ValueError if cls_instance does not have a `dir` method.
+        ValueError if `cls` does not have a `dir()` method or is not a `type`.
         
     &#34;&#34;&#34;
-    if not dir(cls_instance):
+    if not dir(cls) or not isinstance(cls, type):
         raise ValueError(&#39;Invalid cls_instance - must have dir() method&#39;)
-    props = {}
-    props_list = [a for a in dir(cls_instance)
-                  if not a.startswith((&#39;_&#39;, &#39;properties&#39;)) and
-                  a not in ignore and
-                  not callable(getattr(cls_instance, a))]
-    if include_values:
-        for prop in props_list:
-            props[prop] = getattr(cls_instance, prop)
+    if &#39;__slots__&#39; not in dir(cls):
+        _log.warning(&#39;Attributes in __init__ will be missed&#39;)
+    attrs = [attr for attr in dir(cls)
+             if not attr.startswith((&#39;_&#39;, &#39;properties&#39;)) and
+             attr not in ignore and
+             not callable(inspect.getattr_static(cls, attr)) and
+             not attr.isupper()]
     if not categorize:
-        return props if include_values else props_list
+        return attrs
     categorized = {}
-    ro_props = [attr for attr, val in vars(cls_instance.__class__).items()
-                if isinstance(val, property) and val.fset is None and
-                attr not in ignore]
-    if include_values:
-        read_only = {}
-        read_write = {}
-        for prop in props:
-            if prop in ro_props:
-                read_only[prop] = props[prop]
-            else:
-                read_write[prop] = props[prop]
-    else:
-        read_only = ro_props
-        read_write = [p for p in props_list if p not in ro_props]
+    read_only = [attr for attr, val in vars(cls).items() if attr in attrs and
+                 isinstance(val, property) and val.fset is None]
+    read_write = [attr for attr in attrs if attr not in read_only]
     if read_only:
         categorized[&#39;read_only&#39;] = read_only
     if read_write:
@@ -695,6 +690,23 @@ flag is set the return dictionary structure is:
     if not isinstance(cls, type):
         raise ValueError(&#39;cls must be a class type&#39;)
     return cls.__name__.lower()</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.class_properties.hasattr_static"><code class="name flex">
+<span>def <span class="ident">hasattr_static</span></span>(<span>obj: object, name: str) ‑> bool</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def hasattr_static(obj: object, name: str) -&gt; bool:
+    try:
+        inspect.getattr_static(obj, name)
+        return True
+    except AttributeError:
+        return False</code></pre>
 </details>
 </dd>
 <dt id="fieldedge_utilities.class_properties.json_compatible"><code class="name flex">
@@ -823,16 +835,13 @@ keys to <code>camelCase</code>.</dd>
 <dd>
 <div class="desc"><p>Retrieves the class public properties tagged with a routing prefix.</p>
 <p>If a <code>tag</code> is not provided, the lowercase name of the instance's class will
-be used.</p>
+be used e.g. MyClass.property becomes myclassProperty.</p>
 <p>Using the defaults will return a simple list of tagged property names
 with the form <code>['tagProp1Name', 'tagProp2Name']</code></p>
 <p>If <code>categorize</code> is <code>True</code> a dictionary is returned of the form
 <code>{ 'read_only': ['tagProp1Name'], 'read_write': ['tagProp2Name']}</code> where
 <code>read_only</code> or <code>read_write</code> are not present if no properties meet the
 respective criteria.</p>
-<p>If <code>categorize</code> is <code>False</code> and <code>include_values</code> is <code>True</code> then a simple
-dictionary of tagged names and values will be returned with the form
-<code>{ 'tagProp1Name': &lt;prop1_value&gt;, 'tagProp2Name': &lt;prop2_value&gt; }</code></p>
 <p>If <code>json</code> is <code>False</code> the above applies but property names will use
 their original case e.g. <code>tag_prop1_name</code></p>
 <h2 id="args">Args</h2>
@@ -865,7 +874,7 @@ module <code>__name__</code> will be used.</dd>
     &#34;&#34;&#34;Retrieves the class public properties tagged with a routing prefix.
     
     If a `tag` is not provided, the lowercase name of the instance&#39;s class will
-    be used.
+    be used e.g. MyClass.property becomes myclassProperty.
     
     Using the defaults will return a simple list of tagged property names
     with the form `[&#39;tagProp1Name&#39;, &#39;tagProp2Name&#39;]`
@@ -874,10 +883,6 @@ module <code>__name__</code> will be used.</dd>
     `{ &#39;read_only&#39;: [&#39;tagProp1Name&#39;], &#39;read_write&#39;: [&#39;tagProp2Name&#39;]}` where
     `read_only` or `read_write` are not present if no properties meet the
     respective criteria.
-    
-    If `categorize` is `False` and `include_values` is `True` then a simple
-    dictionary of tagged names and values will be returned with the form
-    `{ &#39;tagProp1Name&#39;: &lt;prop1_value&gt;, &#39;tagProp2Name&#39;: &lt;prop2_value&gt; }`
     
     If `json` is `False` the above applies but property names will use
     their original case e.g. `tag_prop1_name`
@@ -899,10 +904,9 @@ module <code>__name__</code> will be used.</dd>
         raise ValueError(&#39;cls must be a class type&#39;)
     if not isinstance(tag, str) or not tag:
         tag = get_class_tag(cls)
-    class_props = get_class_properties(cls(),
+    class_props = get_class_properties(cls,
                                        ignore,
-                                       categorize,
-                                       include_values=False)
+                                       categorize)
     if not categorize:
         return [tag_property(tag, prop, json) for prop in class_props]
     result = {}
@@ -1048,6 +1052,7 @@ property value in snake_case, and the tag</p></div>
 <li><code><a title="fieldedge_utilities.class_properties.equivalent_attributes" href="#fieldedge_utilities.class_properties.equivalent_attributes">equivalent_attributes</a></code></li>
 <li><code><a title="fieldedge_utilities.class_properties.get_class_properties" href="#fieldedge_utilities.class_properties.get_class_properties">get_class_properties</a></code></li>
 <li><code><a title="fieldedge_utilities.class_properties.get_class_tag" href="#fieldedge_utilities.class_properties.get_class_tag">get_class_tag</a></code></li>
+<li><code><a title="fieldedge_utilities.class_properties.hasattr_static" href="#fieldedge_utilities.class_properties.hasattr_static">hasattr_static</a></code></li>
 <li><code><a title="fieldedge_utilities.class_properties.json_compatible" href="#fieldedge_utilities.class_properties.json_compatible">json_compatible</a></code></li>
 <li><code><a title="fieldedge_utilities.class_properties.snake_to_camel" href="#fieldedge_utilities.class_properties.snake_to_camel">snake_to_camel</a></code></li>
 <li><code><a title="fieldedge_utilities.class_properties.tag_class_properties" href="#fieldedge_utilities.class_properties.tag_class_properties">tag_class_properties</a></code></li>

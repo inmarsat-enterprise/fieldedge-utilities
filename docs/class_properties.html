@@ -37,11 +37,14 @@ import re
 import inspect
 import itertools
 from time import time
+from abc import ABC
 
 from .logger import verbose_logging
 from .path import get_caller_name
 
 PROPERTY_CACHE_DEFAULT = int(os.getenv(&#39;PROPERTY_CACHE_DEFAULT&#39;, 5))
+PROPERTY_READ_ONLY_CATEGORY = &#39;info&#39;
+PROPERTY_READ_WRITE_CATEGORY = &#39;config&#39;
 
 _log = logging.getLogger(__name__)
 
@@ -132,17 +135,42 @@ def cache_valid(ref_time: &#39;int|float&#39;,
     return True
 
 
-def hasattr_static(obj: object, name: str) -&gt; bool:
+def hasattr_static(obj: object, attr: str) -&gt; bool:
+    &#34;&#34;&#34;Determines if an object has an attribute without calling the attribute.
+    
+    Args:
+        obj: The object to inspect.
+        attr: The name of the attribute to query.
+    
+    Returns:
+        `True` if the object has the attribute.
+        
+    &#34;&#34;&#34;
     try:
-        inspect.getattr_static(obj, name)
+        inspect.getattr_static(obj, attr)
         return True
     except AttributeError:
         return False
 
 
+def property_is_read_only(instance: object, property_name: str) -&gt; bool:
+    if not hasattr_static(instance, property_name):
+        raise ValueError(f&#39;Object has no property {property_name}&#39;)
+    prop = inspect.getattr_static(instance, property_name)
+    try:
+        return prop.fset is None
+    except AttributeError:
+        return False
+        
+    
+def get_class_tag(cls: type) -&gt; str:
+    if isinstance(cls, type):
+        return cls.__name__.lower()
+    return cls.__class__.__name__.lower()
+
+
 def get_class_properties(cls: type,
                          ignore: &#39;list[str]&#39; = [],
-                         categorize: bool = False,
                          ) -&gt; &#39;list[str]|dict[str, list]&#39;:
     &#34;&#34;&#34;Returns non-hidden, non-callable properties/values of a Class instance.
     
@@ -151,58 +179,48 @@ def get_class_properties(cls: type,
     Args:
         cls: The Class whose properties will be derived
         ignore: A list of names to ignore (optional)
-        categorize: If `True` the properties will be grouped as `read_only` or
-            `read_write`.
     
     Returns:
-        A list of property names or if `categorize` is `True` a dictionary like:
-            `{ &#39;read_write&#39;: [&#39;property_1&#39;, &#39;property_2&#39;],
-            &#39;read_only&#39;: [&#39;property_3&#39;] }`
+        A list of exposed property names.
         
     Raises:
         ValueError if `cls` does not have a `dir()` method or is not a `type`.
         
     &#34;&#34;&#34;
-    if not dir(cls) or not isinstance(cls, type):
+    if not dir(cls):
         raise ValueError(&#39;Invalid cls_instance - must have dir() method&#39;)
-    if &#39;__slots__&#39; not in dir(cls):
-        _log.warning(&#39;Attributes in __init__ will be missed&#39;)
+    if isinstance(cls, type) and &#39;__slots__&#39; not in dir(cls):
+        _log.warning(f&#39;No __slots__: attributes in __init__ will be missed&#39;)
     attrs = [attr for attr in dir(cls)
-             if not attr.startswith((&#39;_&#39;, &#39;properties&#39;)) and
+             if not attr.startswith((&#39;_&#39;,)) and
              attr not in ignore and
              not callable(inspect.getattr_static(cls, attr)) and
              not attr.isupper()]
-    if not categorize:
-        return attrs
-    categorized = {}
-    read_only = [attr for attr, val in vars(cls).items() if attr in attrs and
-                 isinstance(val, property) and val.fset is None]
-    read_write = [attr for attr in attrs if attr not in read_only]
-    if read_only:
-        categorized[&#39;read_only&#39;] = read_only
-    if read_write:
-        categorized[&#39;read_write&#39;] = read_write
-    return categorized
+    return attrs
 
 
 def tag_class_properties(cls: type,
                          tag: str = None,
+                         auto_tag: bool = True,
                          json: bool = True,
                          categorize: bool = False,
                          ignore: &#39;list[str]&#39; = [],
                          ) -&gt; &#39;list|dict&#39;:
     &#34;&#34;&#34;Retrieves the class public properties tagged with a routing prefix.
     
-    If a `tag` is not provided, the lowercase name of the instance&#39;s class will
-    be used e.g. MyClass.property becomes myclassProperty.
+    If a `tag` is not provided and `auto_tag` is `True` then the lowercase name
+    of the instance&#39;s class will be used e.g. MyClass.property becomes
+    myclassProperty.
     
     Using the defaults will return a simple list of tagged property names
     with the form `[&#39;tagProp1Name&#39;, &#39;tagProp2Name&#39;]`
     
+    If `tag` is `None` and `auto_tag` is `False` then no tag will be applied
+    and the native property names will be returned as JSON if `json` is `True`.
+    
     If `categorize` is `True` a dictionary is returned of the form
-    `{ &#39;read_only&#39;: [&#39;tagProp1Name&#39;], &#39;read_write&#39;: [&#39;tagProp2Name&#39;]}` where
-    `read_only` or `read_write` are not present if no properties meet the
-    respective criteria.
+    `{ &#39;info&#39;: [&#39;tagProp1Name&#39;], &#39;config&#39;: [&#39;tagProp2Name&#39;]}` where
+    the category is not present if no properties meet the respective criteria.
     
     If `json` is `False` the above applies but property names will use
     their original case e.g. `tag_prop1_name`
@@ -211,44 +229,60 @@ def tag_class_properties(cls: type,
         cls: A class to tag.
         tag: The name of the routing prefix. If `None`, the calling function&#39;s
             module `__name__` will be used.
+        auto_tag: If `True` will use the class name in lowercase.
         json: A flag indicating whether to use camelCase keys.
-        categorize: A flag indicating whether to group as `read_only` and
-            `read_write`.
+        categorize: A flag indicating whether to group as `info` and `config`.
         ignore: A list of property names to ignore.
     
     Retuns:
         A dictionary or list of strings (see docstring).
         
     &#34;&#34;&#34;
-    if not isinstance(cls, type):
-        raise ValueError(&#39;cls must be a class type&#39;)
-    if not isinstance(tag, str) or not tag:
+    # TODO: class checking seems not to work for certain subclasses
+    if isinstance(cls, type):
+        _log.debug(&#39;Processing for class type&#39;)
+    # elif issubclass(cls, ABC):
+    #     _log.debug(&#39;Processing for microservice&#39;)
+    if auto_tag and not tag:
         tag = get_class_tag(cls)
     class_props = get_class_properties(cls,
-                                       ignore,
-                                       categorize)
+                                       ignore)
     if not categorize:
-        return [tag_property(tag, prop, json) for prop in class_props]
+        return [tag_class_property(prop, tag, json) for prop in class_props]
     result = {}
-    for category, props in class_props.items():
-        cat = snake_to_camel(category) if json else category
-        result[cat] = [tag_property(tag, prop, json) for prop in props]
+    for prop in class_props:
+        if property_is_read_only(cls, prop):
+            if &#39;info&#39; not in result:
+                result[&#39;info&#39;] = []
+            result[&#39;info&#39;].append(tag_class_property(prop, tag, json))
+        else:
+            if &#39;config&#39; not in result:
+                result[&#39;config&#39;] = []
+            result[&#39;config&#39;].append(tag_class_property(prop, tag, json))
     return result
 
 
-def tag_property(tag: str, prop: str, json: bool = True):
+def tag_class_property(prop: str,
+                       tag_or_cls: &#39;str|type&#39; = None,
+                       json: bool = True) -&gt; str:
+    &#34;&#34;&#34;Converts a property for ISC adding an optional tag.&#34;&#34;&#34;
+    if tag_or_cls is None:
+        tagged = prop
+    else:
+        if isinstance(tag_or_cls, type):
+            tag = get_class_tag(tag_or_cls)
+        elif isinstance(tag_or_cls, str):
+            tag = tag_or_cls
+        else:
+            raise ValueError(&#39;tag_or_cls must be a string or class type&#39;)
+        tagged = f&#39;{tag.lower()}_{prop}&#39;
     if json:
-        return snake_to_camel(f&#39;{tag}_{prop}&#39;)
+        return snake_to_camel(f&#39;{tagged}&#39;)
     return f&#39;{tag}_{prop}&#39;
 
 
-def get_class_tag(cls: type) -&gt; str:
-    if not isinstance(cls, type):
-        raise ValueError(&#39;cls must be a class type&#39;)
-    return cls.__name__.lower()
-
-
-def untag_class_property(tagged_property: str,
+def untag_class_property(property_name: str,
+                         is_tagged: bool = True,
                          include_tag: bool = False,
                          ) -&gt; &#39;str|tuple[str, str]&#39;:
     &#34;&#34;&#34;Reverts a JSON-format tagged property to its PEP representation.
@@ -257,7 +291,7 @@ def untag_class_property(tagged_property: str,
     `(unique_id, modem)` where it assumes the first word is the tag.
 
     Args:
-        tagged_property: The tagged property value, allowing for camelCase.
+        property_name: The property name, assumes using camelCase.
         include_tag: If True, a tuple is returned with the tag as the second
             element.
     
@@ -266,9 +300,12 @@ def untag_class_property(tagged_property: str,
             property value in snake_case, and the tag
 
     &#34;&#34;&#34;
-    if &#39;_&#39; not in camel_to_snake(tagged_property):
-        raise ValueError(f&#39;Invalid camelCase {tagged_property}&#39;)
-    tag, prop = camel_to_snake(tagged_property).split(&#39;_&#39;, 1)
+    if &#39;_&#39; not in camel_to_snake(property_name):
+        raise ValueError(f&#39;Invalid camelCase {property_name}&#39;)
+    if is_tagged:
+        tag, prop = camel_to_snake(property_name).split(&#39;_&#39;, 1)
+    else:
+        tag, prop = None, camel_to_snake(property_name)
     if not include_tag:
         return prop
     return (prop, tag)
@@ -292,7 +329,7 @@ def tag_merge(*args) -&gt; &#39;list|dict&#39;:
     if container_type == &#39;list&#39;:
         return list(itertools.chain(*args))
     merged = {}
-    categories = [&#39;read_only&#39;, &#39;read_write&#39;]
+    categories = [&#39;info&#39;, &#39;config&#39;]
     dict_0: dict = args[0]
     if any(k in categories for k in dict_0):
         for arg in args:
@@ -607,7 +644,7 @@ raw resource.</p></div>
 </details>
 </dd>
 <dt id="fieldedge_utilities.class_properties.get_class_properties"><code class="name flex">
-<span>def <span class="ident">get_class_properties</span></span>(<span>cls: type, ignore: list[str] = [], categorize: bool = False) ‑> list[str] | dict[str, list]</span>
+<span>def <span class="ident">get_class_properties</span></span>(<span>cls: type, ignore: list[str] = []) ‑> list[str] | dict[str, list]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Returns non-hidden, non-callable properties/values of a Class instance.</p>
@@ -618,14 +655,9 @@ raw resource.</p></div>
 <dd>The Class whose properties will be derived</dd>
 <dt><strong><code>ignore</code></strong></dt>
 <dd>A list of names to ignore (optional)</dd>
-<dt><strong><code>categorize</code></strong></dt>
-<dd>If <code>True</code> the properties will be grouped as <code>read_only</code> or
-<code>read_write</code>.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
-<p>A list of property names or if <code>categorize</code> is <code>True</code> a dictionary like:
-<code>{ 'read_write': ['property_1', 'property_2'],
-'read_only': ['property_3'] }</code></p>
+<p>A list of exposed property names.</p>
 <h2 id="raises">Raises</h2>
 <p>ValueError if <code>cls</code> does not have a <code>dir()</code> method or is not a <code>type</code>.</p></div>
 <details class="source">
@@ -634,7 +666,6 @@ raw resource.</p></div>
 </summary>
 <pre><code class="python">def get_class_properties(cls: type,
                          ignore: &#39;list[str]&#39; = [],
-                         categorize: bool = False,
                          ) -&gt; &#39;list[str]|dict[str, list]&#39;:
     &#34;&#34;&#34;Returns non-hidden, non-callable properties/values of a Class instance.
     
@@ -643,38 +674,24 @@ raw resource.</p></div>
     Args:
         cls: The Class whose properties will be derived
         ignore: A list of names to ignore (optional)
-        categorize: If `True` the properties will be grouped as `read_only` or
-            `read_write`.
     
     Returns:
-        A list of property names or if `categorize` is `True` a dictionary like:
-            `{ &#39;read_write&#39;: [&#39;property_1&#39;, &#39;property_2&#39;],
-            &#39;read_only&#39;: [&#39;property_3&#39;] }`
+        A list of exposed property names.
         
     Raises:
         ValueError if `cls` does not have a `dir()` method or is not a `type`.
         
     &#34;&#34;&#34;
-    if not dir(cls) or not isinstance(cls, type):
+    if not dir(cls):
         raise ValueError(&#39;Invalid cls_instance - must have dir() method&#39;)
-    if &#39;__slots__&#39; not in dir(cls):
-        _log.warning(&#39;Attributes in __init__ will be missed&#39;)
+    if isinstance(cls, type) and &#39;__slots__&#39; not in dir(cls):
+        _log.warning(f&#39;No __slots__: attributes in __init__ will be missed&#39;)
     attrs = [attr for attr in dir(cls)
-             if not attr.startswith((&#39;_&#39;, &#39;properties&#39;)) and
+             if not attr.startswith((&#39;_&#39;,)) and
              attr not in ignore and
              not callable(inspect.getattr_static(cls, attr)) and
              not attr.isupper()]
-    if not categorize:
-        return attrs
-    categorized = {}
-    read_only = [attr for attr, val in vars(cls).items() if attr in attrs and
-                 isinstance(val, property) and val.fset is None]
-    read_write = [attr for attr in attrs if attr not in read_only]
-    if read_only:
-        categorized[&#39;read_only&#39;] = read_only
-    if read_write:
-        categorized[&#39;read_write&#39;] = read_write
-    return categorized</code></pre>
+    return attrs</code></pre>
 </details>
 </dd>
 <dt id="fieldedge_utilities.class_properties.get_class_tag"><code class="name flex">
@@ -687,23 +704,42 @@ raw resource.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_class_tag(cls: type) -&gt; str:
-    if not isinstance(cls, type):
-        raise ValueError(&#39;cls must be a class type&#39;)
-    return cls.__name__.lower()</code></pre>
+    if isinstance(cls, type):
+        return cls.__name__.lower()
+    return cls.__class__.__name__.lower()</code></pre>
 </details>
 </dd>
 <dt id="fieldedge_utilities.class_properties.hasattr_static"><code class="name flex">
-<span>def <span class="ident">hasattr_static</span></span>(<span>obj: object, name: str) ‑> bool</span>
+<span>def <span class="ident">hasattr_static</span></span>(<span>obj: object, attr: str) ‑> bool</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Determines if an object has an attribute without calling the attribute.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>obj</code></strong></dt>
+<dd>The object to inspect.</dd>
+<dt><strong><code>attr</code></strong></dt>
+<dd>The name of the attribute to query.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p><code>True</code> if the object has the attribute.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def hasattr_static(obj: object, name: str) -&gt; bool:
+<pre><code class="python">def hasattr_static(obj: object, attr: str) -&gt; bool:
+    &#34;&#34;&#34;Determines if an object has an attribute without calling the attribute.
+    
+    Args:
+        obj: The object to inspect.
+        attr: The name of the attribute to query.
+    
+    Returns:
+        `True` if the object has the attribute.
+        
+    &#34;&#34;&#34;
     try:
-        inspect.getattr_static(obj, name)
+        inspect.getattr_static(obj, attr)
         return True
     except AttributeError:
         return False</code></pre>
@@ -790,6 +826,25 @@ keys to <code>camelCase</code>.</dd>
         return res</code></pre>
 </details>
 </dd>
+<dt id="fieldedge_utilities.class_properties.property_is_read_only"><code class="name flex">
+<span>def <span class="ident">property_is_read_only</span></span>(<span>instance: object, property_name: str) ‑> bool</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def property_is_read_only(instance: object, property_name: str) -&gt; bool:
+    if not hasattr_static(instance, property_name):
+        raise ValueError(f&#39;Object has no property {property_name}&#39;)
+    prop = inspect.getattr_static(instance, property_name)
+    try:
+        return prop.fset is None
+    except AttributeError:
+        return False</code></pre>
+</details>
+</dd>
 <dt id="fieldedge_utilities.class_properties.snake_to_camel"><code class="name flex">
 <span>def <span class="ident">snake_to_camel</span></span>(<span>snake_str: str, skip_caps: bool = False) ‑> str</span>
 </code></dt>
@@ -830,18 +885,20 @@ keys to <code>camelCase</code>.</dd>
 </details>
 </dd>
 <dt id="fieldedge_utilities.class_properties.tag_class_properties"><code class="name flex">
-<span>def <span class="ident">tag_class_properties</span></span>(<span>cls: type, tag: str = None, json: bool = True, categorize: bool = False, ignore: list[str] = []) ‑> list | dict</span>
+<span>def <span class="ident">tag_class_properties</span></span>(<span>cls: type, tag: str = None, auto_tag: bool = True, json: bool = True, categorize: bool = False, ignore: list[str] = []) ‑> list | dict</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Retrieves the class public properties tagged with a routing prefix.</p>
-<p>If a <code>tag</code> is not provided, the lowercase name of the instance's class will
-be used e.g. MyClass.property becomes myclassProperty.</p>
+<p>If a <code>tag</code> is not provided and <code>auto_tag</code> is <code>True</code> then the lowercase name
+of the instance's class will be used e.g. MyClass.property becomes
+myclassProperty.</p>
 <p>Using the defaults will return a simple list of tagged property names
 with the form <code>['tagProp1Name', 'tagProp2Name']</code></p>
+<p>If <code>tag</code> is <code>None</code> and <code>auto_tag</code> is <code>False</code> then no tag will be applied
+and the native property names will be returned as JSON if <code>json</code> is <code>True</code>.</p>
 <p>If <code>categorize</code> is <code>True</code> a dictionary is returned of the form
-<code>{ 'read_only': ['tagProp1Name'], 'read_write': ['tagProp2Name']}</code> where
-<code>read_only</code> or <code>read_write</code> are not present if no properties meet the
-respective criteria.</p>
+<code>{ 'info': ['tagProp1Name'], 'config': ['tagProp2Name']}</code> where
+the category is not present if no properties meet the respective criteria.</p>
 <p>If <code>json</code> is <code>False</code> the above applies but property names will use
 their original case e.g. <code>tag_prop1_name</code></p>
 <h2 id="args">Args</h2>
@@ -851,11 +908,12 @@ their original case e.g. <code>tag_prop1_name</code></p>
 <dt><strong><code>tag</code></strong></dt>
 <dd>The name of the routing prefix. If <code>None</code>, the calling function's
 module <code>__name__</code> will be used.</dd>
+<dt><strong><code>auto_tag</code></strong></dt>
+<dd>If <code>True</code> will use the class name in lowercase.</dd>
 <dt><strong><code>json</code></strong></dt>
 <dd>A flag indicating whether to use camelCase keys.</dd>
 <dt><strong><code>categorize</code></strong></dt>
-<dd>A flag indicating whether to group as <code>read_only</code> and
-<code>read_write</code>.</dd>
+<dd>A flag indicating whether to group as <code>info</code> and <code>config</code>.</dd>
 <dt><strong><code>ignore</code></strong></dt>
 <dd>A list of property names to ignore.</dd>
 </dl>
@@ -867,22 +925,26 @@ module <code>__name__</code> will be used.</dd>
 </summary>
 <pre><code class="python">def tag_class_properties(cls: type,
                          tag: str = None,
+                         auto_tag: bool = True,
                          json: bool = True,
                          categorize: bool = False,
                          ignore: &#39;list[str]&#39; = [],
                          ) -&gt; &#39;list|dict&#39;:
     &#34;&#34;&#34;Retrieves the class public properties tagged with a routing prefix.
     
-    If a `tag` is not provided, the lowercase name of the instance&#39;s class will
-    be used e.g. MyClass.property becomes myclassProperty.
+    If a `tag` is not provided and `auto_tag` is `True` then the lowercase name
+    of the instance&#39;s class will be used e.g. MyClass.property becomes
+    myclassProperty.
     
     Using the defaults will return a simple list of tagged property names
     with the form `[&#39;tagProp1Name&#39;, &#39;tagProp2Name&#39;]`
     
+    If `tag` is `None` and `auto_tag` is `False` then no tag will be applied
+    and the native property names will be returned as JSON if `json` is `True`.
+    
     If `categorize` is `True` a dictionary is returned of the form
-    `{ &#39;read_only&#39;: [&#39;tagProp1Name&#39;], &#39;read_write&#39;: [&#39;tagProp2Name&#39;]}` where
-    `read_only` or `read_write` are not present if no properties meet the
-    respective criteria.
+    `{ &#39;info&#39;: [&#39;tagProp1Name&#39;], &#39;config&#39;: [&#39;tagProp2Name&#39;]}` where
+    the category is not present if no properties meet the respective criteria.
     
     If `json` is `False` the above applies but property names will use
     their original case e.g. `tag_prop1_name`
@@ -891,29 +953,65 @@ module <code>__name__</code> will be used.</dd>
         cls: A class to tag.
         tag: The name of the routing prefix. If `None`, the calling function&#39;s
             module `__name__` will be used.
+        auto_tag: If `True` will use the class name in lowercase.
         json: A flag indicating whether to use camelCase keys.
-        categorize: A flag indicating whether to group as `read_only` and
-            `read_write`.
+        categorize: A flag indicating whether to group as `info` and `config`.
         ignore: A list of property names to ignore.
     
     Retuns:
         A dictionary or list of strings (see docstring).
         
     &#34;&#34;&#34;
-    if not isinstance(cls, type):
-        raise ValueError(&#39;cls must be a class type&#39;)
-    if not isinstance(tag, str) or not tag:
+    # TODO: class checking seems not to work for certain subclasses
+    if isinstance(cls, type):
+        _log.debug(&#39;Processing for class type&#39;)
+    # elif issubclass(cls, ABC):
+    #     _log.debug(&#39;Processing for microservice&#39;)
+    if auto_tag and not tag:
         tag = get_class_tag(cls)
     class_props = get_class_properties(cls,
-                                       ignore,
-                                       categorize)
+                                       ignore)
     if not categorize:
-        return [tag_property(tag, prop, json) for prop in class_props]
+        return [tag_class_property(prop, tag, json) for prop in class_props]
     result = {}
-    for category, props in class_props.items():
-        cat = snake_to_camel(category) if json else category
-        result[cat] = [tag_property(tag, prop, json) for prop in props]
+    for prop in class_props:
+        if property_is_read_only(cls, prop):
+            if &#39;info&#39; not in result:
+                result[&#39;info&#39;] = []
+            result[&#39;info&#39;].append(tag_class_property(prop, tag, json))
+        else:
+            if &#39;config&#39; not in result:
+                result[&#39;config&#39;] = []
+            result[&#39;config&#39;].append(tag_class_property(prop, tag, json))
     return result</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.class_properties.tag_class_property"><code class="name flex">
+<span>def <span class="ident">tag_class_property</span></span>(<span>prop: str, tag_or_cls: str|type = None, json: bool = True) ‑> str</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Converts a property for ISC adding an optional tag.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def tag_class_property(prop: str,
+                       tag_or_cls: &#39;str|type&#39; = None,
+                       json: bool = True) -&gt; str:
+    &#34;&#34;&#34;Converts a property for ISC adding an optional tag.&#34;&#34;&#34;
+    if tag_or_cls is None:
+        tagged = prop
+    else:
+        if isinstance(tag_or_cls, type):
+            tag = get_class_tag(tag_or_cls)
+        elif isinstance(tag_or_cls, str):
+            tag = tag_or_cls
+        else:
+            raise ValueError(&#39;tag_or_cls must be a string or class type&#39;)
+        tagged = f&#39;{tag.lower()}_{prop}&#39;
+    if json:
+        return snake_to_camel(f&#39;{tagged}&#39;)
+    return f&#39;{tag}_{prop}&#39;</code></pre>
 </details>
 </dd>
 <dt id="fieldedge_utilities.class_properties.tag_merge"><code class="name flex">
@@ -950,7 +1048,7 @@ module <code>__name__</code> will be used.</dd>
     if container_type == &#39;list&#39;:
         return list(itertools.chain(*args))
     merged = {}
-    categories = [&#39;read_only&#39;, &#39;read_write&#39;]
+    categories = [&#39;info&#39;, &#39;config&#39;]
     dict_0: dict = args[0]
     if any(k in categories for k in dict_0):
         for arg in args:
@@ -966,23 +1064,8 @@ module <code>__name__</code> will be used.</dd>
     return merged</code></pre>
 </details>
 </dd>
-<dt id="fieldedge_utilities.class_properties.tag_property"><code class="name flex">
-<span>def <span class="ident">tag_property</span></span>(<span>tag: str, prop: str, json: bool = True)</span>
-</code></dt>
-<dd>
-<div class="desc"></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def tag_property(tag: str, prop: str, json: bool = True):
-    if json:
-        return snake_to_camel(f&#39;{tag}_{prop}&#39;)
-    return f&#39;{tag}_{prop}&#39;</code></pre>
-</details>
-</dd>
 <dt id="fieldedge_utilities.class_properties.untag_class_property"><code class="name flex">
-<span>def <span class="ident">untag_class_property</span></span>(<span>tagged_property: str, include_tag: bool = False) ‑> str | tuple[str, str]</span>
+<span>def <span class="ident">untag_class_property</span></span>(<span>property_name: str, is_tagged: bool = True, include_tag: bool = False) ‑> str | tuple[str, str]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Reverts a JSON-format tagged property to its PEP representation.</p>
@@ -990,8 +1073,8 @@ module <code>__name__</code> will be used.</dd>
 <code>(unique_id, modem)</code> where it assumes the first word is the tag.</p>
 <h2 id="args">Args</h2>
 <dl>
-<dt><strong><code>tagged_property</code></strong></dt>
-<dd>The tagged property value, allowing for camelCase.</dd>
+<dt><strong><code>property_name</code></strong></dt>
+<dd>The property name, assumes using camelCase.</dd>
 <dt><strong><code>include_tag</code></strong></dt>
 <dd>If True, a tuple is returned with the tag as the second
 element.</dd>
@@ -1003,7 +1086,8 @@ property value in snake_case, and the tag</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def untag_class_property(tagged_property: str,
+<pre><code class="python">def untag_class_property(property_name: str,
+                         is_tagged: bool = True,
                          include_tag: bool = False,
                          ) -&gt; &#39;str|tuple[str, str]&#39;:
     &#34;&#34;&#34;Reverts a JSON-format tagged property to its PEP representation.
@@ -1012,7 +1096,7 @@ property value in snake_case, and the tag</p></div>
     `(unique_id, modem)` where it assumes the first word is the tag.
 
     Args:
-        tagged_property: The tagged property value, allowing for camelCase.
+        property_name: The property name, assumes using camelCase.
         include_tag: If True, a tuple is returned with the tag as the second
             element.
     
@@ -1021,9 +1105,12 @@ property value in snake_case, and the tag</p></div>
             property value in snake_case, and the tag
 
     &#34;&#34;&#34;
-    if &#39;_&#39; not in camel_to_snake(tagged_property):
-        raise ValueError(f&#39;Invalid camelCase {tagged_property}&#39;)
-    tag, prop = camel_to_snake(tagged_property).split(&#39;_&#39;, 1)
+    if &#39;_&#39; not in camel_to_snake(property_name):
+        raise ValueError(f&#39;Invalid camelCase {property_name}&#39;)
+    if is_tagged:
+        tag, prop = camel_to_snake(property_name).split(&#39;_&#39;, 1)
+    else:
+        tag, prop = None, camel_to_snake(property_name)
     if not include_tag:
         return prop
     return (prop, tag)</code></pre>
@@ -1054,10 +1141,11 @@ property value in snake_case, and the tag</p></div>
 <li><code><a title="fieldedge_utilities.class_properties.get_class_tag" href="#fieldedge_utilities.class_properties.get_class_tag">get_class_tag</a></code></li>
 <li><code><a title="fieldedge_utilities.class_properties.hasattr_static" href="#fieldedge_utilities.class_properties.hasattr_static">hasattr_static</a></code></li>
 <li><code><a title="fieldedge_utilities.class_properties.json_compatible" href="#fieldedge_utilities.class_properties.json_compatible">json_compatible</a></code></li>
+<li><code><a title="fieldedge_utilities.class_properties.property_is_read_only" href="#fieldedge_utilities.class_properties.property_is_read_only">property_is_read_only</a></code></li>
 <li><code><a title="fieldedge_utilities.class_properties.snake_to_camel" href="#fieldedge_utilities.class_properties.snake_to_camel">snake_to_camel</a></code></li>
 <li><code><a title="fieldedge_utilities.class_properties.tag_class_properties" href="#fieldedge_utilities.class_properties.tag_class_properties">tag_class_properties</a></code></li>
+<li><code><a title="fieldedge_utilities.class_properties.tag_class_property" href="#fieldedge_utilities.class_properties.tag_class_property">tag_class_property</a></code></li>
 <li><code><a title="fieldedge_utilities.class_properties.tag_merge" href="#fieldedge_utilities.class_properties.tag_merge">tag_merge</a></code></li>
-<li><code><a title="fieldedge_utilities.class_properties.tag_property" href="#fieldedge_utilities.class_properties.tag_property">tag_property</a></code></li>
 <li><code><a title="fieldedge_utilities.class_properties.untag_class_property" href="#fieldedge_utilities.class_properties.untag_class_property">untag_class_property</a></code></li>
 </ul>
 </li>

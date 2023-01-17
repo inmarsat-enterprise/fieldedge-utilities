@@ -1,0 +1,2532 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+<meta name="generator" content="pdoc 0.10.0" />
+<title>fieldedge_utilities.isc API documentation</title>
+<meta name="description" content="Abstract Class definition for a FieldEdge microservice object." />
+<link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
+<link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
+<link rel="stylesheet preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/github.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:30px;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:1em 0 .50em 0}h3{font-size:1.4em;margin:25px 0 10px 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .3s ease-in-out}a:hover{color:#e82}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900}pre code{background:#f8f8f8;font-size:.8em;line-height:1.4em}code{background:#f2f2f1;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{background:#f8f8f8;border:0;border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0;padding:1ex}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-weight:bold;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em .5em;margin-bottom:1em}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.item .name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul{padding-left:1.5em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/highlight.min.js" integrity="sha256-Uv3H6lx7dJmRfRvH8TH6kJD1TSK1aFcwgx+mdg3epi8=" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => hljs.initHighlighting())</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>fieldedge_utilities.isc</code></h1>
+</header>
+<section id="section-intro">
+<p>Abstract Class definition for a FieldEdge microservice object.</p>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">&#34;&#34;&#34;Abstract Class definition for a FieldEdge microservice object.&#34;&#34;&#34;
+import logging
+import time
+from abc import ABC, abstractmethod
+from typing import Any, Callable
+from uuid import uuid4
+
+from .class_properties import (get_class_properties, get_class_tag,
+                               json_compatible, property_is_read_only,
+                               tag_class_property, untag_class_property)
+from .logger import verbose_logging
+from .mqtt import MqttClient
+from .timer import RepeatingTimer
+
+_log = logging.getLogger(__name__)
+
+
+class IscTask:
+    &#34;&#34;&#34;An interservice communication task waiting for an MQTT response.
+    
+    May be a long-running query typically triggering a chained callback, with
+    optional metadata and callback to a chained function.
+    
+    The `task_meta` attribute supports a dictionary keyword `timeout_callback`
+    as a Callable that will be passed the metadata and `uid` if the task expires
+    triggered by the method `IscTaskQueue.remove_expired`.
+    
+    Attributes:
+        uid (UUID): A unique task identifier, if none is provided a UUID4 will
+            be generated.
+        ts: (float): The unix timestamp when the task was queued
+        lifetime (int): Seconds before the task times out. `None` value
+            means the task will not expire/timeout.
+        task_type (str): A short name for the task purpose
+        task_meta (Any): Metadata to be used on completion or passed to the
+            callback
+        callback (Callable): An optional callback function
+
+    &#34;&#34;&#34;
+    def __init__(self,
+                 uid: str = None,
+                 task_type: str = None,
+                 task_meta: Any = None,
+                 callback: Callable = None,
+                 lifetime: float = 10,
+                 ) -&gt; None:
+        &#34;&#34;&#34;Initialize the Task.
+        
+        Args:
+            uid (UUID): A unique task identifier
+            task_type (str): A short name for the task purpose
+            task_meta (Any): Metadata to be passed to the callback. Supports
+                dict key &#39;timeout_callback&#39; with Callable value.
+            callback (Callable): An optional callback function to chain
+            lifetime (int): Seconds before the task times out. `None` value
+                means the task will not expire/timeout.
+        
+        &#34;&#34;&#34;
+        self._ts: float = round(time.time(), 3)
+        self.uid: str = uid or str(uuid4())
+        self.task_type: str = task_type
+        self._lifetime: float = float(lifetime)
+        self.task_meta = task_meta
+        if (isinstance(task_meta, dict) and
+            &#39;timeout_callback&#39; in task_meta and
+            not callable(task_meta[&#39;timeout_callback&#39;])):
+            # Generate warning
+            _log.warning(f&#39;Task timeout_callback is not callable&#39;)
+        if callback is not None and not callable(callback):
+            raise ValueError(&#39;Next task callback must be callable if not None&#39;)
+        self.callback: Callable = callback
+    
+    @property
+    def ts(self) -&gt; float:
+        return self._ts
+    
+    @property
+    def lifetime(self) -&gt; float:
+        return round(self._lifetime, 3)
+    
+    @lifetime.setter
+    def lifetime(self, value: &#39;float|int&#39;):
+        if not isinstance(value, (float, int)):
+            raise ValueError(&#39;Value must be float or int&#39;)
+        self._lifetime = float(value)
+
+
+class IscTaskQueue(list):
+    &#34;&#34;&#34;A task queue (order-independent) for interservice communications.&#34;&#34;&#34;
+    
+    def append(self, task: IscTask):
+        &#34;&#34;&#34;Add a task to the queue.&#34;&#34;&#34;
+        if not isinstance(task, IscTask):
+            raise ValueError(&#39;item must be QueuedIscTask type&#39;)
+        if self.is_queued(task.uid):
+            raise ValueError(f&#39;Task {task.uid} already queued&#39;)
+        super().append(task)
+    
+    def insert(self, index: int, element: Any):
+        &#34;&#34;&#34;Invalid operation.&#34;&#34;&#34;
+        raise OSError(&#39;ISC task queue does not support insertion&#39;)
+        
+    def is_queued(self,
+                  task_id: str = None,
+                  task_type: str = None,
+                  task_meta: tuple = None) -&gt; bool:
+        &#34;&#34;&#34;Returns `True` if the specified task is queued.
+        
+        Args:
+            task_id: Optional (preferred) unique search criteria.
+            task_type: Optional search criteria. May not be unique.
+            cb_meta: Optional key/value search criteria.
+            
+        &#34;&#34;&#34;
+        if not task_id and not task_type and not task_meta:
+            raise ValueError(&#39;Missing search criteria&#39;)
+        if isinstance(task_meta, tuple) and len(task_meta) != 2:
+            raise ValueError(&#39;cb_meta must be a key/value pair&#39;)
+        for task in self:
+            assert isinstance(task, IscTask)
+            if ((task_id and task.uid == task_id) or
+                (task_type and task.task_type == task_type)):
+                return True
+            if isinstance(task_meta, tuple):
+                if not isinstance(task.task_meta, dict):
+                    continue
+                for k, v in task.task_meta.items():
+                    if k == task_meta[0] and v == task_meta[1]:
+                        return True
+        return False
+            
+    def get(self, task_id: str) -&gt; &#39;IscTask|None&#39;:
+        &#34;&#34;&#34;Retrieves the specified task from the queue.&#34;&#34;&#34;
+        for i, task in enumerate(self):
+            assert isinstance(task, IscTask)
+            if task.uid == task_id:
+                return self.pop(i)
+    
+    def remove_expired(self):
+        &#34;&#34;&#34;Removes expired tasks from the queue.
+        
+        Should be called regularly by the parent, for example every second.
+        
+        Any tasks with callback and cb_meta that include the keyword `timeout`
+        will be called with the cb_meta kwargs.
+        
+        &#34;&#34;&#34;
+        expired = []
+        if len(self) == 0:
+            return
+        for i, task in enumerate(self):
+            assert isinstance(task, IscTask)
+            if task.lifetime is None:
+                continue
+            if time.time() - task.ts &gt; task.lifetime:
+                expired.append(i)
+        for i in expired:
+            rem: IscTask = self.pop(i)
+            _log.warning(f&#39;Removing expired task {rem.uid}&#39;)
+            cb_key = &#39;timeout_callback&#39;
+            if (isinstance(rem.task_meta, dict) and
+                cb_key in rem.task_meta and
+                callable(rem.task_meta[cb_key])):
+                # Callback with metadata
+                timeout_meta = { &#39;uid&#39;: rem.uid }
+                for k, v in rem.task_meta.items():
+                    if k in [cb_key]:
+                        continue
+                    timeout_meta[k] = v
+                rem.task_meta[cb_key](timeout_meta)
+
+
+class FieldedgeMicroservice(ABC):
+    &#34;&#34;&#34;Abstract base class for a FieldEdge microservice.
+    
+    Use `__slots__` to expose initialization properties.
+    
+    &#34;&#34;&#34;
+    
+    __slots__ = (
+        &#39;_tag&#39;, &#39;_mqttc_local&#39;, &#39;_default_publish_topic&#39;, &#39;_subscriptions&#39;,
+        &#39;_isc_queue&#39;, &#39;_isc_timer&#39;, &#39;_isc_tags&#39;, &#39;_isc_ignore&#39;,
+        &#39;_properties&#39;, &#39;_hidden_properties&#39;, &#39;_cached_properties&#39;,
+        &#39;_isc_properties&#39;, &#39;_hidden_isc_properties&#39;, &#39;_rollcall_properties&#39;,
+    )
+    
+    LOG_LEVELS = [&#39;DEBUG&#39;, &#39;INFO&#39;]
+    
+    @abstractmethod
+    def __init__(self,
+                 tag: str = None,
+                 mqtt_client_id: str = None,
+                 auto_connect: bool = False,
+                 isc_tags: bool = False,
+                 isc_poll_interval: float = 1,
+                 ) -&gt; None:
+        &#34;&#34;&#34;Initialize the class instance.
+        
+        Args:
+            tag (str): The short name of the microservice used in MQTT topics
+                and interservice communication properties. If not provided, the
+                lowercase name of the class will be used.
+            mqtt_client_id (str): The name of the client ID when connecting to
+                the local broker. If not provided, will be `fieldedge_&lt;tag&gt;`.
+            auto_connect (bool): If set will automatically connect to the broker
+                during initialization.
+            prop_tags (bool): If set then isc_properties will include the class
+                tag as a prefix. Disabled by default.
+                
+        &#34;&#34;&#34;
+        self._tag: str = tag or get_class_tag(self.__class__)
+        self._isc_tags: bool = isc_tags
+        if not mqtt_client_id:
+            mqtt_client_id = f&#39;fieldedge_{self.tag}&#39;
+        self._subscriptions = [ &#39;fieldedge/+/rollcall/#&#39; ]
+        self._subscriptions.append(f&#39;fieldedge/+/{self.tag}/#&#39;)
+        self._mqttc_local = MqttClient(client_id=mqtt_client_id,
+                                       subscribe_default=self._subscriptions,
+                                       on_message=self._on_isc_message,
+                                       auto_connect=auto_connect)
+        self._default_publish_topic = f&#39;fieldedge/{tag}&#39;
+        self._properties: &#39;list[str]&#39; = None
+        self._hidden_properties: &#39;list[str]&#39; = []
+        self._isc_properties: &#39;list[str]&#39; = None
+        self._hidden_isc_properties: &#39;list[str]&#39; = [
+            &#39;tag&#39;,
+            &#39;properties&#39;,
+            &#39;properties_by_type&#39;,
+            &#39;isc_properties&#39;,
+            &#39;isc_properties_by_type&#39;,
+            &#39;rollcall_properties&#39;,
+        ]
+        self._rollcall_properties: &#39;list[str]&#39; = []
+        self._isc_queue = IscTaskQueue()
+        self._isc_timer = RepeatingTimer(seconds=isc_poll_interval,
+                                         target=self._isc_queue.remove_expired,
+                                         name=&#39;IscTaskExpiryTimer&#39;)
+        self._cached_properties: dict = {}
+    
+    @property
+    def tag(self) -&gt; str:
+        return self._tag
+    
+    @property
+    def log_level(self) -&gt; &#39;str|None&#39;:
+        &#34;&#34;&#34;The logging level of the root logger.&#34;&#34;&#34;
+        return str(logging.getLevelName(logging.getLogger().level))
+    
+    @log_level.setter
+    def log_level(self, value: str):
+        &#34;The logging level of the root logger.&#34;
+        if not isinstance(value, str) or value.upper() not in self.LOG_LEVELS:
+            raise ValueError(f&#39;Level must be in {self.LOG_LEVELS}&#39;)
+        logging.getLogger().setLevel(value.upper())
+        
+    @property
+    def _vlog(self) -&gt; bool:
+        &#34;&#34;&#34;True if environment variable LOG_VERBOSE includes the class tag.&#34;&#34;&#34;
+        return verbose_logging(self.tag)
+    
+    @property
+    def properties(self) -&gt; &#39;list[str]&#39;:
+        &#34;&#34;&#34;Public properties of the class.&#34;&#34;&#34;
+        if not self._properties:
+            self._get_properties()
+        return self._properties
+    
+    def _get_properties(self) -&gt; None:
+        &#34;&#34;&#34;Refreshes the class properties.&#34;&#34;&#34;
+        ignore = self._hidden_properties
+        self._properties = get_class_properties(self.__class__, ignore)
+        
+    def _categorized(self, prop_list: &#39;list[str]&#39;) -&gt; &#39;dict[str, list[str]]&#39;:
+        &#34;&#34;&#34;Categorizes properties as `config` or `info`.&#34;&#34;&#34;
+        categorized = {}
+        for prop in prop_list:
+            if property_is_read_only(self, prop):
+                if &#39;info&#39; not in categorized:
+                    categorized[&#39;info&#39;] = []
+                categorized[&#39;info&#39;].append(prop)
+            else:
+                if &#39;config&#39; not in categorized:
+                    categorized[&#39;config&#39;] = []
+                categorized[&#39;config&#39;].append(prop)
+        return categorized
+        
+    @property
+    def properties_by_type(self) -&gt; &#39;dict[str, list[str]]&#39;:
+        &#34;&#34;&#34;Public properties of the class tagged `info` or `config`.&#34;&#34;&#34;
+        return self._categorized(self.properties)
+    
+    def property_hide(self, prop_name: str):
+        &#34;&#34;&#34;Hides a property so it will not list in `properties`.&#34;&#34;&#34;
+        if prop_name not in self.properties:
+            raise ValueError(f&#39;Invalid prop_name {prop_name}&#39;)
+        if prop_name not in self._hidden_properties:
+            self._hidden_properties.append(prop_name)
+            self._get_properties()
+    
+    def property_unhide(self, prop_name: str):
+        &#34;&#34;&#34;Unhides a hidden property so it appears in `properties`.&#34;&#34;&#34;
+        if prop_name in self._hidden_properties:
+            self._hidden_properties.remove(prop_name)
+            self._get_properties()
+    
+    def property_cache(self, property_name: str, cache_lifetime: int = 5):
+        &#34;&#34;&#34;Sets a cache indicator for the tag name based on current time.
+        
+        Typically used to avoid repeat checking of properties or proxy
+        properties that may be slow to refresh.
+        The cache validity can be checked against `cache_lifetime` using the
+        `property_is_cached` method.
+        
+        Setting `cache_lifetime` to `None` persists the cached value forever
+        unless a subsequent property_cache overwrites the lifetime.
+        
+        Args:
+            property_name (str): The name of the property or proxy.
+            cache_lifetime (int): The validity time in seconds.
+        
+        &#34;&#34;&#34;
+        if property_name in self._cached_properties:
+            old_lifetime = self._cached_properties[property_name][1]
+            _log.warning(f&#39;Overwriting cache for {property_name}&#39;
+                         f&#39; from {old_lifetime} to {cache_lifetime}&#39;)
+        self._cached_properties[property_name] = (time.time(),
+                                                  cache_lifetime)
+    
+    def property_is_cached(self, property_name: str) -&gt; bool:
+        &#34;&#34;&#34;Returns `True` if the property cache_lifetime is not expired.
+        
+        If expired, the property&#39;s cache tag will be removed from the cache.
+        
+        Args:
+            property_name (str): The name of the property or proxy.
+        
+        Returns:
+            `True` if the time passed since cached is within the cache_lifetime
+                specified using the `property_cache` method.
+                
+        &#34;&#34;&#34;
+        if property_name not in self._cached_properties:
+            return False
+        cache_time, cache_lifetime = self._cached_properties[property_name]
+        if cache_lifetime is None:
+            return True
+        elapsed = int(time.time() - cache_time)
+        if elapsed &lt; cache_lifetime:
+            return True
+        _log.debug(f&#39;Cached {property_name} expired ({elapsed}s) - removing&#39;)
+        del self._cached_properties[property_name]
+        return False
+        
+    @property
+    def isc_properties(self) -&gt; &#39;list[str]&#39;:
+        &#34;&#34;&#34;ISC exposed properties.&#34;&#34;&#34;
+        if self._isc_properties is None:
+            self._get_isc_properties()
+        return self._isc_properties
+    
+    def _get_isc_properties(self) -&gt; None:
+        &#34;&#34;&#34;Refreshes the cached ISC properties list.&#34;&#34;&#34;
+        ignore = self._hidden_properties
+        ignore.extend(p for p in self._hidden_isc_properties
+                    if p not in self._hidden_properties)
+        tag = self.tag if self._isc_tags else None
+        self._isc_properties = [tag_class_property(prop, tag)
+                                for prop in self.properties
+                                if prop not in ignore]
+    
+    @property
+    def isc_properties_by_type(self) -&gt; &#39;dict[str, list[str]]&#39;:
+        &#34;&#34;&#34;ISC exposed properties tagged `readOnly` or `readWrite`.&#34;&#34;&#34;
+        categorized = {}
+        for isc_prop in self.isc_properties:
+            entry = self._categorized([untag_class_property(isc_prop,
+                                                            self._isc_tags)])
+            if &#39;config&#39; in entry:
+                if &#39;config&#39; not in categorized:
+                    categorized[&#39;config&#39;] = []
+                categorized[&#39;config&#39;].append(isc_prop)
+            else:
+                if &#39;info&#39; not in categorized:
+                    categorized[&#39;info&#39;] = []
+                categorized[&#39;info&#39;].append(isc_prop)
+        return categorized
+    
+    def isc_get_property(self, isc_property: str) -&gt; Any:
+        &#34;&#34;&#34;Gets a property value based on its ISC name.&#34;&#34;&#34;
+        prop = untag_class_property(isc_property, self._isc_tags)
+        if prop not in self.properties:
+            raise AttributeError(f&#39;{prop} not in properties&#39;)
+        return getattr(self, prop)
+    
+    def isc_set_property(self, isc_property: str, value: Any) -&gt; None:
+        &#34;&#34;&#34;Sets a property value based on its ISC name.&#34;&#34;&#34;
+        prop = untag_class_property(isc_property, self._isc_tags)
+        if prop not in self.properties:
+            raise AttributeError(f&#39;{prop} not in properties&#39;)
+        if prop not in self.properties_by_type[&#39;config&#39;]:
+            raise AttributeError(f&#39;{prop} is not writable&#39;)
+        setattr(self, prop, value)
+    
+    def isc_property_hide(self, isc_property: str) -&gt; None:
+        &#34;&#34;&#34;Hides a property from ISC - does not appear in `isc_properties`.&#34;&#34;&#34;
+        if isc_property not in self.isc_properties:    
+            raise ValueError(f&#39;Invalid prop_name {isc_property}&#39;)
+        if isc_property not in self._hidden_isc_properties:
+            self._hidden_isc_properties.append(isc_property)
+            self._get_isc_properties()
+    
+    def isc_property_unhide(self, isc_property: str) -&gt; None:
+        &#34;&#34;&#34;Unhides a property to ISC so it appears in `isc_properties`.&#34;&#34;&#34;
+        if isc_property in self._hidden_isc_properties:
+            self._hidden_isc_properties.remove(isc_property)
+            self._get_isc_properties()
+        
+    @property
+    def rollcall_properties(self) -&gt; &#39;list[str]&#39;:
+        &#34;&#34;&#34;Property key/values that will be sent in the rollcall response.&#34;&#34;&#34;
+        return self._rollcall_properties
+    
+    def rollcall_property_add(self, prop_name: str):
+        &#34;&#34;&#34;Add a property to the rollcall response.&#34;&#34;&#34;
+        if prop_name not in self.properties:
+            raise ValueError(f&#39;Invalid prop_name {prop_name}&#39;)
+        if prop_name not in self._rollcall_properties:
+            self._rollcall_properties.append(prop_name)
+    
+    def rollcall_property_remove(self, prop_name: str):
+        &#34;&#34;&#34;Remove a property from the rollcall response.&#34;&#34;&#34;
+        if prop_name in self._rollcall_properties:
+            self._rollcall_properties.remove(prop_name)
+        
+    def rollcall(self):
+        &#34;&#34;&#34;Publishes a rollcall broadcast to other microservices with UUID.&#34;&#34;&#34;
+        subtopic = &#39;rollcall&#39;
+        rollcall = { &#39;uid&#39;: str(uuid4()) }
+        self.notify(rollcall, subtopic=subtopic)
+    
+    def _rollcall_respond(self, topic: str, message: dict):
+        &#34;&#34;&#34;Processes an incoming rollcall request.
+        
+        If the requestor is this service based on the topic, it is ignored.
+        If the requestor is another microservice, the response will include
+        key/value pairs from the `rollcall_properties` list.
+        
+        Args:
+            topic: The topic from which the requestor will be determined from
+                the second level of the topic e.g. `fieldedge/&lt;requestor&gt;/...`
+            request (dict): The request message.
+            
+        &#34;&#34;&#34;
+        if not topic.endswith(&#39;/rollcall&#39;):
+            _log.warning(f&#39;rollcall_respond called without rollcall topic&#39;)
+            return
+        if f&#39;/{self.tag}/&#39; in topic:
+            if self._vlog:
+                _log.debug(f&#39;Ignoring rollcall request from self&#39;)
+        else:
+            subtopic = &#39;rollcall/response&#39;
+            if &#39;uid&#39; not in message:
+                _log.warning(&#39;Rollcall request missing unique ID&#39;)
+            response = { &#39;uid&#39;: message.get(&#39;uid&#39;, None) }
+            tag = self.tag if self._isc_tags else None
+            for prop in self._rollcall_properties:
+                if prop in self.properties:
+                    tagged_prop = tag_class_property(prop, tag)
+                    response[tagged_prop] = getattr(self, prop)
+            self.notify(response, subtopic=subtopic)
+        
+    def isc_topic_subscribe(self, topic: str) -&gt; bool:
+        &#34;&#34;&#34;Subscribes to the specified ISC topic.&#34;&#34;&#34;
+        if not topic.startswith(&#39;fieldedge/&#39;):
+            raise ValueError(&#39;First level topic must be fieldedge&#39;)
+        if topic not in self._subscriptions:
+            try:
+                self._mqttc_local.subscribe(topic)
+                self._subscriptions.append(topic)
+                return True
+            except:
+                return False
+        else:
+            _log.warning(f&#39;Already subscribed to {topic}&#39;)
+            return True
+    
+    def isc_topic_unsubscribe(self, topic: str) -&gt; bool:
+        &#34;&#34;&#34;Unsubscribes from the specified ISC topic.&#34;&#34;&#34;
+        mandatory = [&#39;fieldedge/+/rollcall/#&#39;, f&#39;fieldedge/+/{self.tag}/#&#39;]
+        if topic in mandatory:
+            _log.warning(f&#39;Subscription to {topic} is mandatory&#39;)
+            return False
+        if topic not in self._subscriptions:
+            _log.warning(f&#39;Already not subscribed to {topic}&#39;)
+            return True
+        try:
+            self._mqttc_local.unsubscribe(topic)
+            self._subscriptions.remove(topic)
+            return True
+        except:
+            return False
+        
+    def _on_isc_message(self, topic: str, message: dict) -&gt; None:
+        &#34;&#34;&#34;Handles rollcall requests or passes to the `on_isc_message` method.
+        
+        This private method ensures rollcall requests are handled in a standard
+        way.
+        
+        Args:
+            topic: The MQTT topic
+            message: The MQTT/JSON message
+        
+        &#34;&#34;&#34;
+        if self._vlog:
+            _log.debug(f&#39;Received ISC {topic}: {message}&#39;)
+        if topic.endswith(&#39;/rollcall&#39;):
+            self._rollcall_respond(topic, message)
+        else:
+            self.on_isc_message(topic, message)
+        
+    @abstractmethod
+    def on_isc_message(self, topic: str, message: dict) -&gt; None:
+        &#34;&#34;&#34;Handles incoming ISC/MQTT requests.
+        
+        Messages are received from any topics subscribed to using the
+        `isc_subscribe` method. The default subscription `fieldedge/+/rollcall`
+        is handled in a standard way by the private version of this method.
+        The default subscription is `fieldedge/&lt;self.tag&gt;/request/#` which other
+        services use to query this one. After receiving a rollcall, this service
+        may subscribe to `fieldedge/&lt;other&gt;/info/#` topic to receive responses
+        to its queries, tagged with a `uid` in the message body.
+        
+        Args:
+            topic: The MQTT topic received.
+            message: The MQTT/JSON message received.
+            
+        &#34;&#34;&#34;
+        
+    def properties_notify(self, request: dict) -&gt; None:
+        &#34;&#34;&#34;Publishes the requested ISC property values to the local broker.
+        
+        If no `properties` key is in the request, it implies a simple list of
+        ISC property names will be generated.
+        
+        If `properties` is a list it will be used as a filter to create and
+        publish a list of properties/values. An empty list will result in all
+        ISC property/values being published.
+        
+        If the request has the key `categorized` = `True` then the response
+        will be a nested dictionary with `config` and `info` dictionaries.
+        
+        Args:
+            request: A dictionary with optional `properties` list and
+                optional `categorized` flag.
+        
+        &#34;&#34;&#34;
+        _log.warning(&#39;TODO: testing&#39;)
+        if not isinstance(request, dict):
+            raise ValueError(&#39;Request must be a dictionary&#39;)
+        if (&#39;properties&#39; in request and
+            not isinstance(request[&#39;properties&#39;], list)):
+            raise ValueError(&#39;Request properties must be a list&#39;)
+        response = {}
+        request_id = request.get(&#39;uid&#39;, None)
+        if request_id:
+            response[&#39;uid&#39;] = request_id
+        else:
+            _log.warning(&#39;Request missing uid for response correlation&#39;)
+        categorized = request.get(&#39;categorized&#39;, False)
+        if &#39;properties&#39; not in request:
+            subtopic = &#39;info/properties/list&#39;
+            if categorized:
+                response[&#39;properties&#39;] = self.isc_properties_by_type
+            else:
+                response[&#39;properties&#39;] = self.isc_properties
+        else:
+            req_props: list = request[&#39;properties&#39;]
+            subtopic = &#39;info/properties/values&#39;
+            response[&#39;properties&#39;] = {}
+            res_props = response[&#39;properties&#39;]
+            if categorized:
+                props_source = self.isc_properties_by_type
+                if (&#39;config&#39; in props_source and
+                    any(prop in req_props for prop in props_source[&#39;config&#39;])):
+                    res_props[&#39;config&#39;] = {}
+                if (&#39;info&#39; in props_source and
+                    any(prop in req_props for prop in props_source[&#39;info&#39;])):
+                    res_props[&#39;info&#39;] = {}
+            else:
+                props_source = self.isc_properties
+            if len(req_props) == 0:
+                req_props = self.isc_properties
+            if categorized:
+                for p in req_props:
+                    if (&#39;config&#39; in props_source and
+                        p in props_source[&#39;config&#39;]):
+                        res_props[&#39;config&#39;][p] = props_source[&#39;config&#39;][p]
+                    else:
+                        res_props[&#39;info&#39;][p] = props_source[&#39;info&#39;][p]
+            else:
+                for p in req_props:
+                    res_props[p] = props_source[p]
+        _log.debug(f&#39;Responding to request {request_id} for properties&#39;
+                   f&#39;: {request[&#34;properties&#34;] or &#34;ALL&#34;}&#39;)
+        self.notify(response, subtopic=subtopic)
+    
+    def properties_change(self, request: dict) -&gt; &#39;None|dict&#39;:
+        &#34;&#34;&#34;Processes the requested property changes.
+        
+        The `request` dictionary must include the `properties` key with a
+        dictionary of ISC property names and respective value to set.
+        
+        If the request contains a `uid` then the `properties_notify` method
+        will be called with the changed values to confirm the changes to the
+        ISC requestor. If no `uid` is present then a dictionary confirming
+        successful changes will be returned to the calling function.
+        
+        Args:
+            request: A dictionary containing a `properties` dictionary of
+                select ISC property names and values to set.
+        
+        &#34;&#34;&#34;
+        _log.warning(&#39;TODO: testing&#39;)
+        if (not isinstance(request, dict) or
+            &#39;properties&#39; not in request or
+            not isinstance(request[&#39;properties&#39;], dict)):
+            raise ValueError(&#39;Request must contain a properties dictionary&#39;)
+        response = { &#39;properties&#39;: {} }
+        request_id = request.get(&#39;uid&#39;, None)
+        if request_id:
+            response[&#39;uid&#39;] = request_id
+        else:
+            _log.warning(&#39;Request missing uid for response correlation&#39;)
+        for k, v in request[&#39;properties&#39;].items():
+            if k in self.isc_properties_by_type[&#39;config&#39;]:
+                try:
+                    self.isc_set_property(k, v)
+                    response[&#39;properties&#39;][k] = v
+                except Exception as err:
+                    _log.warning(f&#39;Failed to set {k}={v} ({err})&#39;)
+        if not request_id:
+            return response
+        _log.debug(f&#39;Responding to change request {request_id} for properties&#39;
+                   f&#39;: {request[&#34;properties&#34;]}&#39;)
+        self.notify(response, subtopic=&#39;info/properties/values&#39;)
+        
+    def notify(self,
+               message: dict,
+               topic: str = None,
+               subtopic: str = None,
+               qos: int = 1) -&gt; None:
+        &#34;&#34;&#34;Publishes an inter-service (ISC) message to the local MQTT broker.
+        
+        Args:
+            message: The message to publish as a JSON object.
+            topic: Optional override of the class `_default_publish_topic`
+                used if `topic` is not passed in.
+            subtopic: A subtopic appended to the `_default_publish_topic`.
+            
+        &#34;&#34;&#34;
+        if not isinstance(message, dict):
+            raise ValueError(&#39;Invalid message must be a dictionary&#39;)
+        topic = topic or self._default_publish_topic
+        if not isinstance(topic, str) or not topic:
+            raise ValueError(&#39;Invalid topic must be string&#39;)
+        if subtopic is not None:
+            if not isinstance(subtopic, str) or not subtopic:
+                raise ValueError(&#39;Invalid subtopic must be string&#39;)
+            if not subtopic.startswith(&#39;/&#39;):
+                topic += &#39;/&#39;
+            topic += subtopic
+        json_message = json_compatible(message)
+        if &#39;ts&#39; not in json_message:
+            json_message[&#39;ts&#39;] = int(time.time() * 1000)
+        if not self._mqttc_local or not self._mqttc_local.is_connected:
+            _log.error(&#39;MQTT client not connected - failed to publish&#39;
+                            f&#39;{topic}: {message}&#39;)
+            return
+        _log.info(f&#39;Publishing ISC {topic}: {json_message}&#39;)
+        self._mqttc_local.publish(topic, message, qos)
+    
+    def task_add(self, task: IscTask) -&gt; None:
+        &#34;&#34;&#34;Adds a task to the task queue.&#34;&#34;&#34;
+        if self._isc_queue.is_queued(task_id=task.uid):
+            _log.warning(f&#39;Task {task.uid} already queued&#39;)
+        else:
+            self._isc_queue.append(task)
+        
+    def task_get(self, task_id: str) -&gt; &#39;IscTask|None&#39;:
+        &#34;&#34;&#34;Retrieves a task from the queue.
+        
+        Args:
+            task_id: The unique ID of the task.
+        
+        Returns:
+            The `QueuedIscTask` if it was found in the queue, else `None`.
+            
+        &#34;&#34;&#34;
+        return self._isc_queue.get(task_id)
+        
+    def task_expiry_enable(self, enable: bool = True):
+        &#34;&#34;&#34;Starts or stops periodic checking for expired ISC tasks.
+        
+        Args:
+            enable: If `True` (default) starts the checks, else stops checking.
+            
+        &#34;&#34;&#34;
+        if enable:
+            if not self._isc_timer.is_alive():
+                self._isc_timer.start()
+            self._isc_timer.start_timer()
+        else:
+            self._isc_timer.stop_timer()</code></pre>
+</details>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice"><code class="flex name class">
+<span>class <span class="ident">FieldedgeMicroservice</span></span>
+<span>(</span><span>tag: str = None, mqtt_client_id: str = None, auto_connect: bool = False, isc_tags: bool = False, isc_poll_interval: float = 1)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Abstract base class for a FieldEdge microservice.</p>
+<p>Use <code>__slots__</code> to expose initialization properties.</p>
+<p>Initialize the class instance.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>tag</code></strong> :&ensp;<code>str</code></dt>
+<dd>The short name of the microservice used in MQTT topics
+and interservice communication properties. If not provided, the
+lowercase name of the class will be used.</dd>
+<dt><strong><code>mqtt_client_id</code></strong> :&ensp;<code>str</code></dt>
+<dd>The name of the client ID when connecting to
+the local broker. If not provided, will be <code>fieldedge_&lt;tag&gt;</code>.</dd>
+<dt><strong><code>auto_connect</code></strong> :&ensp;<code>bool</code></dt>
+<dd>If set will automatically connect to the broker
+during initialization.</dd>
+<dt><strong><code>prop_tags</code></strong> :&ensp;<code>bool</code></dt>
+<dd>If set then isc_properties will include the class
+tag as a prefix. Disabled by default.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class FieldedgeMicroservice(ABC):
+    &#34;&#34;&#34;Abstract base class for a FieldEdge microservice.
+    
+    Use `__slots__` to expose initialization properties.
+    
+    &#34;&#34;&#34;
+    
+    __slots__ = (
+        &#39;_tag&#39;, &#39;_mqttc_local&#39;, &#39;_default_publish_topic&#39;, &#39;_subscriptions&#39;,
+        &#39;_isc_queue&#39;, &#39;_isc_timer&#39;, &#39;_isc_tags&#39;, &#39;_isc_ignore&#39;,
+        &#39;_properties&#39;, &#39;_hidden_properties&#39;, &#39;_cached_properties&#39;,
+        &#39;_isc_properties&#39;, &#39;_hidden_isc_properties&#39;, &#39;_rollcall_properties&#39;,
+    )
+    
+    LOG_LEVELS = [&#39;DEBUG&#39;, &#39;INFO&#39;]
+    
+    @abstractmethod
+    def __init__(self,
+                 tag: str = None,
+                 mqtt_client_id: str = None,
+                 auto_connect: bool = False,
+                 isc_tags: bool = False,
+                 isc_poll_interval: float = 1,
+                 ) -&gt; None:
+        &#34;&#34;&#34;Initialize the class instance.
+        
+        Args:
+            tag (str): The short name of the microservice used in MQTT topics
+                and interservice communication properties. If not provided, the
+                lowercase name of the class will be used.
+            mqtt_client_id (str): The name of the client ID when connecting to
+                the local broker. If not provided, will be `fieldedge_&lt;tag&gt;`.
+            auto_connect (bool): If set will automatically connect to the broker
+                during initialization.
+            prop_tags (bool): If set then isc_properties will include the class
+                tag as a prefix. Disabled by default.
+                
+        &#34;&#34;&#34;
+        self._tag: str = tag or get_class_tag(self.__class__)
+        self._isc_tags: bool = isc_tags
+        if not mqtt_client_id:
+            mqtt_client_id = f&#39;fieldedge_{self.tag}&#39;
+        self._subscriptions = [ &#39;fieldedge/+/rollcall/#&#39; ]
+        self._subscriptions.append(f&#39;fieldedge/+/{self.tag}/#&#39;)
+        self._mqttc_local = MqttClient(client_id=mqtt_client_id,
+                                       subscribe_default=self._subscriptions,
+                                       on_message=self._on_isc_message,
+                                       auto_connect=auto_connect)
+        self._default_publish_topic = f&#39;fieldedge/{tag}&#39;
+        self._properties: &#39;list[str]&#39; = None
+        self._hidden_properties: &#39;list[str]&#39; = []
+        self._isc_properties: &#39;list[str]&#39; = None
+        self._hidden_isc_properties: &#39;list[str]&#39; = [
+            &#39;tag&#39;,
+            &#39;properties&#39;,
+            &#39;properties_by_type&#39;,
+            &#39;isc_properties&#39;,
+            &#39;isc_properties_by_type&#39;,
+            &#39;rollcall_properties&#39;,
+        ]
+        self._rollcall_properties: &#39;list[str]&#39; = []
+        self._isc_queue = IscTaskQueue()
+        self._isc_timer = RepeatingTimer(seconds=isc_poll_interval,
+                                         target=self._isc_queue.remove_expired,
+                                         name=&#39;IscTaskExpiryTimer&#39;)
+        self._cached_properties: dict = {}
+    
+    @property
+    def tag(self) -&gt; str:
+        return self._tag
+    
+    @property
+    def log_level(self) -&gt; &#39;str|None&#39;:
+        &#34;&#34;&#34;The logging level of the root logger.&#34;&#34;&#34;
+        return str(logging.getLevelName(logging.getLogger().level))
+    
+    @log_level.setter
+    def log_level(self, value: str):
+        &#34;The logging level of the root logger.&#34;
+        if not isinstance(value, str) or value.upper() not in self.LOG_LEVELS:
+            raise ValueError(f&#39;Level must be in {self.LOG_LEVELS}&#39;)
+        logging.getLogger().setLevel(value.upper())
+        
+    @property
+    def _vlog(self) -&gt; bool:
+        &#34;&#34;&#34;True if environment variable LOG_VERBOSE includes the class tag.&#34;&#34;&#34;
+        return verbose_logging(self.tag)
+    
+    @property
+    def properties(self) -&gt; &#39;list[str]&#39;:
+        &#34;&#34;&#34;Public properties of the class.&#34;&#34;&#34;
+        if not self._properties:
+            self._get_properties()
+        return self._properties
+    
+    def _get_properties(self) -&gt; None:
+        &#34;&#34;&#34;Refreshes the class properties.&#34;&#34;&#34;
+        ignore = self._hidden_properties
+        self._properties = get_class_properties(self.__class__, ignore)
+        
+    def _categorized(self, prop_list: &#39;list[str]&#39;) -&gt; &#39;dict[str, list[str]]&#39;:
+        &#34;&#34;&#34;Categorizes properties as `config` or `info`.&#34;&#34;&#34;
+        categorized = {}
+        for prop in prop_list:
+            if property_is_read_only(self, prop):
+                if &#39;info&#39; not in categorized:
+                    categorized[&#39;info&#39;] = []
+                categorized[&#39;info&#39;].append(prop)
+            else:
+                if &#39;config&#39; not in categorized:
+                    categorized[&#39;config&#39;] = []
+                categorized[&#39;config&#39;].append(prop)
+        return categorized
+        
+    @property
+    def properties_by_type(self) -&gt; &#39;dict[str, list[str]]&#39;:
+        &#34;&#34;&#34;Public properties of the class tagged `info` or `config`.&#34;&#34;&#34;
+        return self._categorized(self.properties)
+    
+    def property_hide(self, prop_name: str):
+        &#34;&#34;&#34;Hides a property so it will not list in `properties`.&#34;&#34;&#34;
+        if prop_name not in self.properties:
+            raise ValueError(f&#39;Invalid prop_name {prop_name}&#39;)
+        if prop_name not in self._hidden_properties:
+            self._hidden_properties.append(prop_name)
+            self._get_properties()
+    
+    def property_unhide(self, prop_name: str):
+        &#34;&#34;&#34;Unhides a hidden property so it appears in `properties`.&#34;&#34;&#34;
+        if prop_name in self._hidden_properties:
+            self._hidden_properties.remove(prop_name)
+            self._get_properties()
+    
+    def property_cache(self, property_name: str, cache_lifetime: int = 5):
+        &#34;&#34;&#34;Sets a cache indicator for the tag name based on current time.
+        
+        Typically used to avoid repeat checking of properties or proxy
+        properties that may be slow to refresh.
+        The cache validity can be checked against `cache_lifetime` using the
+        `property_is_cached` method.
+        
+        Setting `cache_lifetime` to `None` persists the cached value forever
+        unless a subsequent property_cache overwrites the lifetime.
+        
+        Args:
+            property_name (str): The name of the property or proxy.
+            cache_lifetime (int): The validity time in seconds.
+        
+        &#34;&#34;&#34;
+        if property_name in self._cached_properties:
+            old_lifetime = self._cached_properties[property_name][1]
+            _log.warning(f&#39;Overwriting cache for {property_name}&#39;
+                         f&#39; from {old_lifetime} to {cache_lifetime}&#39;)
+        self._cached_properties[property_name] = (time.time(),
+                                                  cache_lifetime)
+    
+    def property_is_cached(self, property_name: str) -&gt; bool:
+        &#34;&#34;&#34;Returns `True` if the property cache_lifetime is not expired.
+        
+        If expired, the property&#39;s cache tag will be removed from the cache.
+        
+        Args:
+            property_name (str): The name of the property or proxy.
+        
+        Returns:
+            `True` if the time passed since cached is within the cache_lifetime
+                specified using the `property_cache` method.
+                
+        &#34;&#34;&#34;
+        if property_name not in self._cached_properties:
+            return False
+        cache_time, cache_lifetime = self._cached_properties[property_name]
+        if cache_lifetime is None:
+            return True
+        elapsed = int(time.time() - cache_time)
+        if elapsed &lt; cache_lifetime:
+            return True
+        _log.debug(f&#39;Cached {property_name} expired ({elapsed}s) - removing&#39;)
+        del self._cached_properties[property_name]
+        return False
+        
+    @property
+    def isc_properties(self) -&gt; &#39;list[str]&#39;:
+        &#34;&#34;&#34;ISC exposed properties.&#34;&#34;&#34;
+        if self._isc_properties is None:
+            self._get_isc_properties()
+        return self._isc_properties
+    
+    def _get_isc_properties(self) -&gt; None:
+        &#34;&#34;&#34;Refreshes the cached ISC properties list.&#34;&#34;&#34;
+        ignore = self._hidden_properties
+        ignore.extend(p for p in self._hidden_isc_properties
+                    if p not in self._hidden_properties)
+        tag = self.tag if self._isc_tags else None
+        self._isc_properties = [tag_class_property(prop, tag)
+                                for prop in self.properties
+                                if prop not in ignore]
+    
+    @property
+    def isc_properties_by_type(self) -&gt; &#39;dict[str, list[str]]&#39;:
+        &#34;&#34;&#34;ISC exposed properties tagged `readOnly` or `readWrite`.&#34;&#34;&#34;
+        categorized = {}
+        for isc_prop in self.isc_properties:
+            entry = self._categorized([untag_class_property(isc_prop,
+                                                            self._isc_tags)])
+            if &#39;config&#39; in entry:
+                if &#39;config&#39; not in categorized:
+                    categorized[&#39;config&#39;] = []
+                categorized[&#39;config&#39;].append(isc_prop)
+            else:
+                if &#39;info&#39; not in categorized:
+                    categorized[&#39;info&#39;] = []
+                categorized[&#39;info&#39;].append(isc_prop)
+        return categorized
+    
+    def isc_get_property(self, isc_property: str) -&gt; Any:
+        &#34;&#34;&#34;Gets a property value based on its ISC name.&#34;&#34;&#34;
+        prop = untag_class_property(isc_property, self._isc_tags)
+        if prop not in self.properties:
+            raise AttributeError(f&#39;{prop} not in properties&#39;)
+        return getattr(self, prop)
+    
+    def isc_set_property(self, isc_property: str, value: Any) -&gt; None:
+        &#34;&#34;&#34;Sets a property value based on its ISC name.&#34;&#34;&#34;
+        prop = untag_class_property(isc_property, self._isc_tags)
+        if prop not in self.properties:
+            raise AttributeError(f&#39;{prop} not in properties&#39;)
+        if prop not in self.properties_by_type[&#39;config&#39;]:
+            raise AttributeError(f&#39;{prop} is not writable&#39;)
+        setattr(self, prop, value)
+    
+    def isc_property_hide(self, isc_property: str) -&gt; None:
+        &#34;&#34;&#34;Hides a property from ISC - does not appear in `isc_properties`.&#34;&#34;&#34;
+        if isc_property not in self.isc_properties:    
+            raise ValueError(f&#39;Invalid prop_name {isc_property}&#39;)
+        if isc_property not in self._hidden_isc_properties:
+            self._hidden_isc_properties.append(isc_property)
+            self._get_isc_properties()
+    
+    def isc_property_unhide(self, isc_property: str) -&gt; None:
+        &#34;&#34;&#34;Unhides a property to ISC so it appears in `isc_properties`.&#34;&#34;&#34;
+        if isc_property in self._hidden_isc_properties:
+            self._hidden_isc_properties.remove(isc_property)
+            self._get_isc_properties()
+        
+    @property
+    def rollcall_properties(self) -&gt; &#39;list[str]&#39;:
+        &#34;&#34;&#34;Property key/values that will be sent in the rollcall response.&#34;&#34;&#34;
+        return self._rollcall_properties
+    
+    def rollcall_property_add(self, prop_name: str):
+        &#34;&#34;&#34;Add a property to the rollcall response.&#34;&#34;&#34;
+        if prop_name not in self.properties:
+            raise ValueError(f&#39;Invalid prop_name {prop_name}&#39;)
+        if prop_name not in self._rollcall_properties:
+            self._rollcall_properties.append(prop_name)
+    
+    def rollcall_property_remove(self, prop_name: str):
+        &#34;&#34;&#34;Remove a property from the rollcall response.&#34;&#34;&#34;
+        if prop_name in self._rollcall_properties:
+            self._rollcall_properties.remove(prop_name)
+        
+    def rollcall(self):
+        &#34;&#34;&#34;Publishes a rollcall broadcast to other microservices with UUID.&#34;&#34;&#34;
+        subtopic = &#39;rollcall&#39;
+        rollcall = { &#39;uid&#39;: str(uuid4()) }
+        self.notify(rollcall, subtopic=subtopic)
+    
+    def _rollcall_respond(self, topic: str, message: dict):
+        &#34;&#34;&#34;Processes an incoming rollcall request.
+        
+        If the requestor is this service based on the topic, it is ignored.
+        If the requestor is another microservice, the response will include
+        key/value pairs from the `rollcall_properties` list.
+        
+        Args:
+            topic: The topic from which the requestor will be determined from
+                the second level of the topic e.g. `fieldedge/&lt;requestor&gt;/...`
+            request (dict): The request message.
+            
+        &#34;&#34;&#34;
+        if not topic.endswith(&#39;/rollcall&#39;):
+            _log.warning(f&#39;rollcall_respond called without rollcall topic&#39;)
+            return
+        if f&#39;/{self.tag}/&#39; in topic:
+            if self._vlog:
+                _log.debug(f&#39;Ignoring rollcall request from self&#39;)
+        else:
+            subtopic = &#39;rollcall/response&#39;
+            if &#39;uid&#39; not in message:
+                _log.warning(&#39;Rollcall request missing unique ID&#39;)
+            response = { &#39;uid&#39;: message.get(&#39;uid&#39;, None) }
+            tag = self.tag if self._isc_tags else None
+            for prop in self._rollcall_properties:
+                if prop in self.properties:
+                    tagged_prop = tag_class_property(prop, tag)
+                    response[tagged_prop] = getattr(self, prop)
+            self.notify(response, subtopic=subtopic)
+        
+    def isc_topic_subscribe(self, topic: str) -&gt; bool:
+        &#34;&#34;&#34;Subscribes to the specified ISC topic.&#34;&#34;&#34;
+        if not topic.startswith(&#39;fieldedge/&#39;):
+            raise ValueError(&#39;First level topic must be fieldedge&#39;)
+        if topic not in self._subscriptions:
+            try:
+                self._mqttc_local.subscribe(topic)
+                self._subscriptions.append(topic)
+                return True
+            except:
+                return False
+        else:
+            _log.warning(f&#39;Already subscribed to {topic}&#39;)
+            return True
+    
+    def isc_topic_unsubscribe(self, topic: str) -&gt; bool:
+        &#34;&#34;&#34;Unsubscribes from the specified ISC topic.&#34;&#34;&#34;
+        mandatory = [&#39;fieldedge/+/rollcall/#&#39;, f&#39;fieldedge/+/{self.tag}/#&#39;]
+        if topic in mandatory:
+            _log.warning(f&#39;Subscription to {topic} is mandatory&#39;)
+            return False
+        if topic not in self._subscriptions:
+            _log.warning(f&#39;Already not subscribed to {topic}&#39;)
+            return True
+        try:
+            self._mqttc_local.unsubscribe(topic)
+            self._subscriptions.remove(topic)
+            return True
+        except:
+            return False
+        
+    def _on_isc_message(self, topic: str, message: dict) -&gt; None:
+        &#34;&#34;&#34;Handles rollcall requests or passes to the `on_isc_message` method.
+        
+        This private method ensures rollcall requests are handled in a standard
+        way.
+        
+        Args:
+            topic: The MQTT topic
+            message: The MQTT/JSON message
+        
+        &#34;&#34;&#34;
+        if self._vlog:
+            _log.debug(f&#39;Received ISC {topic}: {message}&#39;)
+        if topic.endswith(&#39;/rollcall&#39;):
+            self._rollcall_respond(topic, message)
+        else:
+            self.on_isc_message(topic, message)
+        
+    @abstractmethod
+    def on_isc_message(self, topic: str, message: dict) -&gt; None:
+        &#34;&#34;&#34;Handles incoming ISC/MQTT requests.
+        
+        Messages are received from any topics subscribed to using the
+        `isc_subscribe` method. The default subscription `fieldedge/+/rollcall`
+        is handled in a standard way by the private version of this method.
+        The default subscription is `fieldedge/&lt;self.tag&gt;/request/#` which other
+        services use to query this one. After receiving a rollcall, this service
+        may subscribe to `fieldedge/&lt;other&gt;/info/#` topic to receive responses
+        to its queries, tagged with a `uid` in the message body.
+        
+        Args:
+            topic: The MQTT topic received.
+            message: The MQTT/JSON message received.
+            
+        &#34;&#34;&#34;
+        
+    def properties_notify(self, request: dict) -&gt; None:
+        &#34;&#34;&#34;Publishes the requested ISC property values to the local broker.
+        
+        If no `properties` key is in the request, it implies a simple list of
+        ISC property names will be generated.
+        
+        If `properties` is a list it will be used as a filter to create and
+        publish a list of properties/values. An empty list will result in all
+        ISC property/values being published.
+        
+        If the request has the key `categorized` = `True` then the response
+        will be a nested dictionary with `config` and `info` dictionaries.
+        
+        Args:
+            request: A dictionary with optional `properties` list and
+                optional `categorized` flag.
+        
+        &#34;&#34;&#34;
+        _log.warning(&#39;TODO: testing&#39;)
+        if not isinstance(request, dict):
+            raise ValueError(&#39;Request must be a dictionary&#39;)
+        if (&#39;properties&#39; in request and
+            not isinstance(request[&#39;properties&#39;], list)):
+            raise ValueError(&#39;Request properties must be a list&#39;)
+        response = {}
+        request_id = request.get(&#39;uid&#39;, None)
+        if request_id:
+            response[&#39;uid&#39;] = request_id
+        else:
+            _log.warning(&#39;Request missing uid for response correlation&#39;)
+        categorized = request.get(&#39;categorized&#39;, False)
+        if &#39;properties&#39; not in request:
+            subtopic = &#39;info/properties/list&#39;
+            if categorized:
+                response[&#39;properties&#39;] = self.isc_properties_by_type
+            else:
+                response[&#39;properties&#39;] = self.isc_properties
+        else:
+            req_props: list = request[&#39;properties&#39;]
+            subtopic = &#39;info/properties/values&#39;
+            response[&#39;properties&#39;] = {}
+            res_props = response[&#39;properties&#39;]
+            if categorized:
+                props_source = self.isc_properties_by_type
+                if (&#39;config&#39; in props_source and
+                    any(prop in req_props for prop in props_source[&#39;config&#39;])):
+                    res_props[&#39;config&#39;] = {}
+                if (&#39;info&#39; in props_source and
+                    any(prop in req_props for prop in props_source[&#39;info&#39;])):
+                    res_props[&#39;info&#39;] = {}
+            else:
+                props_source = self.isc_properties
+            if len(req_props) == 0:
+                req_props = self.isc_properties
+            if categorized:
+                for p in req_props:
+                    if (&#39;config&#39; in props_source and
+                        p in props_source[&#39;config&#39;]):
+                        res_props[&#39;config&#39;][p] = props_source[&#39;config&#39;][p]
+                    else:
+                        res_props[&#39;info&#39;][p] = props_source[&#39;info&#39;][p]
+            else:
+                for p in req_props:
+                    res_props[p] = props_source[p]
+        _log.debug(f&#39;Responding to request {request_id} for properties&#39;
+                   f&#39;: {request[&#34;properties&#34;] or &#34;ALL&#34;}&#39;)
+        self.notify(response, subtopic=subtopic)
+    
+    def properties_change(self, request: dict) -&gt; &#39;None|dict&#39;:
+        &#34;&#34;&#34;Processes the requested property changes.
+        
+        The `request` dictionary must include the `properties` key with a
+        dictionary of ISC property names and respective value to set.
+        
+        If the request contains a `uid` then the `properties_notify` method
+        will be called with the changed values to confirm the changes to the
+        ISC requestor. If no `uid` is present then a dictionary confirming
+        successful changes will be returned to the calling function.
+        
+        Args:
+            request: A dictionary containing a `properties` dictionary of
+                select ISC property names and values to set.
+        
+        &#34;&#34;&#34;
+        _log.warning(&#39;TODO: testing&#39;)
+        if (not isinstance(request, dict) or
+            &#39;properties&#39; not in request or
+            not isinstance(request[&#39;properties&#39;], dict)):
+            raise ValueError(&#39;Request must contain a properties dictionary&#39;)
+        response = { &#39;properties&#39;: {} }
+        request_id = request.get(&#39;uid&#39;, None)
+        if request_id:
+            response[&#39;uid&#39;] = request_id
+        else:
+            _log.warning(&#39;Request missing uid for response correlation&#39;)
+        for k, v in request[&#39;properties&#39;].items():
+            if k in self.isc_properties_by_type[&#39;config&#39;]:
+                try:
+                    self.isc_set_property(k, v)
+                    response[&#39;properties&#39;][k] = v
+                except Exception as err:
+                    _log.warning(f&#39;Failed to set {k}={v} ({err})&#39;)
+        if not request_id:
+            return response
+        _log.debug(f&#39;Responding to change request {request_id} for properties&#39;
+                   f&#39;: {request[&#34;properties&#34;]}&#39;)
+        self.notify(response, subtopic=&#39;info/properties/values&#39;)
+        
+    def notify(self,
+               message: dict,
+               topic: str = None,
+               subtopic: str = None,
+               qos: int = 1) -&gt; None:
+        &#34;&#34;&#34;Publishes an inter-service (ISC) message to the local MQTT broker.
+        
+        Args:
+            message: The message to publish as a JSON object.
+            topic: Optional override of the class `_default_publish_topic`
+                used if `topic` is not passed in.
+            subtopic: A subtopic appended to the `_default_publish_topic`.
+            
+        &#34;&#34;&#34;
+        if not isinstance(message, dict):
+            raise ValueError(&#39;Invalid message must be a dictionary&#39;)
+        topic = topic or self._default_publish_topic
+        if not isinstance(topic, str) or not topic:
+            raise ValueError(&#39;Invalid topic must be string&#39;)
+        if subtopic is not None:
+            if not isinstance(subtopic, str) or not subtopic:
+                raise ValueError(&#39;Invalid subtopic must be string&#39;)
+            if not subtopic.startswith(&#39;/&#39;):
+                topic += &#39;/&#39;
+            topic += subtopic
+        json_message = json_compatible(message)
+        if &#39;ts&#39; not in json_message:
+            json_message[&#39;ts&#39;] = int(time.time() * 1000)
+        if not self._mqttc_local or not self._mqttc_local.is_connected:
+            _log.error(&#39;MQTT client not connected - failed to publish&#39;
+                            f&#39;{topic}: {message}&#39;)
+            return
+        _log.info(f&#39;Publishing ISC {topic}: {json_message}&#39;)
+        self._mqttc_local.publish(topic, message, qos)
+    
+    def task_add(self, task: IscTask) -&gt; None:
+        &#34;&#34;&#34;Adds a task to the task queue.&#34;&#34;&#34;
+        if self._isc_queue.is_queued(task_id=task.uid):
+            _log.warning(f&#39;Task {task.uid} already queued&#39;)
+        else:
+            self._isc_queue.append(task)
+        
+    def task_get(self, task_id: str) -&gt; &#39;IscTask|None&#39;:
+        &#34;&#34;&#34;Retrieves a task from the queue.
+        
+        Args:
+            task_id: The unique ID of the task.
+        
+        Returns:
+            The `QueuedIscTask` if it was found in the queue, else `None`.
+            
+        &#34;&#34;&#34;
+        return self._isc_queue.get(task_id)
+        
+    def task_expiry_enable(self, enable: bool = True):
+        &#34;&#34;&#34;Starts or stops periodic checking for expired ISC tasks.
+        
+        Args:
+            enable: If `True` (default) starts the checks, else stops checking.
+            
+        &#34;&#34;&#34;
+        if enable:
+            if not self._isc_timer.is_alive():
+                self._isc_timer.start()
+            self._isc_timer.start_timer()
+        else:
+            self._isc_timer.stop_timer()</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>abc.ABC</li>
+</ul>
+<h3>Class variables</h3>
+<dl>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice.LOG_LEVELS"><code class="name">var <span class="ident">LOG_LEVELS</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+</dl>
+<h3>Instance variables</h3>
+<dl>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice.isc_properties"><code class="name">var <span class="ident">isc_properties</span> : list[str]</code></dt>
+<dd>
+<div class="desc"><p>ISC exposed properties.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def isc_properties(self) -&gt; &#39;list[str]&#39;:
+    &#34;&#34;&#34;ISC exposed properties.&#34;&#34;&#34;
+    if self._isc_properties is None:
+        self._get_isc_properties()
+    return self._isc_properties</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice.isc_properties_by_type"><code class="name">var <span class="ident">isc_properties_by_type</span> : dict[str, list[str]]</code></dt>
+<dd>
+<div class="desc"><p>ISC exposed properties tagged <code>readOnly</code> or <code>readWrite</code>.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def isc_properties_by_type(self) -&gt; &#39;dict[str, list[str]]&#39;:
+    &#34;&#34;&#34;ISC exposed properties tagged `readOnly` or `readWrite`.&#34;&#34;&#34;
+    categorized = {}
+    for isc_prop in self.isc_properties:
+        entry = self._categorized([untag_class_property(isc_prop,
+                                                        self._isc_tags)])
+        if &#39;config&#39; in entry:
+            if &#39;config&#39; not in categorized:
+                categorized[&#39;config&#39;] = []
+            categorized[&#39;config&#39;].append(isc_prop)
+        else:
+            if &#39;info&#39; not in categorized:
+                categorized[&#39;info&#39;] = []
+            categorized[&#39;info&#39;].append(isc_prop)
+    return categorized</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice.log_level"><code class="name">var <span class="ident">log_level</span> : str | None</code></dt>
+<dd>
+<div class="desc"><p>The logging level of the root logger.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def log_level(self) -&gt; &#39;str|None&#39;:
+    &#34;&#34;&#34;The logging level of the root logger.&#34;&#34;&#34;
+    return str(logging.getLevelName(logging.getLogger().level))</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice.properties"><code class="name">var <span class="ident">properties</span> : list[str]</code></dt>
+<dd>
+<div class="desc"><p>Public properties of the class.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def properties(self) -&gt; &#39;list[str]&#39;:
+    &#34;&#34;&#34;Public properties of the class.&#34;&#34;&#34;
+    if not self._properties:
+        self._get_properties()
+    return self._properties</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice.properties_by_type"><code class="name">var <span class="ident">properties_by_type</span> : dict[str, list[str]]</code></dt>
+<dd>
+<div class="desc"><p>Public properties of the class tagged <code>info</code> or <code>config</code>.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def properties_by_type(self) -&gt; &#39;dict[str, list[str]]&#39;:
+    &#34;&#34;&#34;Public properties of the class tagged `info` or `config`.&#34;&#34;&#34;
+    return self._categorized(self.properties)</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice.rollcall_properties"><code class="name">var <span class="ident">rollcall_properties</span> : list[str]</code></dt>
+<dd>
+<div class="desc"><p>Property key/values that will be sent in the rollcall response.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def rollcall_properties(self) -&gt; &#39;list[str]&#39;:
+    &#34;&#34;&#34;Property key/values that will be sent in the rollcall response.&#34;&#34;&#34;
+    return self._rollcall_properties</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice.tag"><code class="name">var <span class="ident">tag</span> : str</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def tag(self) -&gt; str:
+    return self._tag</code></pre>
+</details>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice.isc_get_property"><code class="name flex">
+<span>def <span class="ident">isc_get_property</span></span>(<span>self, isc_property: str) ‑> Any</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Gets a property value based on its ISC name.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def isc_get_property(self, isc_property: str) -&gt; Any:
+    &#34;&#34;&#34;Gets a property value based on its ISC name.&#34;&#34;&#34;
+    prop = untag_class_property(isc_property, self._isc_tags)
+    if prop not in self.properties:
+        raise AttributeError(f&#39;{prop} not in properties&#39;)
+    return getattr(self, prop)</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice.isc_property_hide"><code class="name flex">
+<span>def <span class="ident">isc_property_hide</span></span>(<span>self, isc_property: str) ‑> None</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Hides a property from ISC - does not appear in <code>isc_properties</code>.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def isc_property_hide(self, isc_property: str) -&gt; None:
+    &#34;&#34;&#34;Hides a property from ISC - does not appear in `isc_properties`.&#34;&#34;&#34;
+    if isc_property not in self.isc_properties:    
+        raise ValueError(f&#39;Invalid prop_name {isc_property}&#39;)
+    if isc_property not in self._hidden_isc_properties:
+        self._hidden_isc_properties.append(isc_property)
+        self._get_isc_properties()</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice.isc_property_unhide"><code class="name flex">
+<span>def <span class="ident">isc_property_unhide</span></span>(<span>self, isc_property: str) ‑> None</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Unhides a property to ISC so it appears in <code>isc_properties</code>.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def isc_property_unhide(self, isc_property: str) -&gt; None:
+    &#34;&#34;&#34;Unhides a property to ISC so it appears in `isc_properties`.&#34;&#34;&#34;
+    if isc_property in self._hidden_isc_properties:
+        self._hidden_isc_properties.remove(isc_property)
+        self._get_isc_properties()</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice.isc_set_property"><code class="name flex">
+<span>def <span class="ident">isc_set_property</span></span>(<span>self, isc_property: str, value: Any) ‑> None</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Sets a property value based on its ISC name.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def isc_set_property(self, isc_property: str, value: Any) -&gt; None:
+    &#34;&#34;&#34;Sets a property value based on its ISC name.&#34;&#34;&#34;
+    prop = untag_class_property(isc_property, self._isc_tags)
+    if prop not in self.properties:
+        raise AttributeError(f&#39;{prop} not in properties&#39;)
+    if prop not in self.properties_by_type[&#39;config&#39;]:
+        raise AttributeError(f&#39;{prop} is not writable&#39;)
+    setattr(self, prop, value)</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice.isc_topic_subscribe"><code class="name flex">
+<span>def <span class="ident">isc_topic_subscribe</span></span>(<span>self, topic: str) ‑> bool</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Subscribes to the specified ISC topic.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def isc_topic_subscribe(self, topic: str) -&gt; bool:
+    &#34;&#34;&#34;Subscribes to the specified ISC topic.&#34;&#34;&#34;
+    if not topic.startswith(&#39;fieldedge/&#39;):
+        raise ValueError(&#39;First level topic must be fieldedge&#39;)
+    if topic not in self._subscriptions:
+        try:
+            self._mqttc_local.subscribe(topic)
+            self._subscriptions.append(topic)
+            return True
+        except:
+            return False
+    else:
+        _log.warning(f&#39;Already subscribed to {topic}&#39;)
+        return True</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice.isc_topic_unsubscribe"><code class="name flex">
+<span>def <span class="ident">isc_topic_unsubscribe</span></span>(<span>self, topic: str) ‑> bool</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Unsubscribes from the specified ISC topic.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def isc_topic_unsubscribe(self, topic: str) -&gt; bool:
+    &#34;&#34;&#34;Unsubscribes from the specified ISC topic.&#34;&#34;&#34;
+    mandatory = [&#39;fieldedge/+/rollcall/#&#39;, f&#39;fieldedge/+/{self.tag}/#&#39;]
+    if topic in mandatory:
+        _log.warning(f&#39;Subscription to {topic} is mandatory&#39;)
+        return False
+    if topic not in self._subscriptions:
+        _log.warning(f&#39;Already not subscribed to {topic}&#39;)
+        return True
+    try:
+        self._mqttc_local.unsubscribe(topic)
+        self._subscriptions.remove(topic)
+        return True
+    except:
+        return False</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice.notify"><code class="name flex">
+<span>def <span class="ident">notify</span></span>(<span>self, message: dict, topic: str = None, subtopic: str = None, qos: int = 1) ‑> None</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Publishes an inter-service (ISC) message to the local MQTT broker.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>message</code></strong></dt>
+<dd>The message to publish as a JSON object.</dd>
+<dt><strong><code>topic</code></strong></dt>
+<dd>Optional override of the class <code>_default_publish_topic</code>
+used if <code>topic</code> is not passed in.</dd>
+<dt><strong><code>subtopic</code></strong></dt>
+<dd>A subtopic appended to the <code>_default_publish_topic</code>.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def notify(self,
+           message: dict,
+           topic: str = None,
+           subtopic: str = None,
+           qos: int = 1) -&gt; None:
+    &#34;&#34;&#34;Publishes an inter-service (ISC) message to the local MQTT broker.
+    
+    Args:
+        message: The message to publish as a JSON object.
+        topic: Optional override of the class `_default_publish_topic`
+            used if `topic` is not passed in.
+        subtopic: A subtopic appended to the `_default_publish_topic`.
+        
+    &#34;&#34;&#34;
+    if not isinstance(message, dict):
+        raise ValueError(&#39;Invalid message must be a dictionary&#39;)
+    topic = topic or self._default_publish_topic
+    if not isinstance(topic, str) or not topic:
+        raise ValueError(&#39;Invalid topic must be string&#39;)
+    if subtopic is not None:
+        if not isinstance(subtopic, str) or not subtopic:
+            raise ValueError(&#39;Invalid subtopic must be string&#39;)
+        if not subtopic.startswith(&#39;/&#39;):
+            topic += &#39;/&#39;
+        topic += subtopic
+    json_message = json_compatible(message)
+    if &#39;ts&#39; not in json_message:
+        json_message[&#39;ts&#39;] = int(time.time() * 1000)
+    if not self._mqttc_local or not self._mqttc_local.is_connected:
+        _log.error(&#39;MQTT client not connected - failed to publish&#39;
+                        f&#39;{topic}: {message}&#39;)
+        return
+    _log.info(f&#39;Publishing ISC {topic}: {json_message}&#39;)
+    self._mqttc_local.publish(topic, message, qos)</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice.on_isc_message"><code class="name flex">
+<span>def <span class="ident">on_isc_message</span></span>(<span>self, topic: str, message: dict) ‑> None</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Handles incoming ISC/MQTT requests.</p>
+<p>Messages are received from any topics subscribed to using the
+<code>isc_subscribe</code> method. The default subscription <code>fieldedge/+/rollcall</code>
+is handled in a standard way by the private version of this method.
+The default subscription is <code>fieldedge/&lt;self.tag&gt;/request/#</code> which other
+services use to query this one. After receiving a rollcall, this service
+may subscribe to <code>fieldedge/&lt;other&gt;/info/#</code> topic to receive responses
+to its queries, tagged with a <code>uid</code> in the message body.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>topic</code></strong></dt>
+<dd>The MQTT topic received.</dd>
+<dt><strong><code>message</code></strong></dt>
+<dd>The MQTT/JSON message received.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@abstractmethod
+def on_isc_message(self, topic: str, message: dict) -&gt; None:
+    &#34;&#34;&#34;Handles incoming ISC/MQTT requests.
+    
+    Messages are received from any topics subscribed to using the
+    `isc_subscribe` method. The default subscription `fieldedge/+/rollcall`
+    is handled in a standard way by the private version of this method.
+    The default subscription is `fieldedge/&lt;self.tag&gt;/request/#` which other
+    services use to query this one. After receiving a rollcall, this service
+    may subscribe to `fieldedge/&lt;other&gt;/info/#` topic to receive responses
+    to its queries, tagged with a `uid` in the message body.
+    
+    Args:
+        topic: The MQTT topic received.
+        message: The MQTT/JSON message received.
+        
+    &#34;&#34;&#34;</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice.properties_change"><code class="name flex">
+<span>def <span class="ident">properties_change</span></span>(<span>self, request: dict) ‑> None | dict</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Processes the requested property changes.</p>
+<p>The <code>request</code> dictionary must include the <code>properties</code> key with a
+dictionary of ISC property names and respective value to set.</p>
+<p>If the request contains a <code>uid</code> then the <code>properties_notify</code> method
+will be called with the changed values to confirm the changes to the
+ISC requestor. If no <code>uid</code> is present then a dictionary confirming
+successful changes will be returned to the calling function.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>request</code></strong></dt>
+<dd>A dictionary containing a <code>properties</code> dictionary of
+select ISC property names and values to set.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def properties_change(self, request: dict) -&gt; &#39;None|dict&#39;:
+    &#34;&#34;&#34;Processes the requested property changes.
+    
+    The `request` dictionary must include the `properties` key with a
+    dictionary of ISC property names and respective value to set.
+    
+    If the request contains a `uid` then the `properties_notify` method
+    will be called with the changed values to confirm the changes to the
+    ISC requestor. If no `uid` is present then a dictionary confirming
+    successful changes will be returned to the calling function.
+    
+    Args:
+        request: A dictionary containing a `properties` dictionary of
+            select ISC property names and values to set.
+    
+    &#34;&#34;&#34;
+    _log.warning(&#39;TODO: testing&#39;)
+    if (not isinstance(request, dict) or
+        &#39;properties&#39; not in request or
+        not isinstance(request[&#39;properties&#39;], dict)):
+        raise ValueError(&#39;Request must contain a properties dictionary&#39;)
+    response = { &#39;properties&#39;: {} }
+    request_id = request.get(&#39;uid&#39;, None)
+    if request_id:
+        response[&#39;uid&#39;] = request_id
+    else:
+        _log.warning(&#39;Request missing uid for response correlation&#39;)
+    for k, v in request[&#39;properties&#39;].items():
+        if k in self.isc_properties_by_type[&#39;config&#39;]:
+            try:
+                self.isc_set_property(k, v)
+                response[&#39;properties&#39;][k] = v
+            except Exception as err:
+                _log.warning(f&#39;Failed to set {k}={v} ({err})&#39;)
+    if not request_id:
+        return response
+    _log.debug(f&#39;Responding to change request {request_id} for properties&#39;
+               f&#39;: {request[&#34;properties&#34;]}&#39;)
+    self.notify(response, subtopic=&#39;info/properties/values&#39;)</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice.properties_notify"><code class="name flex">
+<span>def <span class="ident">properties_notify</span></span>(<span>self, request: dict) ‑> None</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Publishes the requested ISC property values to the local broker.</p>
+<p>If no <code>properties</code> key is in the request, it implies a simple list of
+ISC property names will be generated.</p>
+<p>If <code>properties</code> is a list it will be used as a filter to create and
+publish a list of properties/values. An empty list will result in all
+ISC property/values being published.</p>
+<p>If the request has the key <code>categorized</code> = <code>True</code> then the response
+will be a nested dictionary with <code>config</code> and <code>info</code> dictionaries.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>request</code></strong></dt>
+<dd>A dictionary with optional <code>properties</code> list and
+optional <code>categorized</code> flag.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def properties_notify(self, request: dict) -&gt; None:
+    &#34;&#34;&#34;Publishes the requested ISC property values to the local broker.
+    
+    If no `properties` key is in the request, it implies a simple list of
+    ISC property names will be generated.
+    
+    If `properties` is a list it will be used as a filter to create and
+    publish a list of properties/values. An empty list will result in all
+    ISC property/values being published.
+    
+    If the request has the key `categorized` = `True` then the response
+    will be a nested dictionary with `config` and `info` dictionaries.
+    
+    Args:
+        request: A dictionary with optional `properties` list and
+            optional `categorized` flag.
+    
+    &#34;&#34;&#34;
+    _log.warning(&#39;TODO: testing&#39;)
+    if not isinstance(request, dict):
+        raise ValueError(&#39;Request must be a dictionary&#39;)
+    if (&#39;properties&#39; in request and
+        not isinstance(request[&#39;properties&#39;], list)):
+        raise ValueError(&#39;Request properties must be a list&#39;)
+    response = {}
+    request_id = request.get(&#39;uid&#39;, None)
+    if request_id:
+        response[&#39;uid&#39;] = request_id
+    else:
+        _log.warning(&#39;Request missing uid for response correlation&#39;)
+    categorized = request.get(&#39;categorized&#39;, False)
+    if &#39;properties&#39; not in request:
+        subtopic = &#39;info/properties/list&#39;
+        if categorized:
+            response[&#39;properties&#39;] = self.isc_properties_by_type
+        else:
+            response[&#39;properties&#39;] = self.isc_properties
+    else:
+        req_props: list = request[&#39;properties&#39;]
+        subtopic = &#39;info/properties/values&#39;
+        response[&#39;properties&#39;] = {}
+        res_props = response[&#39;properties&#39;]
+        if categorized:
+            props_source = self.isc_properties_by_type
+            if (&#39;config&#39; in props_source and
+                any(prop in req_props for prop in props_source[&#39;config&#39;])):
+                res_props[&#39;config&#39;] = {}
+            if (&#39;info&#39; in props_source and
+                any(prop in req_props for prop in props_source[&#39;info&#39;])):
+                res_props[&#39;info&#39;] = {}
+        else:
+            props_source = self.isc_properties
+        if len(req_props) == 0:
+            req_props = self.isc_properties
+        if categorized:
+            for p in req_props:
+                if (&#39;config&#39; in props_source and
+                    p in props_source[&#39;config&#39;]):
+                    res_props[&#39;config&#39;][p] = props_source[&#39;config&#39;][p]
+                else:
+                    res_props[&#39;info&#39;][p] = props_source[&#39;info&#39;][p]
+        else:
+            for p in req_props:
+                res_props[p] = props_source[p]
+    _log.debug(f&#39;Responding to request {request_id} for properties&#39;
+               f&#39;: {request[&#34;properties&#34;] or &#34;ALL&#34;}&#39;)
+    self.notify(response, subtopic=subtopic)</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice.property_cache"><code class="name flex">
+<span>def <span class="ident">property_cache</span></span>(<span>self, property_name: str, cache_lifetime: int = 5)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Sets a cache indicator for the tag name based on current time.</p>
+<p>Typically used to avoid repeat checking of properties or proxy
+properties that may be slow to refresh.
+The cache validity can be checked against <code>cache_lifetime</code> using the
+<code>property_is_cached</code> method.</p>
+<p>Setting <code>cache_lifetime</code> to <code>None</code> persists the cached value forever
+unless a subsequent property_cache overwrites the lifetime.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>property_name</code></strong> :&ensp;<code>str</code></dt>
+<dd>The name of the property or proxy.</dd>
+<dt><strong><code>cache_lifetime</code></strong> :&ensp;<code>int</code></dt>
+<dd>The validity time in seconds.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def property_cache(self, property_name: str, cache_lifetime: int = 5):
+    &#34;&#34;&#34;Sets a cache indicator for the tag name based on current time.
+    
+    Typically used to avoid repeat checking of properties or proxy
+    properties that may be slow to refresh.
+    The cache validity can be checked against `cache_lifetime` using the
+    `property_is_cached` method.
+    
+    Setting `cache_lifetime` to `None` persists the cached value forever
+    unless a subsequent property_cache overwrites the lifetime.
+    
+    Args:
+        property_name (str): The name of the property or proxy.
+        cache_lifetime (int): The validity time in seconds.
+    
+    &#34;&#34;&#34;
+    if property_name in self._cached_properties:
+        old_lifetime = self._cached_properties[property_name][1]
+        _log.warning(f&#39;Overwriting cache for {property_name}&#39;
+                     f&#39; from {old_lifetime} to {cache_lifetime}&#39;)
+    self._cached_properties[property_name] = (time.time(),
+                                              cache_lifetime)</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice.property_hide"><code class="name flex">
+<span>def <span class="ident">property_hide</span></span>(<span>self, prop_name: str)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Hides a property so it will not list in <code>properties</code>.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def property_hide(self, prop_name: str):
+    &#34;&#34;&#34;Hides a property so it will not list in `properties`.&#34;&#34;&#34;
+    if prop_name not in self.properties:
+        raise ValueError(f&#39;Invalid prop_name {prop_name}&#39;)
+    if prop_name not in self._hidden_properties:
+        self._hidden_properties.append(prop_name)
+        self._get_properties()</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice.property_is_cached"><code class="name flex">
+<span>def <span class="ident">property_is_cached</span></span>(<span>self, property_name: str) ‑> bool</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Returns <code>True</code> if the property cache_lifetime is not expired.</p>
+<p>If expired, the property's cache tag will be removed from the cache.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>property_name</code></strong> :&ensp;<code>str</code></dt>
+<dd>The name of the property or proxy.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p><code>True</code> if the time passed since cached is within the cache_lifetime
+specified using the <code>property_cache</code> method.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def property_is_cached(self, property_name: str) -&gt; bool:
+    &#34;&#34;&#34;Returns `True` if the property cache_lifetime is not expired.
+    
+    If expired, the property&#39;s cache tag will be removed from the cache.
+    
+    Args:
+        property_name (str): The name of the property or proxy.
+    
+    Returns:
+        `True` if the time passed since cached is within the cache_lifetime
+            specified using the `property_cache` method.
+            
+    &#34;&#34;&#34;
+    if property_name not in self._cached_properties:
+        return False
+    cache_time, cache_lifetime = self._cached_properties[property_name]
+    if cache_lifetime is None:
+        return True
+    elapsed = int(time.time() - cache_time)
+    if elapsed &lt; cache_lifetime:
+        return True
+    _log.debug(f&#39;Cached {property_name} expired ({elapsed}s) - removing&#39;)
+    del self._cached_properties[property_name]
+    return False</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice.property_unhide"><code class="name flex">
+<span>def <span class="ident">property_unhide</span></span>(<span>self, prop_name: str)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Unhides a hidden property so it appears in <code>properties</code>.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def property_unhide(self, prop_name: str):
+    &#34;&#34;&#34;Unhides a hidden property so it appears in `properties`.&#34;&#34;&#34;
+    if prop_name in self._hidden_properties:
+        self._hidden_properties.remove(prop_name)
+        self._get_properties()</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice.rollcall"><code class="name flex">
+<span>def <span class="ident">rollcall</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Publishes a rollcall broadcast to other microservices with UUID.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def rollcall(self):
+    &#34;&#34;&#34;Publishes a rollcall broadcast to other microservices with UUID.&#34;&#34;&#34;
+    subtopic = &#39;rollcall&#39;
+    rollcall = { &#39;uid&#39;: str(uuid4()) }
+    self.notify(rollcall, subtopic=subtopic)</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice.rollcall_property_add"><code class="name flex">
+<span>def <span class="ident">rollcall_property_add</span></span>(<span>self, prop_name: str)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Add a property to the rollcall response.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def rollcall_property_add(self, prop_name: str):
+    &#34;&#34;&#34;Add a property to the rollcall response.&#34;&#34;&#34;
+    if prop_name not in self.properties:
+        raise ValueError(f&#39;Invalid prop_name {prop_name}&#39;)
+    if prop_name not in self._rollcall_properties:
+        self._rollcall_properties.append(prop_name)</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice.rollcall_property_remove"><code class="name flex">
+<span>def <span class="ident">rollcall_property_remove</span></span>(<span>self, prop_name: str)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Remove a property from the rollcall response.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def rollcall_property_remove(self, prop_name: str):
+    &#34;&#34;&#34;Remove a property from the rollcall response.&#34;&#34;&#34;
+    if prop_name in self._rollcall_properties:
+        self._rollcall_properties.remove(prop_name)</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice.task_add"><code class="name flex">
+<span>def <span class="ident">task_add</span></span>(<span>self, task: <a title="fieldedge_utilities.isc.IscTask" href="#fieldedge_utilities.isc.IscTask">IscTask</a>) ‑> None</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Adds a task to the task queue.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def task_add(self, task: IscTask) -&gt; None:
+    &#34;&#34;&#34;Adds a task to the task queue.&#34;&#34;&#34;
+    if self._isc_queue.is_queued(task_id=task.uid):
+        _log.warning(f&#39;Task {task.uid} already queued&#39;)
+    else:
+        self._isc_queue.append(task)</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice.task_expiry_enable"><code class="name flex">
+<span>def <span class="ident">task_expiry_enable</span></span>(<span>self, enable: bool = True)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Starts or stops periodic checking for expired ISC tasks.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>enable</code></strong></dt>
+<dd>If <code>True</code> (default) starts the checks, else stops checking.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def task_expiry_enable(self, enable: bool = True):
+    &#34;&#34;&#34;Starts or stops periodic checking for expired ISC tasks.
+    
+    Args:
+        enable: If `True` (default) starts the checks, else stops checking.
+        
+    &#34;&#34;&#34;
+    if enable:
+        if not self._isc_timer.is_alive():
+            self._isc_timer.start()
+        self._isc_timer.start_timer()
+    else:
+        self._isc_timer.stop_timer()</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.FieldedgeMicroservice.task_get"><code class="name flex">
+<span>def <span class="ident">task_get</span></span>(<span>self, task_id: str) ‑> <a title="fieldedge_utilities.isc.IscTask" href="#fieldedge_utilities.isc.IscTask">IscTask</a> | None</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Retrieves a task from the queue.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>task_id</code></strong></dt>
+<dd>The unique ID of the task.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>The <code>QueuedIscTask</code> if it was found in the queue, else <code>None</code>.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def task_get(self, task_id: str) -&gt; &#39;IscTask|None&#39;:
+    &#34;&#34;&#34;Retrieves a task from the queue.
+    
+    Args:
+        task_id: The unique ID of the task.
+    
+    Returns:
+        The `QueuedIscTask` if it was found in the queue, else `None`.
+        
+    &#34;&#34;&#34;
+    return self._isc_queue.get(task_id)</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+<dt id="fieldedge_utilities.isc.IscTask"><code class="flex name class">
+<span>class <span class="ident">IscTask</span></span>
+<span>(</span><span>uid: str = None, task_type: str = None, task_meta: Any = None, callback: Callable = None, lifetime: float = 10)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>An interservice communication task waiting for an MQTT response.</p>
+<p>May be a long-running query typically triggering a chained callback, with
+optional metadata and callback to a chained function.</p>
+<p>The <code>task_meta</code> attribute supports a dictionary keyword <code>timeout_callback</code>
+as a Callable that will be passed the metadata and <code>uid</code> if the task expires
+triggered by the method <code><a title="fieldedge_utilities.isc.IscTaskQueue.remove_expired" href="#fieldedge_utilities.isc.IscTaskQueue.remove_expired">IscTaskQueue.remove_expired()</a></code>.</p>
+<h2 id="attributes">Attributes</h2>
+<dl>
+<dt><strong><code>uid</code></strong> :&ensp;<code>UUID</code></dt>
+<dd>A unique task identifier, if none is provided a UUID4 will
+be generated.</dd>
+<dt><strong><code>ts</code></strong></dt>
+<dd>(float): The unix timestamp when the task was queued</dd>
+<dt><strong><code>lifetime</code></strong> :&ensp;<code>int</code></dt>
+<dd>Seconds before the task times out. <code>None</code> value
+means the task will not expire/timeout.</dd>
+<dt><strong><code>task_type</code></strong> :&ensp;<code>str</code></dt>
+<dd>A short name for the task purpose</dd>
+<dt><strong><code>task_meta</code></strong> :&ensp;<code>Any</code></dt>
+<dd>Metadata to be used on completion or passed to the
+callback</dd>
+<dt><strong><code>callback</code></strong> :&ensp;<code>Callable</code></dt>
+<dd>An optional callback function</dd>
+</dl>
+<p>Initialize the Task.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>uid</code></strong> :&ensp;<code>UUID</code></dt>
+<dd>A unique task identifier</dd>
+<dt><strong><code>task_type</code></strong> :&ensp;<code>str</code></dt>
+<dd>A short name for the task purpose</dd>
+<dt><strong><code>task_meta</code></strong> :&ensp;<code>Any</code></dt>
+<dd>Metadata to be passed to the callback. Supports
+dict key 'timeout_callback' with Callable value.</dd>
+<dt><strong><code>callback</code></strong> :&ensp;<code>Callable</code></dt>
+<dd>An optional callback function to chain</dd>
+<dt><strong><code>lifetime</code></strong> :&ensp;<code>int</code></dt>
+<dd>Seconds before the task times out. <code>None</code> value
+means the task will not expire/timeout.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class IscTask:
+    &#34;&#34;&#34;An interservice communication task waiting for an MQTT response.
+    
+    May be a long-running query typically triggering a chained callback, with
+    optional metadata and callback to a chained function.
+    
+    The `task_meta` attribute supports a dictionary keyword `timeout_callback`
+    as a Callable that will be passed the metadata and `uid` if the task expires
+    triggered by the method `IscTaskQueue.remove_expired`.
+    
+    Attributes:
+        uid (UUID): A unique task identifier, if none is provided a UUID4 will
+            be generated.
+        ts: (float): The unix timestamp when the task was queued
+        lifetime (int): Seconds before the task times out. `None` value
+            means the task will not expire/timeout.
+        task_type (str): A short name for the task purpose
+        task_meta (Any): Metadata to be used on completion or passed to the
+            callback
+        callback (Callable): An optional callback function
+
+    &#34;&#34;&#34;
+    def __init__(self,
+                 uid: str = None,
+                 task_type: str = None,
+                 task_meta: Any = None,
+                 callback: Callable = None,
+                 lifetime: float = 10,
+                 ) -&gt; None:
+        &#34;&#34;&#34;Initialize the Task.
+        
+        Args:
+            uid (UUID): A unique task identifier
+            task_type (str): A short name for the task purpose
+            task_meta (Any): Metadata to be passed to the callback. Supports
+                dict key &#39;timeout_callback&#39; with Callable value.
+            callback (Callable): An optional callback function to chain
+            lifetime (int): Seconds before the task times out. `None` value
+                means the task will not expire/timeout.
+        
+        &#34;&#34;&#34;
+        self._ts: float = round(time.time(), 3)
+        self.uid: str = uid or str(uuid4())
+        self.task_type: str = task_type
+        self._lifetime: float = float(lifetime)
+        self.task_meta = task_meta
+        if (isinstance(task_meta, dict) and
+            &#39;timeout_callback&#39; in task_meta and
+            not callable(task_meta[&#39;timeout_callback&#39;])):
+            # Generate warning
+            _log.warning(f&#39;Task timeout_callback is not callable&#39;)
+        if callback is not None and not callable(callback):
+            raise ValueError(&#39;Next task callback must be callable if not None&#39;)
+        self.callback: Callable = callback
+    
+    @property
+    def ts(self) -&gt; float:
+        return self._ts
+    
+    @property
+    def lifetime(self) -&gt; float:
+        return round(self._lifetime, 3)
+    
+    @lifetime.setter
+    def lifetime(self, value: &#39;float|int&#39;):
+        if not isinstance(value, (float, int)):
+            raise ValueError(&#39;Value must be float or int&#39;)
+        self._lifetime = float(value)</code></pre>
+</details>
+<h3>Instance variables</h3>
+<dl>
+<dt id="fieldedge_utilities.isc.IscTask.lifetime"><code class="name">var <span class="ident">lifetime</span> : float</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def lifetime(self) -&gt; float:
+    return round(self._lifetime, 3)</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.IscTask.ts"><code class="name">var <span class="ident">ts</span> : float</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def ts(self) -&gt; float:
+    return self._ts</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+<dt id="fieldedge_utilities.isc.IscTaskQueue"><code class="flex name class">
+<span>class <span class="ident">IscTaskQueue</span></span>
+<span>(</span><span>*args, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>A task queue (order-independent) for interservice communications.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class IscTaskQueue(list):
+    &#34;&#34;&#34;A task queue (order-independent) for interservice communications.&#34;&#34;&#34;
+    
+    def append(self, task: IscTask):
+        &#34;&#34;&#34;Add a task to the queue.&#34;&#34;&#34;
+        if not isinstance(task, IscTask):
+            raise ValueError(&#39;item must be QueuedIscTask type&#39;)
+        if self.is_queued(task.uid):
+            raise ValueError(f&#39;Task {task.uid} already queued&#39;)
+        super().append(task)
+    
+    def insert(self, index: int, element: Any):
+        &#34;&#34;&#34;Invalid operation.&#34;&#34;&#34;
+        raise OSError(&#39;ISC task queue does not support insertion&#39;)
+        
+    def is_queued(self,
+                  task_id: str = None,
+                  task_type: str = None,
+                  task_meta: tuple = None) -&gt; bool:
+        &#34;&#34;&#34;Returns `True` if the specified task is queued.
+        
+        Args:
+            task_id: Optional (preferred) unique search criteria.
+            task_type: Optional search criteria. May not be unique.
+            cb_meta: Optional key/value search criteria.
+            
+        &#34;&#34;&#34;
+        if not task_id and not task_type and not task_meta:
+            raise ValueError(&#39;Missing search criteria&#39;)
+        if isinstance(task_meta, tuple) and len(task_meta) != 2:
+            raise ValueError(&#39;cb_meta must be a key/value pair&#39;)
+        for task in self:
+            assert isinstance(task, IscTask)
+            if ((task_id and task.uid == task_id) or
+                (task_type and task.task_type == task_type)):
+                return True
+            if isinstance(task_meta, tuple):
+                if not isinstance(task.task_meta, dict):
+                    continue
+                for k, v in task.task_meta.items():
+                    if k == task_meta[0] and v == task_meta[1]:
+                        return True
+        return False
+            
+    def get(self, task_id: str) -&gt; &#39;IscTask|None&#39;:
+        &#34;&#34;&#34;Retrieves the specified task from the queue.&#34;&#34;&#34;
+        for i, task in enumerate(self):
+            assert isinstance(task, IscTask)
+            if task.uid == task_id:
+                return self.pop(i)
+    
+    def remove_expired(self):
+        &#34;&#34;&#34;Removes expired tasks from the queue.
+        
+        Should be called regularly by the parent, for example every second.
+        
+        Any tasks with callback and cb_meta that include the keyword `timeout`
+        will be called with the cb_meta kwargs.
+        
+        &#34;&#34;&#34;
+        expired = []
+        if len(self) == 0:
+            return
+        for i, task in enumerate(self):
+            assert isinstance(task, IscTask)
+            if task.lifetime is None:
+                continue
+            if time.time() - task.ts &gt; task.lifetime:
+                expired.append(i)
+        for i in expired:
+            rem: IscTask = self.pop(i)
+            _log.warning(f&#39;Removing expired task {rem.uid}&#39;)
+            cb_key = &#39;timeout_callback&#39;
+            if (isinstance(rem.task_meta, dict) and
+                cb_key in rem.task_meta and
+                callable(rem.task_meta[cb_key])):
+                # Callback with metadata
+                timeout_meta = { &#39;uid&#39;: rem.uid }
+                for k, v in rem.task_meta.items():
+                    if k in [cb_key]:
+                        continue
+                    timeout_meta[k] = v
+                rem.task_meta[cb_key](timeout_meta)</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>builtins.list</li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="fieldedge_utilities.isc.IscTaskQueue.append"><code class="name flex">
+<span>def <span class="ident">append</span></span>(<span>self, task: <a title="fieldedge_utilities.isc.IscTask" href="#fieldedge_utilities.isc.IscTask">IscTask</a>)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Add a task to the queue.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def append(self, task: IscTask):
+    &#34;&#34;&#34;Add a task to the queue.&#34;&#34;&#34;
+    if not isinstance(task, IscTask):
+        raise ValueError(&#39;item must be QueuedIscTask type&#39;)
+    if self.is_queued(task.uid):
+        raise ValueError(f&#39;Task {task.uid} already queued&#39;)
+    super().append(task)</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.IscTaskQueue.get"><code class="name flex">
+<span>def <span class="ident">get</span></span>(<span>self, task_id: str) ‑> <a title="fieldedge_utilities.isc.IscTask" href="#fieldedge_utilities.isc.IscTask">IscTask</a> | None</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Retrieves the specified task from the queue.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get(self, task_id: str) -&gt; &#39;IscTask|None&#39;:
+    &#34;&#34;&#34;Retrieves the specified task from the queue.&#34;&#34;&#34;
+    for i, task in enumerate(self):
+        assert isinstance(task, IscTask)
+        if task.uid == task_id:
+            return self.pop(i)</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.IscTaskQueue.insert"><code class="name flex">
+<span>def <span class="ident">insert</span></span>(<span>self, index: int, element: Any)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Invalid operation.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def insert(self, index: int, element: Any):
+    &#34;&#34;&#34;Invalid operation.&#34;&#34;&#34;
+    raise OSError(&#39;ISC task queue does not support insertion&#39;)</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.IscTaskQueue.is_queued"><code class="name flex">
+<span>def <span class="ident">is_queued</span></span>(<span>self, task_id: str = None, task_type: str = None, task_meta: tuple = None) ‑> bool</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Returns <code>True</code> if the specified task is queued.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>task_id</code></strong></dt>
+<dd>Optional (preferred) unique search criteria.</dd>
+<dt><strong><code>task_type</code></strong></dt>
+<dd>Optional search criteria. May not be unique.</dd>
+<dt><strong><code>cb_meta</code></strong></dt>
+<dd>Optional key/value search criteria.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def is_queued(self,
+              task_id: str = None,
+              task_type: str = None,
+              task_meta: tuple = None) -&gt; bool:
+    &#34;&#34;&#34;Returns `True` if the specified task is queued.
+    
+    Args:
+        task_id: Optional (preferred) unique search criteria.
+        task_type: Optional search criteria. May not be unique.
+        cb_meta: Optional key/value search criteria.
+        
+    &#34;&#34;&#34;
+    if not task_id and not task_type and not task_meta:
+        raise ValueError(&#39;Missing search criteria&#39;)
+    if isinstance(task_meta, tuple) and len(task_meta) != 2:
+        raise ValueError(&#39;cb_meta must be a key/value pair&#39;)
+    for task in self:
+        assert isinstance(task, IscTask)
+        if ((task_id and task.uid == task_id) or
+            (task_type and task.task_type == task_type)):
+            return True
+        if isinstance(task_meta, tuple):
+            if not isinstance(task.task_meta, dict):
+                continue
+            for k, v in task.task_meta.items():
+                if k == task_meta[0] and v == task_meta[1]:
+                    return True
+    return False</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.isc.IscTaskQueue.remove_expired"><code class="name flex">
+<span>def <span class="ident">remove_expired</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Removes expired tasks from the queue.</p>
+<p>Should be called regularly by the parent, for example every second.</p>
+<p>Any tasks with callback and cb_meta that include the keyword <code>timeout</code>
+will be called with the cb_meta kwargs.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def remove_expired(self):
+    &#34;&#34;&#34;Removes expired tasks from the queue.
+    
+    Should be called regularly by the parent, for example every second.
+    
+    Any tasks with callback and cb_meta that include the keyword `timeout`
+    will be called with the cb_meta kwargs.
+    
+    &#34;&#34;&#34;
+    expired = []
+    if len(self) == 0:
+        return
+    for i, task in enumerate(self):
+        assert isinstance(task, IscTask)
+        if task.lifetime is None:
+            continue
+        if time.time() - task.ts &gt; task.lifetime:
+            expired.append(i)
+    for i in expired:
+        rem: IscTask = self.pop(i)
+        _log.warning(f&#39;Removing expired task {rem.uid}&#39;)
+        cb_key = &#39;timeout_callback&#39;
+        if (isinstance(rem.task_meta, dict) and
+            cb_key in rem.task_meta and
+            callable(rem.task_meta[cb_key])):
+            # Callback with metadata
+            timeout_meta = { &#39;uid&#39;: rem.uid }
+            for k, v in rem.task_meta.items():
+                if k in [cb_key]:
+                    continue
+                timeout_meta[k] = v
+            rem.task_meta[cb_key](timeout_meta)</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<h1>Index</h1>
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="fieldedge_utilities" href="index.html">fieldedge_utilities</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice" href="#fieldedge_utilities.isc.FieldedgeMicroservice">FieldedgeMicroservice</a></code></h4>
+<ul class="">
+<li><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice.LOG_LEVELS" href="#fieldedge_utilities.isc.FieldedgeMicroservice.LOG_LEVELS">LOG_LEVELS</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice.isc_get_property" href="#fieldedge_utilities.isc.FieldedgeMicroservice.isc_get_property">isc_get_property</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice.isc_properties" href="#fieldedge_utilities.isc.FieldedgeMicroservice.isc_properties">isc_properties</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice.isc_properties_by_type" href="#fieldedge_utilities.isc.FieldedgeMicroservice.isc_properties_by_type">isc_properties_by_type</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice.isc_property_hide" href="#fieldedge_utilities.isc.FieldedgeMicroservice.isc_property_hide">isc_property_hide</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice.isc_property_unhide" href="#fieldedge_utilities.isc.FieldedgeMicroservice.isc_property_unhide">isc_property_unhide</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice.isc_set_property" href="#fieldedge_utilities.isc.FieldedgeMicroservice.isc_set_property">isc_set_property</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice.isc_topic_subscribe" href="#fieldedge_utilities.isc.FieldedgeMicroservice.isc_topic_subscribe">isc_topic_subscribe</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice.isc_topic_unsubscribe" href="#fieldedge_utilities.isc.FieldedgeMicroservice.isc_topic_unsubscribe">isc_topic_unsubscribe</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice.log_level" href="#fieldedge_utilities.isc.FieldedgeMicroservice.log_level">log_level</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice.notify" href="#fieldedge_utilities.isc.FieldedgeMicroservice.notify">notify</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice.on_isc_message" href="#fieldedge_utilities.isc.FieldedgeMicroservice.on_isc_message">on_isc_message</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice.properties" href="#fieldedge_utilities.isc.FieldedgeMicroservice.properties">properties</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice.properties_by_type" href="#fieldedge_utilities.isc.FieldedgeMicroservice.properties_by_type">properties_by_type</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice.properties_change" href="#fieldedge_utilities.isc.FieldedgeMicroservice.properties_change">properties_change</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice.properties_notify" href="#fieldedge_utilities.isc.FieldedgeMicroservice.properties_notify">properties_notify</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice.property_cache" href="#fieldedge_utilities.isc.FieldedgeMicroservice.property_cache">property_cache</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice.property_hide" href="#fieldedge_utilities.isc.FieldedgeMicroservice.property_hide">property_hide</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice.property_is_cached" href="#fieldedge_utilities.isc.FieldedgeMicroservice.property_is_cached">property_is_cached</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice.property_unhide" href="#fieldedge_utilities.isc.FieldedgeMicroservice.property_unhide">property_unhide</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice.rollcall" href="#fieldedge_utilities.isc.FieldedgeMicroservice.rollcall">rollcall</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice.rollcall_properties" href="#fieldedge_utilities.isc.FieldedgeMicroservice.rollcall_properties">rollcall_properties</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice.rollcall_property_add" href="#fieldedge_utilities.isc.FieldedgeMicroservice.rollcall_property_add">rollcall_property_add</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice.rollcall_property_remove" href="#fieldedge_utilities.isc.FieldedgeMicroservice.rollcall_property_remove">rollcall_property_remove</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice.tag" href="#fieldedge_utilities.isc.FieldedgeMicroservice.tag">tag</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice.task_add" href="#fieldedge_utilities.isc.FieldedgeMicroservice.task_add">task_add</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice.task_expiry_enable" href="#fieldedge_utilities.isc.FieldedgeMicroservice.task_expiry_enable">task_expiry_enable</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.FieldedgeMicroservice.task_get" href="#fieldedge_utilities.isc.FieldedgeMicroservice.task_get">task_get</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="fieldedge_utilities.isc.IscTask" href="#fieldedge_utilities.isc.IscTask">IscTask</a></code></h4>
+<ul class="">
+<li><code><a title="fieldedge_utilities.isc.IscTask.lifetime" href="#fieldedge_utilities.isc.IscTask.lifetime">lifetime</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.IscTask.ts" href="#fieldedge_utilities.isc.IscTask.ts">ts</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="fieldedge_utilities.isc.IscTaskQueue" href="#fieldedge_utilities.isc.IscTaskQueue">IscTaskQueue</a></code></h4>
+<ul class="">
+<li><code><a title="fieldedge_utilities.isc.IscTaskQueue.append" href="#fieldedge_utilities.isc.IscTaskQueue.append">append</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.IscTaskQueue.get" href="#fieldedge_utilities.isc.IscTaskQueue.get">get</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.IscTaskQueue.insert" href="#fieldedge_utilities.isc.IscTaskQueue.insert">insert</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.IscTaskQueue.is_queued" href="#fieldedge_utilities.isc.IscTaskQueue.is_queued">is_queued</a></code></li>
+<li><code><a title="fieldedge_utilities.isc.IscTaskQueue.remove_expired" href="#fieldedge_utilities.isc.IscTaskQueue.remove_expired">remove_expired</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.10.0</a>.</p>
+</footer>
+</body>
+</html>

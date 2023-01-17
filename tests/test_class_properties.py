@@ -183,6 +183,12 @@ def test_get_class_properties_basic():
     assert not any(prop not in expected for prop in props)
 
 
+def test_get_instance_properties_values(test_obj: TestObj):
+    props_vals = get_instance_properties_values(test_obj)
+    for prop, val in props_vals.items():
+        assert val == getattr(test_obj, prop)
+
+
 def test_get_class_properties_ignore():
     ignore = ['seven', 'one_plus_six']
     props = get_class_properties(TestObj, ignore)

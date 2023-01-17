@@ -170,6 +170,15 @@ def get_class_properties(cls: type,
     return attrs
 
 
+def get_instance_properties_values(instance: object) -> dict:
+    """Returns the instance properties and values."""
+    props_list = get_class_properties(instance)
+    props_values = {}
+    for prop in props_list:
+        props_values[prop] = getattr(instance, prop)
+    return props_values
+
+
 def tag_class_properties(cls: type,
                          tag: str = None,
                          auto_tag: bool = True,

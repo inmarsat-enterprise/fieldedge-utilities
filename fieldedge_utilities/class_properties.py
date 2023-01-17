@@ -8,11 +8,14 @@ import re
 import inspect
 import itertools
 from time import time
+from abc import ABC
 
 from .logger import verbose_logging
 from .path import get_caller_name
 
 PROPERTY_CACHE_DEFAULT = int(os.getenv('PROPERTY_CACHE_DEFAULT', 5))
+PROPERTY_READ_ONLY_CATEGORY = 'info'
+PROPERTY_READ_WRITE_CATEGORY = 'config'
 
 _log = logging.getLogger(__name__)
 
@@ -103,17 +106,42 @@ def cache_valid(ref_time: 'int|float',
     return True
 
 
-def hasattr_static(obj: object, name: str) -> bool:
+def hasattr_static(obj: object, attr: str) -> bool:
+    """Determines if an object has an attribute without calling the attribute.
+    
+    Args:
+        obj: The object to inspect.
+        attr: The name of the attribute to query.
+    
+    Returns:
+        `True` if the object has the attribute.
+        
+    """
     try:
-        inspect.getattr_static(obj, name)
+        inspect.getattr_static(obj, attr)
         return True
     except AttributeError:
         return False
 
 
+def property_is_read_only(instance: object, property_name: str) -> bool:
+    if not hasattr_static(instance, property_name):
+        raise ValueError(f'Object has no property {property_name}')
+    prop = inspect.getattr_static(instance, property_name)
+    try:
+        return prop.fset is None
+    except AttributeError:
+        return False
+        
+    
+def get_class_tag(cls: type) -> str:
+    if isinstance(cls, type):
+        return cls.__name__.lower()
+    return cls.__class__.__name__.lower()
+
+
 def get_class_properties(cls: type,
                          ignore: 'list[str]' = [],
-                         categorize: bool = False,
                          ) -> 'list[str]|dict[str, list]':
     """Returns non-hidden, non-callable properties/values of a Class instance.
     
@@ -122,13 +150,9 @@ def get_class_properties(cls: type,
     Args:
         cls: The Class whose properties will be derived
         ignore: A list of names to ignore (optional)
-        categorize: If `True` the properties will be grouped as `read_only` or
-            `read_write`.
     
     Returns:
-        A list of property names or if `categorize` is `True` a dictionary like:
-            `{ 'read_write': ['property_1', 'property_2'],
-            'read_only': ['property_3'] }`
+        A list of exposed property names.
         
     Raises:
         ValueError if `cls` does not have a `dir()` method or is not a `type`.
@@ -136,24 +160,14 @@ def get_class_properties(cls: type,
     """
     if not dir(cls):
         raise ValueError('Invalid cls_instance - must have dir() method')
-    if '__slots__' not in dir(cls):
-        _log.warning('Attributes in __init__ will be missed')
+    if isinstance(cls, type) and '__slots__' not in dir(cls):
+        _log.warning(f'No __slots__: attributes in __init__ will be missed')
     attrs = [attr for attr in dir(cls)
              if not attr.startswith(('_',)) and
              attr not in ignore and
              not callable(inspect.getattr_static(cls, attr)) and
              not attr.isupper()]
-    if not categorize:
-        return attrs
-    categorized = {}
-    read_only = [attr for attr, val in vars(cls).items() if attr in attrs and
-                 isinstance(val, property) and val.fset is None]
-    read_write = [attr for attr in attrs if attr not in read_only]
-    if read_only:
-        categorized['read_only'] = read_only
-    if read_write:
-        categorized['read_write'] = read_write
-    return categorized
+    return attrs
 
 
 def tag_class_properties(cls: type,
@@ -176,9 +190,8 @@ def tag_class_properties(cls: type,
     and the native property names will be returned as JSON if `json` is `True`.
     
     If `categorize` is `True` a dictionary is returned of the form
-    `{ 'read_only': ['tagProp1Name'], 'read_write': ['tagProp2Name']}` where
-    `read_only` or `read_write` are not present if no properties meet the
-    respective criteria.
+    `{ 'info': ['tagProp1Name'], 'config': ['tagProp2Name']}` where
+    the category is not present if no properties meet the respective criteria.
     
     If `json` is `False` the above applies but property names will use
     their original case e.g. `tag_prop1_name`
@@ -189,27 +202,34 @@ def tag_class_properties(cls: type,
             module `__name__` will be used.
         auto_tag: If `True` will use the class name in lowercase.
         json: A flag indicating whether to use camelCase keys.
-        categorize: A flag indicating whether to group as `read_only` and
-            `read_write`.
+        categorize: A flag indicating whether to group as `info` and `config`.
         ignore: A list of property names to ignore.
     
     Retuns:
         A dictionary or list of strings (see docstring).
         
     """
-    # if not isinstance(cls, type) and not inspect.isclass(cls):
-    #     raise ValueError('cls must be a class type')
+    # TODO: class checking seems not to work for certain subclasses
+    if isinstance(cls, type):
+        _log.debug('Processing for class type')
+    # elif issubclass(cls, ABC):
+    #     _log.debug('Processing for microservice')
     if auto_tag and not tag:
         tag = get_class_tag(cls)
     class_props = get_class_properties(cls,
-                                       ignore,
-                                       categorize)
+                                       ignore)
     if not categorize:
         return [tag_class_property(prop, tag, json) for prop in class_props]
     result = {}
-    for category, props in class_props.items():
-        cat = snake_to_camel(category) if json else category
-        result[cat] = [tag_class_property(prop, tag, json) for prop in props]
+    for prop in class_props:
+        if property_is_read_only(cls, prop):
+            if 'info' not in result:
+                result['info'] = []
+            result['info'].append(tag_class_property(prop, tag, json))
+        else:
+            if 'config' not in result:
+                result['config'] = []
+            result['config'].append(tag_class_property(prop, tag, json))
     return result
 
 
@@ -232,13 +252,8 @@ def tag_class_property(prop: str,
     return f'{tag}_{prop}'
 
 
-def get_class_tag(cls: type) -> str:
-    if not isinstance(cls, type):
-        raise ValueError('cls must be a class type')
-    return cls.__name__.lower()
-
-
-def untag_class_property(tagged_property: str,
+def untag_class_property(property_name: str,
+                         is_tagged: bool = True,
                          include_tag: bool = False,
                          ) -> 'str|tuple[str, str]':
     """Reverts a JSON-format tagged property to its PEP representation.
@@ -247,7 +262,7 @@ def untag_class_property(tagged_property: str,
     `(unique_id, modem)` where it assumes the first word is the tag.
 
     Args:
-        tagged_property: The tagged property value, allowing for camelCase.
+        property_name: The property name, assumes using camelCase.
         include_tag: If True, a tuple is returned with the tag as the second
             element.
     
@@ -256,9 +271,12 @@ def untag_class_property(tagged_property: str,
             property value in snake_case, and the tag
 
     """
-    if '_' not in camel_to_snake(tagged_property):
-        raise ValueError(f'Invalid camelCase {tagged_property}')
-    tag, prop = camel_to_snake(tagged_property).split('_', 1)
+    if '_' not in camel_to_snake(property_name):
+        raise ValueError(f'Invalid camelCase {property_name}')
+    if is_tagged:
+        tag, prop = camel_to_snake(property_name).split('_', 1)
+    else:
+        tag, prop = None, camel_to_snake(property_name)
     if not include_tag:
         return prop
     return (prop, tag)
@@ -282,7 +300,7 @@ def tag_merge(*args) -> 'list|dict':
     if container_type == 'list':
         return list(itertools.chain(*args))
     merged = {}
-    categories = ['read_only', 'read_write']
+    categories = ['info', 'config']
     dict_0: dict = args[0]
     if any(k in categories for k in dict_0):
         for arg in args:

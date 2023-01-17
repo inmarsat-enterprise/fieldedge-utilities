@@ -65,7 +65,8 @@ class TestObjToo:
     an IoT demo service.
     """
     def __init__(self, one: str) -> None:
-        self._one: str = one
+        self._one: str = None
+        self.one = one
         self.two: int = 2
     
     @property
@@ -163,28 +164,23 @@ def test_obj_too():
     return TestObjToo('010203')
 
 
+def test_get_class_tag(test_obj: TestObj, test_obj_too: TestObjToo):
+    assert get_class_tag(TestObj) == 'testobj'
+    assert get_class_tag(test_obj) == 'testobj'
+    props_cls = get_class_properties(TestObj)
+    props_inst = get_class_properties(test_obj)
+    assert props_cls == props_inst
+    props_cls_2 = get_class_properties(TestObjToo)
+    props_inst_2 = get_class_properties(test_obj_too)
+    assert props_cls_2 != props_inst_2
+
+
 def test_get_class_properties_basic():
     props = get_class_properties(TestObj)
     expected = ['two', 'three', 'four', 'five', 'six', 'seven', 'one_plus_six']
     assert isinstance(props, list)
     assert all(prop in props for prop in expected)
     assert not any(prop not in expected for prop in props)
-
-
-def test_get_class_properties_categorized():
-    cat_props = get_class_properties(TestObj, categorize=True)
-    expected_categories = ['read_only', 'read_write']
-    expected_ro = ['five', 'seven', 'one_plus_six']
-    expected_rw = ['two', 'three', 'four', 'six']
-    assert isinstance(cat_props, dict)
-    assert all(cat in cat_props for cat in expected_categories)
-    assert not any(cat not in expected_categories for cat in cat_props)
-    for v in cat_props.values():
-        assert isinstance(v, list)
-    assert all(prop in cat_props['read_only'] for prop in expected_ro)
-    assert not any(prop not in expected_ro for prop in cat_props['read_only'])
-    assert all(prop in cat_props['read_write'] for prop in expected_rw)
-    assert not any(prop not in expected_rw for prop in cat_props['read_write'])
 
 
 def test_get_class_properties_ignore():
@@ -207,15 +203,15 @@ def test_tag_properties_basic():
 
 def test_tag_properties_categorized():
     tagged_cat_props = tag_class_properties(TestObj, categorize=True)
-    assert all(k in tagged_cat_props for k in ['readOnly', 'readWrite'])
+    assert all(k in tagged_cat_props for k in ['info', 'config'])
     exp_ro_untagged = ['five', 'seven', 'one_plus_six']
     exp_rw_untagged = ['two', 'three', 'four', 'six']
     for prop in exp_ro_untagged:
-        expected = tag_class_property(get_class_tag(TestObj), prop)
-        assert expected in tagged_cat_props['readOnly']
+        expected = tag_class_property(prop, get_class_tag(TestObj))
+        assert expected in tagged_cat_props['info']
     for prop in exp_rw_untagged:
-        expected = tag_class_property(get_class_tag(TestObj), prop)
-        assert expected in tagged_cat_props['readWrite']
+        expected = tag_class_property(prop, get_class_tag(TestObj))
+        assert expected in tagged_cat_props['config']
 
 
 def test_tag_properties_kwargs():
@@ -231,50 +227,39 @@ def test_untag_property():
     tagged_properties = tag_class_properties(TestObj)
     tag = get_class_tag(TestObj)
     for prop in tagged_properties:
-        untagged, derived_tag = untag_class_property(prop, include_tag=True)
+        untagged, derived_tag = untag_class_property(prop,
+                                                     is_tagged=True,
+                                                     include_tag=True)
         assert hasattr(TestObj, untagged)
         assert derived_tag == tag
 
 
 def test_tag_merge(test_obj: TestObj, test_obj_too: TestObjToo):
-    tagged_1 = tag_class_properties(test_obj)
-    tagged_2 = tag_class_properties(test_obj_too)
+    tagged_1 = tag_class_properties(TestObj)
+    tagged_2 = tag_class_properties(TestObjToo)
     merged = tag_merge(tagged_1, tagged_2)
     assert merged == tagged_1 + tagged_2
-    tagged_vals_1 = tag_class_properties(test_obj, include_values=True)
-    tagged_vals_2 = tag_class_properties(test_obj_too, include_values=True)
-    merged_vals = tag_merge(tagged_vals_1, tagged_vals_2)
-    for k, v in merged_vals.items():
-        if k in tagged_vals_1:
-            assert v == tagged_vals_1[k]
-        elif k in tagged_vals_2:
-            assert v == tagged_vals_2[k]
-        else:
-            assert False
-    tagged_cat_vals_1 = tag_class_properties(test_obj, categorize=True, include_values=True)
-    tagged_cat_vals_2 = tag_class_properties(test_obj_too, categorize=True, include_values=True)
-    merged_cat_vals = tag_merge(tagged_cat_vals_1, tagged_cat_vals_2)
-    for k, v in merged_cat_vals.items():
-        assert k in ['read_only', 'read_write']
-        assert isinstance(v, dict)
-        for nk, nv in v.items():
-            if nk in tagged_cat_vals_1[k]:
-                assert nv == tagged_cat_vals_1[k][nk]
-            elif nk in tagged_cat_vals_2[k]:
-                assert nv == tagged_cat_vals_2[k][nk]
+    tagged_cat_1 = tag_class_properties(TestObj, categorize=True)
+    tagged_cat_2 = tag_class_properties(TestObjToo, categorize=True)
+    merged_cat = tag_merge(tagged_cat_1, tagged_cat_2)
+    for cat, props in merged_cat.items():
+        if cat in tagged_cat_1:
+            assert all(p in props for p in tagged_cat_1[cat])
+        if cat in tagged_cat_2:
+            assert all(p in props for p in tagged_cat_2[cat])
 
 
 def test_json_compatible(test_obj):
     json_test_obj = json_compatible(test_obj)
     assert isinstance(json.dumps(json_test_obj), str)
-    cat_tagged_vals = tag_class_properties(test_obj, categorize=True, include_values=True)
+    cat_tagged_vals = tag_class_properties(test_obj, categorize=True)
     json_categorized = json_compatible(cat_tagged_vals)
     assert isinstance(json.dumps(json_categorized), str)
 
 
 def test_equivalent_attributes_simple():
-    obj_1 = TestObjToo()
-    obj_2 = TestObjToo()
+    obj_1 = TestObjToo('01')
+    obj_2 = TestObjToo('01')
     assert equivalent_attributes(obj_1, obj_2)
 
 

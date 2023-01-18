@@ -388,8 +388,7 @@ def json_compatible(obj: object,
                                                  skip_caps))
                 res = _temp
             if hasattr(res, '__dict__'):
-                simplified = get_class_properties(res)
-                res = json_compatible(simplified)
+                res = json_compatible(get_instance_properties_values(res))
             if isinstance(res, dict):
                 res = json_compatible(res, camel_keys, skip_caps)
         except Exception as err:

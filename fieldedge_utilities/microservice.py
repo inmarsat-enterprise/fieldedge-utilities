@@ -5,7 +5,8 @@ from abc import ABC, abstractmethod
 from typing import Any, Callable
 from uuid import uuid4
 
-from .class_properties import (get_class_properties, get_class_tag,
+from .class_properties import (READ_ONLY, READ_WRITE,
+                               get_class_properties, get_class_tag,
                                json_compatible, property_is_read_only,
                                tag_class_property, untag_class_property)
 from .logger import verbose_logging
@@ -18,12 +19,12 @@ _log = logging.getLogger(__name__)
 class IscTask:
     """An interservice communication task waiting for an MQTT response.
     
-    May be a long-running query typically triggering a chained callback, with
-    optional metadata and callback to a chained function.
+    May be a long-running query with optional metadata, and optional callback
+    to a chained function.
     
     The `task_meta` attribute supports a dictionary keyword `timeout_callback`
-    as a Callable that will be passed the metadata and `uid` if the task expires
-    triggered by the method `IscTaskQueue.remove_expired`.
+    as a `Callable` that will be passed the metadata and `uid` if the task
+    expires triggered by the method `IscTaskQueue.remove_expired`.
     
     Attributes:
         uid (UUID): A unique task identifier, if none is provided a UUID4 will
@@ -170,7 +171,7 @@ class IscTaskQueue(list):
                 rem.task_meta[cb_key](timeout_meta)
 
 
-class FieldedgeMicroservice(ABC):
+class Microservice(ABC):
     """Abstract base class for a FieldEdge microservice.
     
     Use `__slots__` to expose initialization properties.
@@ -260,7 +261,7 @@ class FieldedgeMicroservice(ABC):
     
     @property
     def properties(self) -> 'list[str]':
-        """Public properties of the class."""
+        """A list of public properties of the class."""
         if not self._properties:
             self._get_properties()
         return self._properties
@@ -275,18 +276,18 @@ class FieldedgeMicroservice(ABC):
         categorized = {}
         for prop in prop_list:
             if property_is_read_only(self, prop):
-                if 'info' not in categorized:
-                    categorized['info'] = []
-                categorized['info'].append(prop)
+                if READ_ONLY not in categorized:
+                    categorized[READ_ONLY] = []
+                categorized[READ_ONLY].append(prop)
             else:
-                if 'config' not in categorized:
-                    categorized['config'] = []
-                categorized['config'].append(prop)
+                if READ_WRITE not in categorized:
+                    categorized[READ_WRITE] = []
+                categorized[READ_WRITE].append(prop)
         return categorized
         
     @property
     def properties_by_type(self) -> 'dict[str, list[str]]':
-        """Public properties of the class tagged `info` or `config`."""
+        """Public properties lists of the class tagged `info` or `config`."""
         return self._categorized(self.properties)
     
     def property_hide(self, prop_name: str):
@@ -375,14 +376,14 @@ class FieldedgeMicroservice(ABC):
         for isc_prop in self.isc_properties:
             entry = self._categorized([untag_class_property(isc_prop,
                                                             self._isc_tags)])
-            if 'config' in entry:
-                if 'config' not in categorized:
-                    categorized['config'] = []
-                categorized['config'].append(isc_prop)
+            if READ_WRITE in entry:
+                if READ_WRITE not in categorized:
+                    categorized[READ_WRITE] = []
+                categorized[READ_WRITE].append(isc_prop)
             else:
-                if 'info' not in categorized:
-                    categorized['info'] = []
-                categorized['info'].append(isc_prop)
+                if READ_ONLY not in categorized:
+                    categorized[READ_ONLY] = []
+                categorized[READ_ONLY].append(isc_prop)
         return categorized
     
     def isc_get_property(self, isc_property: str) -> Any:
@@ -397,7 +398,7 @@ class FieldedgeMicroservice(ABC):
         prop = untag_class_property(isc_property, self._isc_tags)
         if prop not in self.properties:
             raise AttributeError(f'{prop} not in properties')
-        if prop not in self.properties_by_type['config']:
+        if prop not in self.properties_by_type[READ_WRITE]:
             raise AttributeError(f'{prop} is not writable')
         setattr(self, prop, value)
     
@@ -515,6 +516,15 @@ class FieldedgeMicroservice(ABC):
             _log.debug(f'Received ISC {topic}: {message}')
         if topic.endswith('/rollcall'):
             self._rollcall_respond(topic, message)
+        elif (topic.endswith('/rollcall/response') and
+              f'/{self.tag}/' in topic):
+            if self._vlog:
+                _log.debug(f'Ignoring own rollcall response')
+        elif (topic.endswith(f'/{self.tag}/request/properties/list') or
+              topic.endswith(f'/{self.tag}/request/properties/get')):
+            self.properties_notify(message)
+        elif topic.endswith(f'/{self.tag}/request/properties/set'):
+            self.properties_change(message)
         else:
             self.on_isc_message(topic, message)
         
@@ -580,23 +590,23 @@ class FieldedgeMicroservice(ABC):
             res_props = response['properties']
             if categorized:
                 props_source = self.isc_properties_by_type
-                if ('config' in props_source and
-                    any(prop in req_props for prop in props_source['config'])):
-                    res_props['config'] = {}
-                if ('info' in props_source and
-                    any(prop in req_props for prop in props_source['info'])):
-                    res_props['info'] = {}
+                if (READ_WRITE in props_source and
+                    any(prop in req_props for prop in props_source[READ_WRITE])):
+                    res_props[READ_WRITE] = {}
+                if (READ_ONLY in props_source and
+                    any(prop in req_props for prop in props_source[READ_ONLY])):
+                    res_props[READ_ONLY] = {}
             else:
                 props_source = self.isc_properties
             if len(req_props) == 0:
                 req_props = self.isc_properties
             if categorized:
                 for p in req_props:
-                    if ('config' in props_source and
-                        p in props_source['config']):
-                        res_props['config'][p] = props_source['config'][p]
+                    if (READ_WRITE in props_source and
+                        p in props_source[READ_WRITE]):
+                        res_props[READ_WRITE][p] = props_source[READ_WRITE][p]
                     else:
-                        res_props['info'][p] = props_source['info'][p]
+                        res_props[READ_ONLY][p] = props_source[READ_ONLY][p]
             else:
                 for p in req_props:
                     res_props[p] = props_source[p]
@@ -610,8 +620,8 @@ class FieldedgeMicroservice(ABC):
         The `request` dictionary must include the `properties` key with a
         dictionary of ISC property names and respective value to set.
         
-        If the request contains a `uid` then the `properties_notify` method
-        will be called with the changed values to confirm the changes to the
+        If the request contains a `uid` then the changed values will be notified
+        as `info/property/values` to confirm the changes to the
         ISC requestor. If no `uid` is present then a dictionary confirming
         successful changes will be returned to the calling function.
         
@@ -632,16 +642,17 @@ class FieldedgeMicroservice(ABC):
         else:
             _log.warning('Request missing uid for response correlation')
         for k, v in request['properties'].items():
-            if k in self.isc_properties_by_type['config']:
-                try:
-                    self.isc_set_property(k, v)
-                    response['properties'][k] = v
-                except Exception as err:
-                    _log.warning(f'Failed to set {k}={v} ({err})')
+            if k not in self.isc_properties_by_type[READ_WRITE]:
+                _log.warning(f'{k} is not a config property')
+                continue
+            try:
+                self.isc_set_property(k, v)
+                response['properties'][k] = v
+            except Exception as err:
+                _log.warning(f'Failed to set {k}={v} ({err})')
         if not request_id:
             return response
-        _log.debug(f'Responding to change request {request_id} for properties'
-                   f': {request["properties"]}')
+        _log.debug(f'Responding to property change request {request_id}')
         self.notify(response, subtopic='info/properties/values')
         
     def notify(self,

@@ -3,14 +3,14 @@ import pytest
 import time
 
 import fieldedge_utilities   # required for mocking
-from fieldedge_utilities.isc import FieldedgeMicroservice, IscTask, IscTaskQueue
+from fieldedge_utilities.microservice import Microservice, IscTask, IscTaskQueue
 from fieldedge_utilities.class_properties import get_class_tag, get_class_properties
 
 
 logger = logging.getLogger()
 
 
-class TestService(FieldedgeMicroservice):
+class TestService(Microservice):
     """Basic subclass of abstract class for testing."""
     
     # __slots__ = ['slot_config', '_info_prop', '_config_prop']   # must expose all init properties

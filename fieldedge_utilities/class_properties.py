@@ -8,14 +8,14 @@ import re
 import inspect
 import itertools
 from time import time
-from abc import ABC
+# from abc import ABC
 
 from .logger import verbose_logging
-from .path import get_caller_name
+# from .path import get_caller_name
 
 PROPERTY_CACHE_DEFAULT = int(os.getenv('PROPERTY_CACHE_DEFAULT', 5))
-PROPERTY_READ_ONLY_CATEGORY = 'info'
-PROPERTY_READ_WRITE_CATEGORY = 'config'
+READ_ONLY = 'info'
+READ_WRITE = 'config'
 
 _log = logging.getLogger(__name__)
 
@@ -89,6 +89,8 @@ def cache_valid(ref_time: 'int|float',
             raw resource.
 
     """
+    if ref_time is None:
+        return False
     if not isinstance(ref_time, int):
         try:
             ref_time = int(ref_time)
@@ -219,7 +221,7 @@ def tag_class_properties(cls: type,
         
     """
     # TODO: class checking seems not to work for certain subclasses
-    if isinstance(cls, type):
+    if isinstance(cls, type) and _vlog():
         _log.debug('Processing for class type')
     # elif issubclass(cls, ABC):
     #     _log.debug('Processing for microservice')
@@ -232,13 +234,13 @@ def tag_class_properties(cls: type,
     result = {}
     for prop in class_props:
         if property_is_read_only(cls, prop):
-            if 'info' not in result:
-                result['info'] = []
-            result['info'].append(tag_class_property(prop, tag, json))
+            if READ_ONLY not in result:
+                result[READ_ONLY] = []
+            result[READ_ONLY].append(tag_class_property(prop, tag, json))
         else:
-            if 'config' not in result:
-                result['config'] = []
-            result['config'].append(tag_class_property(prop, tag, json))
+            if READ_WRITE not in result:
+                result[READ_WRITE] = []
+            result[READ_WRITE].append(tag_class_property(prop, tag, json))
     return result
 
 
@@ -309,7 +311,7 @@ def tag_merge(*args) -> 'list|dict':
     if container_type == 'list':
         return list(itertools.chain(*args))
     merged = {}
-    categories = ['info', 'config']
+    categories = [READ_ONLY, READ_WRITE]
     dict_0: dict = args[0]
     if any(k in categories for k in dict_0):
         for arg in args:
@@ -369,7 +371,7 @@ def json_compatible(obj: object,
                     camel_key = k
                 else:
                     camel_key = snake_to_camel(str(k))
-                if camel_key != k:
+                if camel_key != k and _vlog():
                     _log.debug(f'Changed {k} to {camel_key}')
                 res[camel_key] = json_compatible(v, camel_keys, skip_caps)
         elif isinstance(obj, list):

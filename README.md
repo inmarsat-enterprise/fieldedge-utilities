@@ -8,7 +8,7 @@ This library available on **PyPI** provides:
 * A common **`logger`** format and wrapping file facility.
 * A repeating **`timer`** utility (thread) that can be started, stopped,
 restarted, and interval changed.
-* A simplified **`mqtt`** client that automatically connects
+* A simplified **`mqtt`** client that automatically (re)onnects
 (by default to a local `fieldedge-broker`).
 * Helper functions for managing files and **`path`** on different OS.
 * An interface for the FieldEdge **`hostpipe`** service for sending host
@@ -17,9 +17,11 @@ commands from a Docker container, with request/result captured in a logfile.
 and addresses/subnets.
 * A defined set of common **`protocols`** used for packet analysis and
 satellite data traffic optimisation.
-* Helpers for **`tag`** assignment of class definitions to expose properties
+* Helpers for **`class_properties`** to expose public properties of classes
 for MQTT transport between microservices, converting between PEP and JSON style.
 * Helpers for managing **`serial`** ports on a host system.
 * Utilities for converting **`timestamp`**s between unix and ISO 8601
+* Classes useful for implementing **`microservice`**s based on MQTT
+inter-service communications and task workflows
 
 [Docmentation](https://inmarsat-enterprise.github.io/fieldedge-utilities/)

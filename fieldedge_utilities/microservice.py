@@ -1,4 +1,6 @@
-"""Abstract Class definition for a FieldEdge microservice object."""
+"""Helper Classes for a FieldEdge microservice and inter-service communications.
+
+"""
 import logging
 import time
 from abc import ABC, abstractmethod
@@ -27,14 +29,14 @@ class IscTask:
     expires triggered by the method `IscTaskQueue.remove_expired`.
     
     Attributes:
-        uid (UUID): A unique task identifier, if none is provided a UUID4 will
+        uid (UUID): A unique task identifier, if none is provided a `UUID4` will
             be generated.
         ts: (float): The unix timestamp when the task was queued
         lifetime (int): Seconds before the task times out. `None` value
             means the task will not expire/timeout.
         task_type (str): A short name for the task purpose
         task_meta (Any): Metadata to be used on completion or passed to the
-            callback
+            `callback`
         callback (Callable): An optional callback function
 
     """

@@ -141,8 +141,8 @@ class MqttClient:
             _log.warning('No on_message specified')
         on_exit(self._cleanup)
         self.on_message = on_message
-        self.on_connect = kwargs.get('on_connect', None)
-        self.on_disconnect = kwargs.get('on_disconnect', None)
+        self.on_connect: 'Callable|None' = kwargs.get('on_connect', None)
+        self.on_disconnect: 'Callable|None' = kwargs.get('on_disconnect', None)
         self._qos = kwargs.get('qos', 0)
         self._thread_name: str = kwargs.get('thread_name', None)
         self._client_base_id = client_id
@@ -157,7 +157,6 @@ class MqttClient:
                                 reconnect_on_failure=False)
         self._connect_timeout = 5
         self.connect_timeout = int(kwargs.get('connect_timeout', 5))
-        self.is_connected = False
         self._subscriptions = {}
         self.connect_retry_interval = connect_retry_interval
         self.auto_connect = auto_connect
@@ -185,6 +184,10 @@ class MqttClient:
                 id = self._client_base_id
             self._client_id = f'{id}_{int(time())}'
 
+    @property
+    def is_connected(self) -> bool:
+        return self._mqtt.is_connected()
+    
     @property
     def subscriptions(self) -> dict:
         """The dictionary of subscriptions.
@@ -277,15 +280,17 @@ class MqttClient:
             before_names = [t.name for t in threads_before]
             new_thread.name = self._unique_thread_name(before_names)
             _log.debug(f'New MQTT client thread: {new_thread.name}')
+            return
         except (ConnectionError, timeout, TimeoutError) as err:
+            self._mqtt.loop_stop()
             self._failed_connect_attempts += 1
-            _log.error(f'Failed to connect to {self._host} ({err})'
-                         f'(attempt {self._failed_connect_attempts})',
-                         exc_info=True)
-            if self.connect_retry_interval > 0:
-                _log.debug(f'Retrying in {self.connect_retry_interval} s')
-                sleep(self.connect_retry_interval)
-                self.connect()
+            _log.error(f'Failed attempt {self._failed_connect_attempts}'
+                       f' to connect to {self._host} ({err})')
+        # avoid recursing the exception in the stack
+        if self.auto_connect and self.connect_retry_interval > 0:
+            _log.debug(f'Retrying in {self.connect_retry_interval} s')
+            sleep(self.connect_retry_interval)
+            self.connect()
 
     def disconnect(self):
         """Attempts to disconnect from the broker."""
@@ -303,11 +308,9 @@ class MqttClient:
         if rc == MqttResultCode.SUCCESS:
             if _vlog():
                 _log.debug(f'Established MQTT connection to {self._host}')
-            if not self.is_connected:
-                for sub in self.subscriptions:
-                    self._mqtt_subscribe(sub, self.subscriptions[sub]['qos'])
-                self.is_connected = True
-            if self.on_connect:
+            for sub in self.subscriptions:
+                self._mqtt_subscribe(sub, self.subscriptions[sub]['qos'])
+            if callable(self.on_connect):
                 self.on_connect(client, userdata, flags, rc)
         else:
             _log.error(f'MQTT broker connection result code: {rc}'
@@ -408,20 +411,12 @@ class MqttClient:
 
     def _mqtt_on_disconnect(self, client: PahoClient, userdata: any, rc: int):
         """Internal callback when disconnected, clears subscription status."""
-        if self.on_disconnect:
+        if callable(self.on_disconnect):
             self.on_disconnect(client, userdata, rc)
         if userdata != 'terminate':
             _log.warning('MQTT broker disconnected'
                          f' - result code {rc} ({_get_mqtt_result(rc)})')
-            self._mqtt.loop_stop()
-            for sub in self.subscriptions:
-                self._subscriptions[sub]['mid'] = 0
-            # get new unique ID to avoid bouncing connection
-            self.is_connected = False
-            if self.auto_connect:
-                if self._client_uid:
-                    self.client_id = self.client_id
-                self.connect()
+            # reconnect handling is managed automatically by Paho library
 
     def publish(self,
                 topic: str,

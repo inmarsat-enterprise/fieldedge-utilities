@@ -1,6 +1,6 @@
 
 import os
-import json
+import logging
 from enum import IntEnum
 from time import sleep
 
@@ -10,6 +10,7 @@ from fieldedge_utilities import mqtt
 TEST_TOPIC = 'fieldedge/test'
 TEST_PAYLOAD = 'payload'
 message_received = ''
+_log = logging.getLogger(__name__)
 
 
 @pytest.fixture
@@ -63,6 +64,40 @@ def test_basic_pubsub(capsys):
         sleep(0.5)
     captured = capsys.readouterr()
     assert message_received == f'{TEST_TOPIC}: {TEST_PAYLOAD}'
+
+
+connected = False
+
+def on_connect(*args):
+    global connected
+    connected = True
+    _log.info(f'Connected: {connected}')
+    
+
+def on_disconnect(*args):
+    global connected
+    connected = False
+    _log.info(f'Connected: {connected}')
+    
+
+def test_local_manual():
+    """Requires running a local broker that is started and stopped manually."""
+    global connected
+    mqttc = mqtt.MqttClient('test_client',
+                            host='localhost',
+                            auto_connect=True,
+                            connect_retry_interval=5,
+                            on_connect=on_connect,
+                            on_disconnect=on_disconnect,)
+    while not mqttc.is_connected:
+        pass
+    assert connected
+    while mqttc.is_connected:
+        pass
+    assert not connected
+    while not mqttc.is_connected:
+        pass
+    assert connected
 
 
 def test_azure_sas(capsys):

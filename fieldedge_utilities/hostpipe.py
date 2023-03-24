@@ -7,10 +7,12 @@ be removed and the command run directly as root.
 It assumes the architecture runs from a directory structure where the hostpipe
 fifo is called ./hostpipe/pipe relative to the main app launch directory.
 
+Hostpipe log entries are comma-separated values structured as:
+`<iso_timestamp>,[<log_level>],<command or result>=<data>`
+
 References environment variables:
 
 * `HOST_USER` (default: fieldedge)
-* `TIMESTAMP_FMT` str (default: YYYY-mm-ddTHH:MM:SS.NNNZ)
 * `HOSTPIPE_TIMEOUT` float (default: 0.25)
 * `MAX_FILE_SIZE` int MegaBytes (default 2)
 
@@ -30,9 +32,8 @@ APP_ENV = os.getenv('APP_ENV', 'docker')
 HOST_USER = os.getenv('HOST_USER', 'fieldedge')
 HOSTPIPE_PATH = os.getenv('HOSTPIPE_PATH', './hostpipe/pipe')
 HOSTPIPE_LOG = os.getenv('HOSTPIPE_LOG', './logs/hostpipe.log')
-TIMESTAMP_FMT = os.getenv('HOSTPIPE_TS_FMT', 'YYYY-mm-ddTHH:MM:SS.SSSZ')
-COMMAND_PREFIX = f'{TIMESTAMP_FMT},[INFO],command='
-RESPONSE_PREFIX = f'{TIMESTAMP_FMT},[INFO],result='
+CMD_TAG = ',command='
+RES_TAG = ',result='
 
 HOSTPIPE_TIMEOUT = float(os.getenv('HOSTPIPE_TIMEOUT', 0.25))
 MAX_FILE_SIZE = int(os.getenv('HOSTPIPE_LOGFILE_SIZE', 2)) * 1024 * 1024
@@ -155,6 +156,7 @@ def host_get_response(command: str,
     
     Returns:
         A string concatenating all the response lines following the command.
+        Newline separates each response line if multiple exist.
 
     Raises:
         FileNotFoundError if the hostpipe log cannot be found.
@@ -167,7 +169,7 @@ def host_get_response(command: str,
     if not os.path.isfile(pipelog):
         raise FileNotFoundError(f'Could not find file {pipelog}')
     _log.debug(f'Searching {pipelog} for {modcommand}')
-    response = []
+    response: 'list[str]' = []
     filepass = 0
     while len(response) == 0:
         # test_mode assumes manual step through will usually violate timeout
@@ -190,8 +192,8 @@ def host_get_response(command: str,
                 # older command, skip this pass
                 sleep(0.1)
                 break
-            if ',command=' in line:
-                logged_command = line.split(',command=')[1].strip()
+            if CMD_TAG in line:
+                logged_command = line.split(CMD_TAG)[1].strip()
                 if _vlog():
                     _log.debug(f'Found command {logged_command} in {pipelog}'
                                f'({_get_line_ts(line)})'
@@ -213,14 +215,14 @@ def host_get_response(command: str,
                     if _vlog():
                         _log.debug(f'Found target {modcommand}'
                                    f' with {len(response)} response lines')
-                    response = [l[len(RESPONSE_PREFIX):] for l in response]
+                    response = [l.split(RES_TAG, 1)[1].strip() for l in response]
                     break
-            elif ',result=' in line:
+            elif RES_TAG in line:
                 response.append(line)
         if not test_mode:
             sleep(timeout / 2)
     response.reverse()
-    return ''.join(response)
+    return '\n'.join(response)
 
 
 def _maintain_pipelog(pipelog: str,
@@ -241,9 +243,9 @@ def _maintain_pipelog(pipelog: str,
         lines = open(pipelog, 'r').readlines()
         while os.path.getsize(pipelog) > max_file_size:
             for line in lines:
-                if ',result=' in line:
+                if RES_TAG in line:
                     to_delete.append(line)
-                elif ',command=' in line:
+                elif CMD_TAG in line:
                     if len(to_delete) == 0:
                         to_delete.append(line)
                     else:

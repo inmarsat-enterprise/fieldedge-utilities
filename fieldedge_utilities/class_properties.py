@@ -136,6 +136,14 @@ def property_is_read_only(instance: object, property_name: str) -> bool:
         return False
         
     
+def property_is_async(instance: object, property_name: str) -> bool:
+    if not hasattr_static(instance, property_name):
+        raise ValueError(f'Object has no property {property_name}')
+    if inspect.isawaitable(getattr(instance, property_name)):
+        return True
+    return False
+
+    
 def get_class_tag(cls: type) -> str:
     if isinstance(cls, type):
         return cls.__name__.lower()

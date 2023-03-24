@@ -1,16 +1,18 @@
 """Helper Classes for a FieldEdge microservice and inter-service communications.
 
 """
+import asyncio
 import logging
 import time
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Any, Callable
 from uuid import uuid4
 
-from .class_properties import (READ_ONLY, READ_WRITE,
-                               get_class_properties, get_class_tag,
-                               json_compatible, property_is_read_only,
-                               tag_class_property, untag_class_property)
+from .class_properties import (READ_ONLY, READ_WRITE, get_class_properties,
+                               get_class_tag, json_compatible, property_is_async,
+                               property_is_read_only, tag_class_property,
+                               untag_class_property)
 from .logger import verbose_logging
 from .mqtt import MqttClient
 from .timer import RepeatingTimer
@@ -195,7 +197,7 @@ class Microservice(ABC):
                  mqtt_client_id: str = None,
                  auto_connect: bool = False,
                  isc_tags: bool = False,
-                 isc_poll_interval: float = 1,
+                 isc_poll_interval: int = 1,
                  ) -> None:
         """Initialize the class instance.
         
@@ -207,8 +209,9 @@ class Microservice(ABC):
                 the local broker. If not provided, will be `fieldedge_<tag>`.
             auto_connect (bool): If set will automatically connect to the broker
                 during initialization.
-            prop_tags (bool): If set then isc_properties will include the class
+            isc_tags (bool): If set then isc_properties will include the class
                 tag as a prefix. Disabled by default.
+            isc_poll_interval (int): The interval at which to poll
                 
         """
         self._tag: str = tag or get_class_tag(self.__class__)
@@ -234,6 +237,7 @@ class Microservice(ABC):
             'rollcall_properties',
         ]
         self._rollcall_properties: 'list[str]' = []
+        self._isc_poll_interval: int = int(isc_poll_interval)
         self._isc_queue = IscTaskQueue()
         self._isc_timer = RepeatingTimer(seconds=isc_poll_interval,
                                          target=self._isc_queue.remove_expired,
@@ -586,8 +590,8 @@ class Microservice(ABC):
             else:
                 response['properties'] = self.isc_properties
         else:
-            req_props: list = request['properties']
             subtopic = 'info/properties/values'
+            req_props: list = request['properties']
             response['properties'] = {}
             res_props = response['properties']
             if categorized:
@@ -724,3 +728,65 @@ class Microservice(ABC):
             self._isc_timer.start_timer()
         else:
             self._isc_timer.stop_timer()
+
+
+@dataclass
+class CachedProperty:
+    name: str
+    value: Any
+    cache_lifetime: int = 5
+    cache_time: float = time.time()
+
+
+class MicroserviceProxy:
+    """"""
+    def __init__(self,
+                 tag: str,
+                 isc_poll_interval: int = 1) -> None:
+        if not isinstance(tag, str):
+            raise ValueError('Tag must be a valid microservice name')
+        self._tag: str = tag
+        self._isc_queue = IscTaskQueue()
+        self._isc_timer = RepeatingTimer(seconds=isc_poll_interval,
+                                         target=self._isc_queue.remove_expired,
+                                         name='IscTaskExpiryTimer')
+        self._cached_properties: dict = {}
+    
+    def task_add(self, task: IscTask) -> None:
+        """Adds a task to the task queue."""
+        if self._isc_queue.is_queued(task_id=task.uid):
+            _log.warning(f'Task {task.uid} already queued')
+        else:
+            self._isc_queue.append(task)
+        
+    def task_get(self, task_id: str) -> 'IscTask|None':
+        """Retrieves a task from the queue.
+        
+        Args:
+            task_id: The unique ID of the task.
+        
+        Returns:
+            The `QueuedIscTask` if it was found in the queue, else `None`.
+            
+        """
+        return self._isc_queue.get(task_id)
+        
+    def task_expiry_enable(self, enable: bool = True):
+        """Starts or stops periodic checking for expired ISC tasks.
+        
+        Args:
+            enable: If `True` (default) starts the checks, else stops checking.
+            
+        """
+        if enable:
+            if not self._isc_timer.is_alive():
+                self._isc_timer.start()
+            self._isc_timer.start_timer()
+        else:
+            self._isc_timer.stop_timer()
+    
+    def initialize(self) -> None:
+        """Requests properties of the microservice to create the proxy."""
+    
+    def property_cache(self, property_name: str):
+        """"""

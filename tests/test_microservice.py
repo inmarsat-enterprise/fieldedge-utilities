@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import pytest
 import time
@@ -36,6 +37,11 @@ class TestService(Microservice):
         if not isinstance(value, int):
             raise ValueError('config_prop must be integer')
         self._config_prop = value
+    
+    @property
+    async def async_info_prop(self) -> str:
+        await asyncio.sleep(1)
+        return self._info_prop
     
     def on_isc_message(self, topic: str, message: dict) -> None:
         logger.info(f'Received ISC message {topic}: {message}')
@@ -111,6 +117,13 @@ def test_ms_isc_get_property(test_service: TestService):
     test_prop = 'info_prop'
     test_isc_prop = 'infoProp'
     assert test_service.isc_get_property(test_isc_prop) == getattr(test_service, test_prop)
+
+
+@pytest.mark.asyncio
+async def test_ms_isc_get_property_async(test_service: TestService):
+    test_prop = 'async_info_prop'
+    test_isc_prop = 'asyncInfoProp'
+    assert test_service.isc_get_property(test_isc_prop) == await getattr(test_service, test_prop)
 
 
 def test_ms_isc_set_property(test_service: TestService):

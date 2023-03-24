@@ -165,6 +165,14 @@ def property_is_read_only(instance: object, property_name: str) -&gt; bool:
         return False
         
     
+def property_is_async(instance: object, property_name: str) -&gt; bool:
+    if not hasattr_static(instance, property_name):
+        raise ValueError(f&#39;Object has no property {property_name}&#39;)
+    if inspect.isawaitable(getattr(instance, property_name)):
+        return True
+    return False
+
+    
 def get_class_tag(cls: type) -&gt; str:
     if isinstance(cls, type):
         return cls.__name__.lower()
@@ -855,6 +863,23 @@ keys to <code>camelCase</code>.</dd>
         return res</code></pre>
 </details>
 </dd>
+<dt id="fieldedge_utilities.class_properties.property_is_async"><code class="name flex">
+<span>def <span class="ident">property_is_async</span></span>(<span>instance: object, property_name: str) ‑> bool</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def property_is_async(instance: object, property_name: str) -&gt; bool:
+    if not hasattr_static(instance, property_name):
+        raise ValueError(f&#39;Object has no property {property_name}&#39;)
+    if inspect.isawaitable(getattr(instance, property_name)):
+        return True
+    return False</code></pre>
+</details>
+</dd>
 <dt id="fieldedge_utilities.class_properties.property_is_read_only"><code class="name flex">
 <span>def <span class="ident">property_is_read_only</span></span>(<span>instance: object, property_name: str) ‑> bool</span>
 </code></dt>
@@ -1171,6 +1196,7 @@ property value in snake_case, and the tag</p></div>
 <li><code><a title="fieldedge_utilities.class_properties.get_instance_properties_values" href="#fieldedge_utilities.class_properties.get_instance_properties_values">get_instance_properties_values</a></code></li>
 <li><code><a title="fieldedge_utilities.class_properties.hasattr_static" href="#fieldedge_utilities.class_properties.hasattr_static">hasattr_static</a></code></li>
 <li><code><a title="fieldedge_utilities.class_properties.json_compatible" href="#fieldedge_utilities.class_properties.json_compatible">json_compatible</a></code></li>
+<li><code><a title="fieldedge_utilities.class_properties.property_is_async" href="#fieldedge_utilities.class_properties.property_is_async">property_is_async</a></code></li>
 <li><code><a title="fieldedge_utilities.class_properties.property_is_read_only" href="#fieldedge_utilities.class_properties.property_is_read_only">property_is_read_only</a></code></li>
 <li><code><a title="fieldedge_utilities.class_properties.snake_to_camel" href="#fieldedge_utilities.class_properties.snake_to_camel">snake_to_camel</a></code></li>
 <li><code><a title="fieldedge_utilities.class_properties.tag_class_properties" href="#fieldedge_utilities.class_properties.tag_class_properties">tag_class_properties</a></code></li>

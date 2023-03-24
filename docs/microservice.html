@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
 <meta name="generator" content="pdoc 0.10.0" />
 <title>fieldedge_utilities.microservice API documentation</title>
-<meta name="description" content="Abstract Class definition for a FieldEdge microservice object." />
+<meta name="description" content="Helper Classes for a FieldEdge microservice and inter-service communications." />
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
 <link rel="stylesheet preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/github.min.css" crossorigin>
@@ -22,22 +22,26 @@
 <h1 class="title">Module <code>fieldedge_utilities.microservice</code></h1>
 </header>
 <section id="section-intro">
-<p>Abstract Class definition for a FieldEdge microservice object.</p>
+<p>Helper Classes for a FieldEdge microservice and inter-service communications.</p>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">&#34;&#34;&#34;Abstract Class definition for a FieldEdge microservice object.&#34;&#34;&#34;
+<pre><code class="python">&#34;&#34;&#34;Helper Classes for a FieldEdge microservice and inter-service communications.
+
+&#34;&#34;&#34;
+import asyncio
 import logging
 import time
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Any, Callable
 from uuid import uuid4
 
-from .class_properties import (READ_ONLY, READ_WRITE,
-                               get_class_properties, get_class_tag,
-                               json_compatible, property_is_read_only,
-                               tag_class_property, untag_class_property)
+from .class_properties import (READ_ONLY, READ_WRITE, get_class_properties,
+                               get_class_tag, json_compatible, property_is_async,
+                               property_is_read_only, tag_class_property,
+                               untag_class_property)
 from .logger import verbose_logging
 from .mqtt import MqttClient
 from .timer import RepeatingTimer
@@ -56,14 +60,14 @@ class IscTask:
     expires triggered by the method `IscTaskQueue.remove_expired`.
     
     Attributes:
-        uid (UUID): A unique task identifier, if none is provided a UUID4 will
+        uid (UUID): A unique task identifier, if none is provided a `UUID4` will
             be generated.
         ts: (float): The unix timestamp when the task was queued
         lifetime (int): Seconds before the task times out. `None` value
             means the task will not expire/timeout.
         task_type (str): A short name for the task purpose
         task_meta (Any): Metadata to be used on completion or passed to the
-            callback
+            `callback`
         callback (Callable): An optional callback function
 
     &#34;&#34;&#34;
@@ -222,7 +226,7 @@ class Microservice(ABC):
                  mqtt_client_id: str = None,
                  auto_connect: bool = False,
                  isc_tags: bool = False,
-                 isc_poll_interval: float = 1,
+                 isc_poll_interval: int = 1,
                  ) -&gt; None:
         &#34;&#34;&#34;Initialize the class instance.
         
@@ -234,8 +238,9 @@ class Microservice(ABC):
                 the local broker. If not provided, will be `fieldedge_&lt;tag&gt;`.
             auto_connect (bool): If set will automatically connect to the broker
                 during initialization.
-            prop_tags (bool): If set then isc_properties will include the class
+            isc_tags (bool): If set then isc_properties will include the class
                 tag as a prefix. Disabled by default.
+            isc_poll_interval (int): The interval at which to poll
                 
         &#34;&#34;&#34;
         self._tag: str = tag or get_class_tag(self.__class__)
@@ -261,6 +266,7 @@ class Microservice(ABC):
             &#39;rollcall_properties&#39;,
         ]
         self._rollcall_properties: &#39;list[str]&#39; = []
+        self._isc_poll_interval: int = int(isc_poll_interval)
         self._isc_queue = IscTaskQueue()
         self._isc_timer = RepeatingTimer(seconds=isc_poll_interval,
                                          target=self._isc_queue.remove_expired,
@@ -613,8 +619,8 @@ class Microservice(ABC):
             else:
                 response[&#39;properties&#39;] = self.isc_properties
         else:
-            req_props: list = request[&#39;properties&#39;]
             subtopic = &#39;info/properties/values&#39;
+            req_props: list = request[&#39;properties&#39;]
             response[&#39;properties&#39;] = {}
             res_props = response[&#39;properties&#39;]
             if categorized:
@@ -750,7 +756,69 @@ class Microservice(ABC):
                 self._isc_timer.start()
             self._isc_timer.start_timer()
         else:
-            self._isc_timer.stop_timer()</code></pre>
+            self._isc_timer.stop_timer()
+
+
+@dataclass
+class CachedProperty:
+    name: str
+    value: Any
+    cache_lifetime: int = 5
+    cache_time: float = time.time()
+
+
+class MicroserviceProxy:
+    &#34;&#34;&#34;&#34;&#34;&#34;
+    def __init__(self,
+                 tag: str,
+                 isc_poll_interval: int = 1) -&gt; None:
+        if not isinstance(tag, str):
+            raise ValueError(&#39;Tag must be a valid microservice name&#39;)
+        self._tag: str = tag
+        self._isc_queue = IscTaskQueue()
+        self._isc_timer = RepeatingTimer(seconds=isc_poll_interval,
+                                         target=self._isc_queue.remove_expired,
+                                         name=&#39;IscTaskExpiryTimer&#39;)
+        self._cached_properties: dict = {}
+    
+    def task_add(self, task: IscTask) -&gt; None:
+        &#34;&#34;&#34;Adds a task to the task queue.&#34;&#34;&#34;
+        if self._isc_queue.is_queued(task_id=task.uid):
+            _log.warning(f&#39;Task {task.uid} already queued&#39;)
+        else:
+            self._isc_queue.append(task)
+        
+    def task_get(self, task_id: str) -&gt; &#39;IscTask|None&#39;:
+        &#34;&#34;&#34;Retrieves a task from the queue.
+        
+        Args:
+            task_id: The unique ID of the task.
+        
+        Returns:
+            The `QueuedIscTask` if it was found in the queue, else `None`.
+            
+        &#34;&#34;&#34;
+        return self._isc_queue.get(task_id)
+        
+    def task_expiry_enable(self, enable: bool = True):
+        &#34;&#34;&#34;Starts or stops periodic checking for expired ISC tasks.
+        
+        Args:
+            enable: If `True` (default) starts the checks, else stops checking.
+            
+        &#34;&#34;&#34;
+        if enable:
+            if not self._isc_timer.is_alive():
+                self._isc_timer.start()
+            self._isc_timer.start_timer()
+        else:
+            self._isc_timer.stop_timer()
+    
+    def initialize(self) -&gt; None:
+        &#34;&#34;&#34;Requests properties of the microservice to create the proxy.&#34;&#34;&#34;
+    
+    def property_cache(self, property_name: str):
+        &#34;&#34;&#34;&#34;&#34;&#34;</code></pre>
 </details>
 </section>
 <section>
@@ -762,6 +830,43 @@ class Microservice(ABC):
 <section>
 <h2 class="section-title" id="header-classes">Classes</h2>
 <dl>
+<dt id="fieldedge_utilities.microservice.CachedProperty"><code class="flex name class">
+<span>class <span class="ident">CachedProperty</span></span>
+<span>(</span><span>name: str, value: Any, cache_lifetime: int = 5, cache_time: float = 1679670803.873782)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>CachedProperty(name: str, value: Any, cache_lifetime: int = 5, cache_time: float = 1679670803.873782)</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@dataclass
+class CachedProperty:
+    name: str
+    value: Any
+    cache_lifetime: int = 5
+    cache_time: float = time.time()</code></pre>
+</details>
+<h3>Class variables</h3>
+<dl>
+<dt id="fieldedge_utilities.microservice.CachedProperty.cache_lifetime"><code class="name">var <span class="ident">cache_lifetime</span> : int</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="fieldedge_utilities.microservice.CachedProperty.cache_time"><code class="name">var <span class="ident">cache_time</span> : float</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="fieldedge_utilities.microservice.CachedProperty.name"><code class="name">var <span class="ident">name</span> : str</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="fieldedge_utilities.microservice.CachedProperty.value"><code class="name">var <span class="ident">value</span> : Any</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
 <dt id="fieldedge_utilities.microservice.IscTask"><code class="flex name class">
 <span>class <span class="ident">IscTask</span></span>
 <span>(</span><span>uid: str = None, task_type: str = None, task_meta: Any = None, callback: Callable = None, lifetime: float = 10)</span>
@@ -776,7 +881,7 @@ expires triggered by the method <code><a title="fieldedge_utilities.microservice
 <h2 id="attributes">Attributes</h2>
 <dl>
 <dt><strong><code>uid</code></strong> :&ensp;<code>UUID</code></dt>
-<dd>A unique task identifier, if none is provided a UUID4 will
+<dd>A unique task identifier, if none is provided a <code>UUID4</code> will
 be generated.</dd>
 <dt><strong><code>ts</code></strong></dt>
 <dd>(float): The unix timestamp when the task was queued</dd>
@@ -787,7 +892,7 @@ means the task will not expire/timeout.</dd>
 <dd>A short name for the task purpose</dd>
 <dt><strong><code>task_meta</code></strong> :&ensp;<code>Any</code></dt>
 <dd>Metadata to be used on completion or passed to the
-callback</dd>
+<code>callback</code></dd>
 <dt><strong><code>callback</code></strong> :&ensp;<code>Callable</code></dt>
 <dd>An optional callback function</dd>
 </dl>
@@ -822,14 +927,14 @@ means the task will not expire/timeout.</dd>
     expires triggered by the method `IscTaskQueue.remove_expired`.
     
     Attributes:
-        uid (UUID): A unique task identifier, if none is provided a UUID4 will
+        uid (UUID): A unique task identifier, if none is provided a `UUID4` will
             be generated.
         ts: (float): The unix timestamp when the task was queued
         lifetime (int): Seconds before the task times out. `None` value
             means the task will not expire/timeout.
         task_type (str): A short name for the task purpose
         task_meta (Any): Metadata to be used on completion or passed to the
-            callback
+            `callback`
         callback (Callable): An optional callback function
 
     &#34;&#34;&#34;
@@ -1155,7 +1260,7 @@ will be called with the cb_meta kwargs.</p></div>
 </dd>
 <dt id="fieldedge_utilities.microservice.Microservice"><code class="flex name class">
 <span>class <span class="ident">Microservice</span></span>
-<span>(</span><span>tag: str = None, mqtt_client_id: str = None, auto_connect: bool = False, isc_tags: bool = False, isc_poll_interval: float = 1)</span>
+<span>(</span><span>tag: str = None, mqtt_client_id: str = None, auto_connect: bool = False, isc_tags: bool = False, isc_poll_interval: int = 1)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Abstract base class for a FieldEdge microservice.</p>
@@ -1173,9 +1278,11 @@ the local broker. If not provided, will be <code>fieldedge_&lt;tag&gt;</code>.</
 <dt><strong><code>auto_connect</code></strong> :&ensp;<code>bool</code></dt>
 <dd>If set will automatically connect to the broker
 during initialization.</dd>
-<dt><strong><code>prop_tags</code></strong> :&ensp;<code>bool</code></dt>
+<dt><strong><code>isc_tags</code></strong> :&ensp;<code>bool</code></dt>
 <dd>If set then isc_properties will include the class
 tag as a prefix. Disabled by default.</dd>
+<dt><strong><code>isc_poll_interval</code></strong> :&ensp;<code>int</code></dt>
+<dd>The interval at which to poll</dd>
 </dl></div>
 <details class="source">
 <summary>
@@ -1203,7 +1310,7 @@ tag as a prefix. Disabled by default.</dd>
                  mqtt_client_id: str = None,
                  auto_connect: bool = False,
                  isc_tags: bool = False,
-                 isc_poll_interval: float = 1,
+                 isc_poll_interval: int = 1,
                  ) -&gt; None:
         &#34;&#34;&#34;Initialize the class instance.
         
@@ -1215,8 +1322,9 @@ tag as a prefix. Disabled by default.</dd>
                 the local broker. If not provided, will be `fieldedge_&lt;tag&gt;`.
             auto_connect (bool): If set will automatically connect to the broker
                 during initialization.
-            prop_tags (bool): If set then isc_properties will include the class
+            isc_tags (bool): If set then isc_properties will include the class
                 tag as a prefix. Disabled by default.
+            isc_poll_interval (int): The interval at which to poll
                 
         &#34;&#34;&#34;
         self._tag: str = tag or get_class_tag(self.__class__)
@@ -1242,6 +1350,7 @@ tag as a prefix. Disabled by default.</dd>
             &#39;rollcall_properties&#39;,
         ]
         self._rollcall_properties: &#39;list[str]&#39; = []
+        self._isc_poll_interval: int = int(isc_poll_interval)
         self._isc_queue = IscTaskQueue()
         self._isc_timer = RepeatingTimer(seconds=isc_poll_interval,
                                          target=self._isc_queue.remove_expired,
@@ -1594,8 +1703,8 @@ tag as a prefix. Disabled by default.</dd>
             else:
                 response[&#39;properties&#39;] = self.isc_properties
         else:
-            req_props: list = request[&#39;properties&#39;]
             subtopic = &#39;info/properties/values&#39;
+            req_props: list = request[&#39;properties&#39;]
             response[&#39;properties&#39;] = {}
             res_props = response[&#39;properties&#39;]
             if categorized:
@@ -2196,8 +2305,8 @@ optional <code>categorized</code> flag.</dd>
         else:
             response[&#39;properties&#39;] = self.isc_properties
     else:
-        req_props: list = request[&#39;properties&#39;]
         subtopic = &#39;info/properties/values&#39;
+        req_props: list = request[&#39;properties&#39;]
         response[&#39;properties&#39;] = {}
         res_props = response[&#39;properties&#39;]
         if categorized:
@@ -2476,6 +2585,174 @@ specified using the <code>property_cache</code> method.</p></div>
 </dd>
 </dl>
 </dd>
+<dt id="fieldedge_utilities.microservice.MicroserviceProxy"><code class="flex name class">
+<span>class <span class="ident">MicroserviceProxy</span></span>
+<span>(</span><span>tag: str, isc_poll_interval: int = 1)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class MicroserviceProxy:
+    &#34;&#34;&#34;&#34;&#34;&#34;
+    def __init__(self,
+                 tag: str,
+                 isc_poll_interval: int = 1) -&gt; None:
+        if not isinstance(tag, str):
+            raise ValueError(&#39;Tag must be a valid microservice name&#39;)
+        self._tag: str = tag
+        self._isc_queue = IscTaskQueue()
+        self._isc_timer = RepeatingTimer(seconds=isc_poll_interval,
+                                         target=self._isc_queue.remove_expired,
+                                         name=&#39;IscTaskExpiryTimer&#39;)
+        self._cached_properties: dict = {}
+    
+    def task_add(self, task: IscTask) -&gt; None:
+        &#34;&#34;&#34;Adds a task to the task queue.&#34;&#34;&#34;
+        if self._isc_queue.is_queued(task_id=task.uid):
+            _log.warning(f&#39;Task {task.uid} already queued&#39;)
+        else:
+            self._isc_queue.append(task)
+        
+    def task_get(self, task_id: str) -&gt; &#39;IscTask|None&#39;:
+        &#34;&#34;&#34;Retrieves a task from the queue.
+        
+        Args:
+            task_id: The unique ID of the task.
+        
+        Returns:
+            The `QueuedIscTask` if it was found in the queue, else `None`.
+            
+        &#34;&#34;&#34;
+        return self._isc_queue.get(task_id)
+        
+    def task_expiry_enable(self, enable: bool = True):
+        &#34;&#34;&#34;Starts or stops periodic checking for expired ISC tasks.
+        
+        Args:
+            enable: If `True` (default) starts the checks, else stops checking.
+            
+        &#34;&#34;&#34;
+        if enable:
+            if not self._isc_timer.is_alive():
+                self._isc_timer.start()
+            self._isc_timer.start_timer()
+        else:
+            self._isc_timer.stop_timer()
+    
+    def initialize(self) -&gt; None:
+        &#34;&#34;&#34;Requests properties of the microservice to create the proxy.&#34;&#34;&#34;
+    
+    def property_cache(self, property_name: str):
+        &#34;&#34;&#34;&#34;&#34;&#34;</code></pre>
+</details>
+<h3>Methods</h3>
+<dl>
+<dt id="fieldedge_utilities.microservice.MicroserviceProxy.initialize"><code class="name flex">
+<span>def <span class="ident">initialize</span></span>(<span>self) ‑> None</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Requests properties of the microservice to create the proxy.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def initialize(self) -&gt; None:
+    &#34;&#34;&#34;Requests properties of the microservice to create the proxy.&#34;&#34;&#34;</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.microservice.MicroserviceProxy.property_cache"><code class="name flex">
+<span>def <span class="ident">property_cache</span></span>(<span>self, property_name: str)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def property_cache(self, property_name: str):
+    &#34;&#34;&#34;&#34;&#34;&#34;</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.microservice.MicroserviceProxy.task_add"><code class="name flex">
+<span>def <span class="ident">task_add</span></span>(<span>self, task: <a title="fieldedge_utilities.microservice.IscTask" href="#fieldedge_utilities.microservice.IscTask">IscTask</a>) ‑> None</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Adds a task to the task queue.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def task_add(self, task: IscTask) -&gt; None:
+    &#34;&#34;&#34;Adds a task to the task queue.&#34;&#34;&#34;
+    if self._isc_queue.is_queued(task_id=task.uid):
+        _log.warning(f&#39;Task {task.uid} already queued&#39;)
+    else:
+        self._isc_queue.append(task)</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.microservice.MicroserviceProxy.task_expiry_enable"><code class="name flex">
+<span>def <span class="ident">task_expiry_enable</span></span>(<span>self, enable: bool = True)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Starts or stops periodic checking for expired ISC tasks.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>enable</code></strong></dt>
+<dd>If <code>True</code> (default) starts the checks, else stops checking.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def task_expiry_enable(self, enable: bool = True):
+    &#34;&#34;&#34;Starts or stops periodic checking for expired ISC tasks.
+    
+    Args:
+        enable: If `True` (default) starts the checks, else stops checking.
+        
+    &#34;&#34;&#34;
+    if enable:
+        if not self._isc_timer.is_alive():
+            self._isc_timer.start()
+        self._isc_timer.start_timer()
+    else:
+        self._isc_timer.stop_timer()</code></pre>
+</details>
+</dd>
+<dt id="fieldedge_utilities.microservice.MicroserviceProxy.task_get"><code class="name flex">
+<span>def <span class="ident">task_get</span></span>(<span>self, task_id: str) ‑> <a title="fieldedge_utilities.microservice.IscTask" href="#fieldedge_utilities.microservice.IscTask">IscTask</a> | None</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Retrieves a task from the queue.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>task_id</code></strong></dt>
+<dd>The unique ID of the task.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>The <code>QueuedIscTask</code> if it was found in the queue, else <code>None</code>.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def task_get(self, task_id: str) -&gt; &#39;IscTask|None&#39;:
+    &#34;&#34;&#34;Retrieves a task from the queue.
+    
+    Args:
+        task_id: The unique ID of the task.
+    
+    Returns:
+        The `QueuedIscTask` if it was found in the queue, else `None`.
+        
+    &#34;&#34;&#34;
+    return self._isc_queue.get(task_id)</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
 </dl>
 </section>
 </article>
@@ -2492,6 +2769,15 @@ specified using the <code>property_cache</code> method.</p></div>
 </li>
 <li><h3><a href="#header-classes">Classes</a></h3>
 <ul>
+<li>
+<h4><code><a title="fieldedge_utilities.microservice.CachedProperty" href="#fieldedge_utilities.microservice.CachedProperty">CachedProperty</a></code></h4>
+<ul class="">
+<li><code><a title="fieldedge_utilities.microservice.CachedProperty.cache_lifetime" href="#fieldedge_utilities.microservice.CachedProperty.cache_lifetime">cache_lifetime</a></code></li>
+<li><code><a title="fieldedge_utilities.microservice.CachedProperty.cache_time" href="#fieldedge_utilities.microservice.CachedProperty.cache_time">cache_time</a></code></li>
+<li><code><a title="fieldedge_utilities.microservice.CachedProperty.name" href="#fieldedge_utilities.microservice.CachedProperty.name">name</a></code></li>
+<li><code><a title="fieldedge_utilities.microservice.CachedProperty.value" href="#fieldedge_utilities.microservice.CachedProperty.value">value</a></code></li>
+</ul>
+</li>
 <li>
 <h4><code><a title="fieldedge_utilities.microservice.IscTask" href="#fieldedge_utilities.microservice.IscTask">IscTask</a></code></h4>
 <ul class="">
@@ -2540,6 +2826,16 @@ specified using the <code>property_cache</code> method.</p></div>
 <li><code><a title="fieldedge_utilities.microservice.Microservice.task_add" href="#fieldedge_utilities.microservice.Microservice.task_add">task_add</a></code></li>
 <li><code><a title="fieldedge_utilities.microservice.Microservice.task_expiry_enable" href="#fieldedge_utilities.microservice.Microservice.task_expiry_enable">task_expiry_enable</a></code></li>
 <li><code><a title="fieldedge_utilities.microservice.Microservice.task_get" href="#fieldedge_utilities.microservice.Microservice.task_get">task_get</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="fieldedge_utilities.microservice.MicroserviceProxy" href="#fieldedge_utilities.microservice.MicroserviceProxy">MicroserviceProxy</a></code></h4>
+<ul class="">
+<li><code><a title="fieldedge_utilities.microservice.MicroserviceProxy.initialize" href="#fieldedge_utilities.microservice.MicroserviceProxy.initialize">initialize</a></code></li>
+<li><code><a title="fieldedge_utilities.microservice.MicroserviceProxy.property_cache" href="#fieldedge_utilities.microservice.MicroserviceProxy.property_cache">property_cache</a></code></li>
+<li><code><a title="fieldedge_utilities.microservice.MicroserviceProxy.task_add" href="#fieldedge_utilities.microservice.MicroserviceProxy.task_add">task_add</a></code></li>
+<li><code><a title="fieldedge_utilities.microservice.MicroserviceProxy.task_expiry_enable" href="#fieldedge_utilities.microservice.MicroserviceProxy.task_expiry_enable">task_expiry_enable</a></code></li>
+<li><code><a title="fieldedge_utilities.microservice.MicroserviceProxy.task_get" href="#fieldedge_utilities.microservice.MicroserviceProxy.task_get">task_get</a></code></li>
 </ul>
 </li>
 </ul>

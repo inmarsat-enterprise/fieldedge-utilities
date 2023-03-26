@@ -110,14 +110,15 @@ def test_camel_to_snake():
         x = snake_to_camel(1)
 
 
+# TODO: Deprecate this method and test
 def test_cache_valid():
     cache = {}
     CACHE_MAX_TIME = 1
     CACHE_TAG = 'prop_value'
     cache[CACHE_TAG] = time()
-    sleep(1)
+    sleep(CACHE_MAX_TIME - 0.25)
     assert cache_valid(cache[CACHE_TAG], CACHE_MAX_TIME)
-    sleep(CACHE_MAX_TIME + 1)
+    sleep(CACHE_MAX_TIME)
     assert not cache_valid(cache[CACHE_TAG], CACHE_MAX_TIME)
     with pytest.raises(ValueError):
         x = cache_valid('time')

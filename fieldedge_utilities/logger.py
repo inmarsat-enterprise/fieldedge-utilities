@@ -315,11 +315,12 @@ def get_fieldedge_logger(filename: str = None,
     return logger
 
 
-def verbose_logging(filter: 'str' = '') -> bool:
+def verbose_logging(filter: str = '', case_sensitive: bool = True) -> bool:
     """Indicates if verbose logging is configured, with an optional filter.
     
     Args:
         filter: An optional filter e.g. the package+module name
+        case_sensitive: Defaults to case sensitive filter.
     
     Returns:
         True if `LOG_VERBOSE` environment variable is set
@@ -328,7 +329,8 @@ def verbose_logging(filter: 'str' = '') -> bool:
     """
     if LOG_VERBOSE:
         if filter:
-            if filter in LOG_VERBOSE:
+            if (filter in LOG_VERBOSE or
+                not case_sensitive and filter.upper() in LOG_VERBOSE.upper()):
                 return True
             return False
         return True

@@ -4,8 +4,11 @@ from logging import Logger
 
 import pytest
 from fieldedge_utilities import hostpipe
-from fieldedge_utilities.hostpipe import (COMMAND_PREFIX, RESPONSE_PREFIX,
-                                          TIMESTAMP_FMT)
+
+# TODO: cleanup legacy fmt/prefix stuff
+TIMESTAMP_FMT = os.getenv('HOSTPIPE_TS_FMT', 'YYYY-mm-ddTHH:MM:SS.SSSZ')
+COMMAND_PREFIX = f'{TIMESTAMP_FMT},[INFO],command='
+RESPONSE_PREFIX = f'{TIMESTAMP_FMT},[INFO],result='
 
 TESTAPPDIR = '/home/fieldedge/fieldedge'
 LOGDIR = './tests/hostpipe_logs'

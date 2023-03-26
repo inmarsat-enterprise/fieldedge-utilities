@@ -47,7 +47,15 @@ def test_stderr(capsys):
     assert captured.err != ''
 
 
+def create_test_file_dir(filename) -> 'str|None':
+    if not os.path.isdir(os.path.dirname(filename)):
+        newdir = os.path.dirname(TEST_FILE)
+        os.mkdir(newdir)
+        return newdir
+
+
 def test_file(capsys):
+    newdir = create_test_file_dir(TEST_FILE)
     log = logger.get_wrapping_logger(name='test', filename=TEST_FILE)
     log.info(TEST_STR)
     captured = capsys.readouterr()
@@ -56,9 +64,11 @@ def test_file(capsys):
     f = open(TEST_FILE, 'r')
     assert TEST_STR in f.readline()
     os.remove(TEST_FILE)
+    if newdir: os.rmdir(newdir)
 
 
 def test_exception_singleline(capsys):
+    newdir = create_test_file_dir(TEST_FILE)
     log = logger.get_wrapping_logger(name='test', filename=TEST_FILE)
     try:
         log.info('A non-exception')
@@ -68,12 +78,13 @@ def test_exception_singleline(capsys):
     f = open(TEST_FILE, 'r')
     assert 'ZeroDivisionError: ' in f.readlines()[1]
     os.remove(TEST_FILE)
+    if newdir: os.rmdir(newdir)
 
 
 def test_invalid_file_path(capsys):
-    with pytest.raises(ValueError, match='Directory /bad/path not found'):
-        log = logger.get_wrapping_logger(name='test',
-                                         filename='/bad/path/test.log')
+    bad_path = '/bad/path/test.log'
+    with pytest.raises(FileNotFoundError, match=f'Path {bad_path} not found'):
+        log = logger.get_wrapping_logger(name='test', filename=bad_path)
 
 
 log = logging.getLogger()
@@ -88,15 +99,17 @@ def timer_callback():
 
 def test_library_log(capsys):
     global timer_cycles
+    newdir = create_test_file_dir(TEST_FILE)
     testlog = logger.get_wrapping_logger(name='test', filename=TEST_FILE)
     for h in testlog.handlers:
         logger.add_handler(log, h)
     logger.apply_formatter(log, logger.get_formatter())
     testlog.warning('This is a test warning')
-    rt = timer.RepeatingTimer(seconds=2, target=timer_callback, verbose_debug=True)
+    rt = timer.RepeatingTimer(seconds=2, target=timer_callback)
     rt.start()
     rt.start_timer()
     while timer_cycles < 2:
         sleep(1)
     assert True
     os.remove(TEST_FILE)
+    if newdir: os.rmdir(newdir)

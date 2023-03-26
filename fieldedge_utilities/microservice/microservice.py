@@ -1,12 +1,15 @@
 """Microservice and related proxy classes.
 """
 import logging
+import time
 from abc import ABC, abstractmethod
 from typing import Any
 from uuid import uuid4
 
-from fieldedge_utilities.microservice import IscTask, IscTaskQueue, PropertyCache
+from fieldedge_utilities.logger import verbose_logging
+from fieldedge_utilities.microservice.interservice import IscTask, IscTaskQueue
 from fieldedge_utilities.microservice.properties import *
+from fieldedge_utilities.microservice.propertycache import PropertyCache
 from fieldedge_utilities.mqtt import MqttClient
 from fieldedge_utilities.timer import RepeatingTimer
 
@@ -235,6 +238,8 @@ class Microservice(ABC):
         prop = untag_class_property(isc_property, self._isc_tags)
         if prop not in self.properties:
             raise AttributeError(f'{prop} not in properties')
+        if property_is_async(self, prop):
+            raise NotImplementedError
         return getattr(self, prop)
     
     def isc_set_property(self, isc_property: str, value: Any) -> None:

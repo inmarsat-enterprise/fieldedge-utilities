@@ -80,7 +80,9 @@ def on_disconnect(*args):
     _log.info(f'Connected: {connected}')
     
 
-def test_local_manual():
+# *** Below tests are manual, may require tools or generation of parameters
+
+def mtest_local_manual():
     """Requires running a local broker that is started and stopped manually."""
     global connected
     mqttc = mqtt.MqttClient('test_client',
@@ -100,7 +102,7 @@ def test_local_manual():
     assert connected
 
 
-def test_azure_sas(capsys):
+def mtest_azure_sas(capsys):
     global message_received
     AZURE_IOT_HUB = os.getenv('AZURE_IOT_HUB')
     AZURE_ROOT_CA = os.getenv('AZURE_ROOT_CA')
@@ -136,7 +138,7 @@ def test_azure_sas(capsys):
     assert pubres
 
 
-def test_aws(capsys):
+def mtest_aws(capsys):
     # TODO: broken, disconnect RC=7 probably illegal subscription/publish topic
     AWS_ENDPOINT = os.getenv('AWS_ENDPOINT')
     AWS_ROOT_CA = os.getenv('AWS_ROOT_CA')

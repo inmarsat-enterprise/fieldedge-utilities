@@ -27,8 +27,8 @@ from dotenv import load_dotenv
 from paho.mqtt.client import Client as PahoClient
 from paho.mqtt.client import MQTTMessage as PahoMessage
 
-from .class_properties import json_compatible
-from .logger import verbose_logging
+from fieldedge_utilities.microservice.properties import json_compatible
+from fieldedge_utilities.logger import verbose_logging
 
 MQTT_HOST = os.getenv('MQTT_HOST', 'fieldedge-broker')
 MQTT_USER = os.getenv('MQTT_USER')

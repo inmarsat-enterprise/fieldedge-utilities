@@ -3,9 +3,15 @@ import itertools
 import json
 import logging
 import re
-import time
 
 from fieldedge_utilities.logger import verbose_logging
+
+__all__ = ['camel_to_snake', 'snake_to_camel', 'get_class_tag',
+           'get_class_properties', 'get_instance_properties_values',
+           'json_compatible', 'hasattr_static',
+           'property_is_read_only', 'property_is_async', 'tag_class_properties',
+           'tag_class_property', 'untag_class_property', 'tag_merge',
+           'equivalent_attributes', 'READ_ONLY', 'READ_WRITE']
 
 READ_ONLY = 'info'
 READ_WRITE = 'config'
@@ -188,6 +194,12 @@ def property_is_read_only(instance: object, property_name: str) -> bool:
         return prop.fset is None
     except AttributeError:
         return False
+
+
+def property_is_async(instance: object, property_name: str) -> bool:
+    if not hasattr_static(instance, property_name):
+        raise ValueError(f'Object has no property {property_name}')
+    return inspect.isawaitable(getattr(instance, property_name))
 
 
 def tag_class_properties(cls: type,

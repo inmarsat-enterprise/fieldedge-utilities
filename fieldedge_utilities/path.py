@@ -20,6 +20,10 @@ def clean_path(pathname: str) -> str:
     
     Returns:
         A clean file/path name for the current OS and directory structure.
+    
+    Raises:
+        `FileNotFoundError` if the clean path cannot be determined.
+    
     """
     if '/' not in pathname:
         return pathname
@@ -30,7 +34,7 @@ def clean_path(pathname: str) -> str:
     if os.path.isdir(os.path.dirname(pathname)):
         return os.path.realpath(pathname)
     else:
-        raise ValueError(f'Path {pathname} not found')
+        raise FileNotFoundError(f'Path {pathname} not found')
 
 
 def get_caller_name(depth: int = 2,

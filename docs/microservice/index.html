@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
 <meta name="generator" content="pdoc 0.10.0" />
-<title>fieldedge_utilities API documentation</title>
-<meta name="description" content="FieldEdge Utilities …" />
+<title>fieldedge_utilities.microservice API documentation</title>
+<meta name="description" content="" />
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
 <link rel="stylesheet preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/github.min.css" crossorigin>
@@ -19,76 +19,28 @@
 <main>
 <article id="content">
 <header>
-<h1 class="title">Package <code>fieldedge_utilities</code></h1>
+<h1 class="title">Module <code>fieldedge_utilities.microservice</code></h1>
 </header>
 <section id="section-intro">
-<h1 id="fieldedge-utilities">FieldEdge Utilities</h1>
-<p>This Python library contains common functionality used by many of the Inmarsat
-<strong>FieldEdge</strong> embedded microservices.</p>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">&#34;&#34;&#34;
-# FieldEdge Utilities
-
-This Python library contains common functionality used by many of the Inmarsat
-**FieldEdge** embedded microservices.
-
-&#34;&#34;&#34;
-__docformat__ = &#39;google&#39;</code></pre>
-</details>
 </section>
 <section>
 <h2 class="section-title" id="header-submodules">Sub-modules</h2>
 <dl>
-<dt><code class="name"><a title="fieldedge_utilities.class_properties" href="class_properties.html">fieldedge_utilities.class_properties</a></code></dt>
+<dt><code class="name"><a title="fieldedge_utilities.microservice.interservice" href="interservice.html">fieldedge_utilities.microservice.interservice</a></code></dt>
 <dd>
-<div class="desc"><p>FieldEdge class/property helpers …</p></div>
+<div class="desc"><p>Classes for interservice communications (ISC).</p></div>
 </dd>
-<dt><code class="name"><a title="fieldedge_utilities.hostpipe" href="hostpipe.html">fieldedge_utilities.hostpipe</a></code></dt>
+<dt><code class="name"><a title="fieldedge_utilities.microservice.microservice" href="microservice.html">fieldedge_utilities.microservice.microservice</a></code></dt>
 <dd>
-<div class="desc"><p>Operations for interacting with the hostpipe service from a Docker container …</p></div>
+<div class="desc"><p>Microservice and related proxy classes.</p></div>
 </dd>
-<dt><code class="name"><a title="fieldedge_utilities.ip_interfaces" href="ip_interfaces.html">fieldedge_utilities.ip_interfaces</a></code></dt>
-<dd>
-<div class="desc"><p>Tools for querying IP interface properties of the system …</p></div>
-</dd>
-<dt><code class="name"><a title="fieldedge_utilities.ip_protocols" href="ip_protocols.html">fieldedge_utilities.ip_protocols</a></code></dt>
-<dd>
-<div class="desc"><p>Enumerated types for protocol analysis.</p></div>
-</dd>
-<dt><code class="name"><a title="fieldedge_utilities.logger" href="logger.html">fieldedge_utilities.logger</a></code></dt>
-<dd>
-<div class="desc"><p>Wrapping logger common format for FieldEdge project(s) with UTC timestamp …</p></div>
-</dd>
-<dt><code class="name"><a title="fieldedge_utilities.microservice" href="microservice/index.html">fieldedge_utilities.microservice</a></code></dt>
+<dt><code class="name"><a title="fieldedge_utilities.microservice.properties" href="properties.html">fieldedge_utilities.microservice.properties</a></code></dt>
 <dd>
 <div class="desc"></div>
 </dd>
-<dt><code class="name"><a title="fieldedge_utilities.mqtt" href="mqtt.html">fieldedge_utilities.mqtt</a></code></dt>
+<dt><code class="name"><a title="fieldedge_utilities.microservice.propertycache" href="propertycache.html">fieldedge_utilities.microservice.propertycache</a></code></dt>
 <dd>
-<div class="desc"><p>MQTT client for local broker inter-service communications …</p></div>
-</dd>
-<dt><code class="name"><a title="fieldedge_utilities.path" href="path.html">fieldedge_utilities.path</a></code></dt>
-<dd>
-<div class="desc"><p>Tools for file path and caller traces.</p></div>
-</dd>
-<dt><code class="name"><a title="fieldedge_utilities.serial" href="serial.html">fieldedge_utilities.serial</a></code></dt>
-<dd>
-<div class="desc"><p>Helpers for managing serial ports on the system.</p></div>
-</dd>
-<dt><code class="name"><a title="fieldedge_utilities.timer" href="timer.html">fieldedge_utilities.timer</a></code></dt>
-<dd>
-<div class="desc"><p>A threaded timer class that allows flexible reconfiguration.</p></div>
-</dd>
-<dt><code class="name"><a title="fieldedge_utilities.timestamp" href="timestamp.html">fieldedge_utilities.timestamp</a></code></dt>
-<dd>
-<div class="desc"><p>Helpers for managing unambiguous timestamps and date representation.</p></div>
-</dd>
-<dt><code class="name"><a title="fieldedge_utilities.user_config" href="user_config.html">fieldedge_utilities.user_config</a></code></dt>
-<dd>
-<div class="desc"></div>
+<div class="desc"><p>Classes for managing cached properties …</p></div>
 </dd>
 </dl>
 </section>
@@ -102,25 +54,20 @@ __docformat__ = &#39;google&#39;</code></pre>
 <nav id="sidebar">
 <h1>Index</h1>
 <div class="toc">
-<ul>
-<li><a href="#fieldedge-utilities">FieldEdge Utilities</a></li>
-</ul>
+<ul></ul>
 </div>
 <ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="fieldedge_utilities" href="../index.html">fieldedge_utilities</a></code></li>
+</ul>
+</li>
 <li><h3><a href="#header-submodules">Sub-modules</a></h3>
 <ul>
-<li><code><a title="fieldedge_utilities.class_properties" href="class_properties.html">fieldedge_utilities.class_properties</a></code></li>
-<li><code><a title="fieldedge_utilities.hostpipe" href="hostpipe.html">fieldedge_utilities.hostpipe</a></code></li>
-<li><code><a title="fieldedge_utilities.ip_interfaces" href="ip_interfaces.html">fieldedge_utilities.ip_interfaces</a></code></li>
-<li><code><a title="fieldedge_utilities.ip_protocols" href="ip_protocols.html">fieldedge_utilities.ip_protocols</a></code></li>
-<li><code><a title="fieldedge_utilities.logger" href="logger.html">fieldedge_utilities.logger</a></code></li>
-<li><code><a title="fieldedge_utilities.microservice" href="microservice/index.html">fieldedge_utilities.microservice</a></code></li>
-<li><code><a title="fieldedge_utilities.mqtt" href="mqtt.html">fieldedge_utilities.mqtt</a></code></li>
-<li><code><a title="fieldedge_utilities.path" href="path.html">fieldedge_utilities.path</a></code></li>
-<li><code><a title="fieldedge_utilities.serial" href="serial.html">fieldedge_utilities.serial</a></code></li>
-<li><code><a title="fieldedge_utilities.timer" href="timer.html">fieldedge_utilities.timer</a></code></li>
-<li><code><a title="fieldedge_utilities.timestamp" href="timestamp.html">fieldedge_utilities.timestamp</a></code></li>
-<li><code><a title="fieldedge_utilities.user_config" href="user_config.html">fieldedge_utilities.user_config</a></code></li>
+<li><code><a title="fieldedge_utilities.microservice.interservice" href="interservice.html">fieldedge_utilities.microservice.interservice</a></code></li>
+<li><code><a title="fieldedge_utilities.microservice.microservice" href="microservice.html">fieldedge_utilities.microservice.microservice</a></code></li>
+<li><code><a title="fieldedge_utilities.microservice.properties" href="properties.html">fieldedge_utilities.microservice.properties</a></code></li>
+<li><code><a title="fieldedge_utilities.microservice.propertycache" href="propertycache.html">fieldedge_utilities.microservice.propertycache</a></code></li>
 </ul>
 </li>
 </ul>

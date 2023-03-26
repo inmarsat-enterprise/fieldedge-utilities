@@ -359,11 +359,12 @@ def get_fieldedge_logger(filename: str = None,
     return logger
 
 
-def verbose_logging(filter: &#39;str&#39; = &#39;&#39;) -&gt; bool:
+def verbose_logging(filter: str = &#39;&#39;, case_sensitive: bool = True) -&gt; bool:
     &#34;&#34;&#34;Indicates if verbose logging is configured, with an optional filter.
     
     Args:
         filter: An optional filter e.g. the package+module name
+        case_sensitive: Defaults to case sensitive filter.
     
     Returns:
         True if `LOG_VERBOSE` environment variable is set
@@ -372,7 +373,8 @@ def verbose_logging(filter: &#39;str&#39; = &#39;&#39;) -&gt; bool:
     &#34;&#34;&#34;
     if LOG_VERBOSE:
         if filter:
-            if filter in LOG_VERBOSE:
+            if (filter in LOG_VERBOSE or
+                not case_sensitive and filter.upper() in LOG_VERBOSE.upper()):
                 return True
             return False
         return True
@@ -815,7 +817,7 @@ backupCount (int): defaults to 2</dd>
 </details>
 </dd>
 <dt id="fieldedge_utilities.logger.verbose_logging"><code class="name flex">
-<span>def <span class="ident">verbose_logging</span></span>(<span>filter: str = '') ‑> bool</span>
+<span>def <span class="ident">verbose_logging</span></span>(<span>filter: str = '', case_sensitive: bool = True) ‑> bool</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Indicates if verbose logging is configured, with an optional filter.</p>
@@ -823,6 +825,8 @@ backupCount (int): defaults to 2</dd>
 <dl>
 <dt><strong><code>filter</code></strong></dt>
 <dd>An optional filter e.g. the package+module name</dd>
+<dt><strong><code>case_sensitive</code></strong></dt>
+<dd>Defaults to case sensitive filter.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <p>True if <code>LOG_VERBOSE</code> environment variable is set
@@ -831,11 +835,12 @@ and includes the filter.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def verbose_logging(filter: &#39;str&#39; = &#39;&#39;) -&gt; bool:
+<pre><code class="python">def verbose_logging(filter: str = &#39;&#39;, case_sensitive: bool = True) -&gt; bool:
     &#34;&#34;&#34;Indicates if verbose logging is configured, with an optional filter.
     
     Args:
         filter: An optional filter e.g. the package+module name
+        case_sensitive: Defaults to case sensitive filter.
     
     Returns:
         True if `LOG_VERBOSE` environment variable is set
@@ -844,7 +849,8 @@ and includes the filter.</p></div>
     &#34;&#34;&#34;
     if LOG_VERBOSE:
         if filter:
-            if filter in LOG_VERBOSE:
+            if (filter in LOG_VERBOSE or
+                not case_sensitive and filter.upper() in LOG_VERBOSE.upper()):
                 return True
             return False
         return True

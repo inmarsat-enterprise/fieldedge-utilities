@@ -3,7 +3,7 @@
 __pycache__
 .pytest_cache
 .DS_Store
-logs
+logs/
 dist/archive
 pcaps
 certs

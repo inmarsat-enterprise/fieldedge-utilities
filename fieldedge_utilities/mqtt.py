@@ -346,7 +346,7 @@ class MqttClient:
         if self.is_connected:
             self._mqtt_subscribe(topic, qos)
         else:
-            _log.warning(f'MQTT not connected...subscribing to {topic} later')
+            _log.debug(f'MQTT not connected...subscribing to {topic} later')
 
     def _mqtt_on_subscribe(self,
                            client: PahoClient,

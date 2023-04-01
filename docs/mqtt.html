@@ -385,7 +385,7 @@ class MqttClient:
         if self.is_connected:
             self._mqtt_subscribe(topic, qos)
         else:
-            _log.warning(f&#39;MQTT not connected...subscribing to {topic} later&#39;)
+            _log.debug(f&#39;MQTT not connected...subscribing to {topic} later&#39;)
 
     def _mqtt_on_subscribe(self,
                            client: PahoClient,
@@ -844,7 +844,7 @@ client_id to avoid being rejected by the host.</li>
         if self.is_connected:
             self._mqtt_subscribe(topic, qos)
         else:
-            _log.warning(f&#39;MQTT not connected...subscribing to {topic} later&#39;)
+            _log.debug(f&#39;MQTT not connected...subscribing to {topic} later&#39;)
 
     def _mqtt_on_subscribe(self,
                            client: PahoClient,
@@ -1234,7 +1234,7 @@ Message id <code>mid</code> is 0 when not actively subscribed.</p>
     if self.is_connected:
         self._mqtt_subscribe(topic, qos)
     else:
-        _log.warning(f&#39;MQTT not connected...subscribing to {topic} later&#39;)</code></pre>
+        _log.debug(f&#39;MQTT not connected...subscribing to {topic} later&#39;)</code></pre>
 </details>
 </dd>
 <dt id="fieldedge_utilities.mqtt.MqttClient.unsubscribe"><code class="name flex">

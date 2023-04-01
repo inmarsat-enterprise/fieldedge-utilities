@@ -53,6 +53,8 @@ class PropertyCache:
     def cache(self, value: Any, tag: str, lifetime: 'float|None' = 1.0) -> None:
         """Timestamps and adds a property value to the cache.
         
+        If the property is already cached, it will be overwritten.
+         
         Args:
             value: The property value to be cached.
             tag: The name of the property (must be unique in the cache).

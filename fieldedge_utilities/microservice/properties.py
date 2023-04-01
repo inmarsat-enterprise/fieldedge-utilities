@@ -1,3 +1,5 @@
+"""Helper functions for dealing with FieldEdge classes and interservice comms.
+"""
 import inspect
 import itertools
 import json
@@ -15,6 +17,7 @@ __all__ = ['camel_to_snake', 'snake_to_camel', 'get_class_tag',
 
 READ_ONLY = 'info'
 READ_WRITE = 'config'
+
 _log = logging.getLogger(__name__)
 
 
@@ -70,9 +73,7 @@ def get_class_tag(cls: type) -> str:
     return cls.__class__.__name__.lower()
 
 
-def get_class_properties(cls: type,
-                         ignore: 'list[str]' = [],
-                         ) -> 'list[str]|dict[str, list]':
+def get_class_properties(cls: type, ignore: 'list[str]' = []) -> 'list[str]':
     """Returns non-hidden, non-callable properties/values of a Class instance.
     
     Also ignores CAPITAL_CASE attributes which are assumed to be constants.

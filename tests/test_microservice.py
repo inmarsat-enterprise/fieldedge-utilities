@@ -5,8 +5,9 @@ import time
 import unittest
 
 import fieldedge_utilities   # required for mocking
-from fieldedge_utilities.microservice.microservice import Microservice
+from fieldedge_utilities.microservice.microservice import *
 from fieldedge_utilities.microservice.interservice import IscTask, IscTaskQueue
+from fieldedge_utilities.mqtt import MqttClient
 from fieldedge_utilities.class_properties import get_class_tag, get_class_properties
 
 
@@ -20,8 +21,8 @@ class TestService(Microservice):
     
     TAG = 'test'   # a class constant
     
-    def __init__(self) -> None:
-        super().__init__(tag=self.TAG)
+    def __init__(self, tag: str = None) -> None:
+        super().__init__(tag=tag or self.TAG)
         self._info_prop: str = 'test'
         self._config_prop: int = 2
         # self.slot_config: str = 'slot_test'
@@ -47,11 +48,61 @@ class TestService(Microservice):
     
     def on_isc_message(self, topic: str, message: dict) -> None:
         logger.info(f'Received ISC message {topic}: {message}')
+    
+    def task_progress(self, **kwargs):
+        logger.info(f'Task info: {kwargs}')
+    
+    def task_completed(self, **kwargs):
+        logger.info(f'Task complete: {kwargs}')
+
+
+class TestFeature(Feature):
+    """"""
+    @property
+    def test_prop(self) -> bool:
+        return True
+    
+    def status(self) -> dict:
+        return { 'test_prop': self.test_prop }
+        
+    def properties_list(self) -> 'list[str]':
+        return ['test_prop']
+    
+    def on_mqtt_message(self, topic: str, message: dict) -> bool:
+        feature_relevant = message.get('feature', None)
+        if feature_relevant:
+            logger.info('Feature handled')
+            return True
+        return False
+
+
+class TestProxy(MicroserviceProxy):
+    """"""
+    def on_mqtt_message(self, topic: str, message: dict) -> bool:
+        proxy_relevant = message.get('proxy', None)
+        if proxy_relevant:
+            logger.info('Proxy handled')
+            return True
+        return False
 
 
 @pytest.fixture
 def test_service() -> TestService:
     return TestService()
+
+
+@pytest.fixture
+def test_complex() -> TestService:
+    c = TestService(tag='complex')
+    c._features['feature'] = TestFeature(task_queue=c._isc_queue,
+                                         task_notify_callback=c.task_progress,
+                                         task_complete_callback=c.task_completed)
+    c._ms_proxies['proxy'] = TestProxy(tag='test',
+                                       publish_callback=c.notify,
+                                       subscribe_callback=c.subscribe,
+                                    #    cache_lifetime=2,
+                                       )
+    return c
 
 
 def test_get_subclass_name(test_service: TestService):
@@ -239,3 +290,85 @@ def test_ms_cached_property(test_service: TestService, mocker):
     logger.info(f'Time elapsed: {elapsed}')
     assert elapsed >= cache_lifetime
     assert not test_service.property_is_cached('sub_prop')
+
+
+class StubMqtt:
+    def __init__(self) -> None:
+        pass
+    
+    def subscribe(self, topic, qos):
+        return True
+    
+    def unsubscribe(self, topic):
+        return True
+
+
+proxy_call_one_count = 0
+proxy_call_two_count = 0
+
+
+def proxy_call_one(topic: str, message: dict):
+    global proxy_call_one_count
+    proxy_call_one_count += 1
+
+
+def proxy_call_two(topic: str, message: dict):
+    global proxy_call_two_count
+    proxy_call_two_count += 1
+
+    
+def test_sub_proxy():
+    global proxy_call_one_count
+    global proxy_call_two_count
+    topic = 'fieldedge/test/event/test'
+    message = {}
+    other_topic = 'fieldedge/other/info/stuff'
+    other_message = {}
+    mqttc = StubMqtt()
+    proxy = SubscriptionProxy(mqttc)
+    proxy.proxy_add('test_module', topic, callback=proxy_call_one)
+    proxy.proxy_add('other_module', topic, callback=proxy_call_two)
+
+    def main_on_message(topic, message):
+        proxy.proxy_pub(topic, message)
+    
+    main_on_message(topic, message)
+    assert proxy_call_one_count == 1
+    assert proxy_call_two_count == 1
+    main_on_message(other_topic, other_message)
+    assert proxy_call_one_count == 1
+    assert proxy_call_two_count == 1
+    proxy.proxy_del('test_module', topic)
+    main_on_message(topic, message)
+    assert proxy_call_one_count == 1
+    assert proxy_call_two_count == 2
+
+
+def test_complex_ms(test_complex: TestService, test_service: TestService):
+    """Requires live connection to a MQTT broker."""
+    complex_props = test_complex.properties
+    assert 'feature_test_prop' in complex_props
+    complex_isc_props = test_complex.isc_properties
+    assert 'featureTestProp' in complex_isc_props
+    test_service._mqttc_local.connect()
+    attempts = 0
+    while not test_service._mqttc_local.is_connected and attempts < 3:
+        attempts += 1
+        time.sleep(0.5)
+    assert test_service._mqttc_local.is_connected, 'Failed to connect to MQTT'
+    test_complex._mqttc_local.connect()
+    while not test_complex._mqttc_local.is_connected:
+        time.sleep(0.5)
+    test_complex.rollcall()
+    time.sleep(0.5)
+    proxy = test_complex._ms_proxies['proxy']
+    proxy.initialize()
+    attempts = 0
+    while not proxy.is_initialized and attempts < 3:
+        attempts += 1
+        time.sleep(0.5)
+    assert proxy.is_initialized
+    assert proxy.property_get('configProp') == 2
+    proxy.property_set('configProp', 3)
+    time.sleep(2.5)
+    assert proxy.property_get('configProp') == 3

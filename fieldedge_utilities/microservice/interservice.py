@@ -1,11 +1,26 @@
 """Classes for interservice communications (ISC).
 """
 import logging
+import threading
 import time
 from typing import Any, Callable
 from uuid import uuid4
 
+__all__ = ['IscException', 'IscTaskQueueFull', 'IscTask', 'IscTaskQueue']
+
 _log = logging.getLogger(__name__)
+
+
+class IscException(Exception):
+    """"""
+
+
+class IscTaskQueueFull(IscException):
+    """"""
+
+
+class IscTaskNotReleased(IscException):
+    """"""
 
 
 class IscTask:
@@ -35,7 +50,7 @@ class IscTask:
                  task_type: str = None,
                  task_meta: Any = None,
                  callback: Callable = None,
-                 lifetime: float = 10,
+                 lifetime: 'float|None' = 10,
                  ) -> None:
         """Initialize the Task.
         
@@ -79,20 +94,72 @@ class IscTask:
 
 
 class IscTaskQueue(list):
-    """A task queue (order-independent) for interservice communications."""
+    """Order-independent searchable task queue for interservice communications.
     
-    def append(self, task: IscTask):
-        """Add a task to the queue."""
+    By default the depth is None (infinite) and supports multiple tasks.
+    Tasks may be retrieved by `uid` or by a `task_meta` key.
+    
+    Supports optional blocking initialization with a queue depth of 1.
+    Care must be taken to `set()` the `task_blocking` Event after using `get`.
+    
+    Attributes:
+        task_blocking (threading.Event): Accessible if initialized as blocking.
+        unblock_on_expiry (bool): If blocking and task expires, automatically
+            unblock.
+    
+    Raises:
+        `IscTaskQueueFull` if blocking and a task is in the queue.
+        `OSError` for unsupported list operations: `insert`, `extend`.
+    
+    """
+    
+    def __init__(self, blocking: bool = False, unblock_on_expiry: bool = True):
+        super().__init__()
+        self._blocking = blocking
+        self._unblock_on_expiry = unblock_on_expiry
+        self._task_blocking = threading.Event()
+        self._task_blocking.set()
+    
+    @property
+    def task_blocking(self) -> 'threading.Event|None':
+        """A threading.Event if the queue was initialized as blocking, or None.
+        """
+        if self._blocking:
+            return self._task_blocking
+        
+    def unblock_tasks(self, unblock: bool = True):
+        """"""
+        if self._blocking and unblock is True:
+            if not self.task_blocking.is_set():
+                _log.debug('Unblocking tasks - task_blocking.set()')
+                self.task_blocking.set()
+        
+    def append(self, task: IscTask) -> None:
+        """Add a task to the queue.
+        
+        Args:
+            task (IscTask): The task to add to the queue.
+        
+        Raises:
+            `ValueError` if the task is invalid type or a conflicting uid is
+                already in the queue.
+            `IscTaskQueueFull` if the queue is blocking and has a task already.
+            `IscTaskNotReleased` if the queue is blocking, empty but the Event
+                was not set (released).
+        
+        """
         if not isinstance(task, IscTask):
-            raise ValueError('item must be QueuedIscTask type')
+            raise ValueError('item must be IscTask type')
         if self.is_queued(task.uid):
             raise ValueError(f'Task {task.uid} already queued')
+        if self._blocking:
+            if len(self) == 1:
+                raise IscTaskQueueFull
+            if not self.task_blocking.is_set():
+                raise IscTaskNotReleased
+            self.task_blocking.clear()
         super().append(task)
     
-    def insert(self, index: int, element: Any):
-        """Invalid operation."""
-        raise OSError('ISC task queue does not support insertion')
-        
     def is_queued(self,
                   task_id: str = None,
                   task_type: str = None,
@@ -103,7 +170,10 @@ class IscTaskQueue(list):
             task_id: Optional (preferred) unique search criteria.
             task_type: Optional search criteria. May not be unique.
             cb_meta: Optional key/value search criteria.
-            
+        
+        Returns:
+            True if the specified task is in the queue.
+        
         """
         if not task_id and not task_type and not task_meta:
             raise ValueError('Missing search criteria')
@@ -122,12 +192,43 @@ class IscTaskQueue(list):
                         return True
         return False
             
-    def get(self, task_id: str) -> 'IscTask|None':
-        """Retrieves the specified task from the queue."""
-        for i, task in enumerate(self):
-            assert isinstance(task, IscTask)
-            if task.uid == task_id:
-                return self.pop(i)
+    def get(self,
+            task_id: str = None,
+            meta_tag: str = None,
+            unblock: bool = False,
+            ) -> 'IscTask|None':
+        """Retrieves the specified task from the queue.
+        
+        Uses `uid` or `task_meta` key.
+        
+        Args:
+            task_id (str): The task `uid`.
+            meta_tag (str): A `task_meta` tag, used if the `uid` is not known.
+        
+        Returns:
+            The specified `IscTask`, removing it from the queue.
+        
+        Raises:
+            `ValueError` if neither task_id nor task_meta are specified.
+        
+        """
+        if isinstance(task_id, str):
+            for i, task in enumerate(self):
+                assert isinstance(task, IscTask)
+                if task.uid == task_id:
+                    self.unblock_tasks(unblock)
+                    return self.pop(i)
+            _log.warning(f'task_id {task_id} not in queue')
+        elif isinstance(meta_tag, str):
+            for i, task in enumerate(self):
+                assert isinstance(task, IscTask)
+                task_meta = task.task_meta
+                if (isinstance(task_meta, dict) and meta_tag in task_meta):
+                    self.unblock_tasks(unblock)
+                    return self.pop(i)
+            _log.warning(f'task_id {task_id} not in queue')
+        else:
+            raise ValueError('task_id or meta_tag must be specified')
     
     def remove_expired(self):
         """Removes expired tasks from the queue.
@@ -138,18 +239,24 @@ class IscTaskQueue(list):
         will be called with the cb_meta kwargs.
         
         """
-        expired = []
         if len(self) == 0:
             return
+        expired: 'dict[int, str]' = {}
         for i, task in enumerate(self):
             assert isinstance(task, IscTask)
             if task.lifetime is None:
                 continue
             if time.time() - task.ts > task.lifetime:
-                expired.append(i)
-        for i in expired:
+                expired[i] = task.uid
+        for i, uid in expired.items():
             rem: IscTask = self.pop(i)
-            _log.warning(f'Removing expired task {rem.uid}')
+            _log.warning(f'Removed expired task {rem.uid}')
+            if self._blocking and not self.task_blocking.is_set():
+                if self._unblock_on_expiry:
+                    _log.info(f'Unblocking expired task {uid}')
+                    self.task_blocking.set()
+                else:
+                    _log.warning(f'Expired task {uid} still blocking')
             cb_key = 'timeout_callback'
             if (isinstance(rem.task_meta, dict) and
                 cb_key in rem.task_meta and
@@ -161,3 +268,11 @@ class IscTaskQueue(list):
                         continue
                     timeout_meta[k] = v
                 rem.task_meta[cb_key](timeout_meta)
+
+    def insert(self, index, item):
+        """Invalid operation."""
+        raise OSError('ISC task queue does not support insertion')
+        
+    def extend(self, other):
+        """Invalid operation."""
+        raise OSError('ISC task queue does not support insertion')

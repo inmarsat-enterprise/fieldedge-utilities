@@ -163,7 +163,7 @@ class IscTaskQueue(list):
     def is_queued(self,
                   task_id: str = None,
                   task_type: str = None,
-                  task_meta: tuple = None) -> bool:
+                  task_meta: 'tuple[str, Any]' = None) -> bool:
         """Returns `True` if the specified task is queued.
         
         Args:
@@ -194,16 +194,15 @@ class IscTaskQueue(list):
             
     def get(self,
             task_id: str = None,
-            meta_tag: str = None,
-            unblock: bool = False,
-            ) -> 'IscTask|None':
+            task_meta: 'tuple[str, Any]' = None,
+            unblock: bool = False) -> 'IscTask|None':
         """Retrieves the specified task from the queue.
         
-        Uses `uid` or `task_meta` key.
+        Uses task `uid` or `task_meta` tuple.
         
         Args:
             task_id (str): The task `uid`.
-            meta_tag (str): A `task_meta` tag, used if the `uid` is not known.
+            task_meta (tuple): A `task_meta` tuple with (key, value).
         
         Returns:
             The specified `IscTask`, removing it from the queue.
@@ -219,11 +218,14 @@ class IscTaskQueue(list):
                     self.unblock_tasks(unblock)
                     return self.pop(i)
             _log.warning(f'task_id {task_id} not in queue')
-        elif isinstance(meta_tag, str):
+        elif isinstance(task_meta, tuple):
+            k, v = task_meta
             for i, task in enumerate(self):
                 assert isinstance(task, IscTask)
-                task_meta = task.task_meta
-                if (isinstance(task_meta, dict) and meta_tag in task_meta):
+                candidate = task.task_meta
+                if (isinstance(candidate, dict) and
+                    k in candidate and candidate[k] == v):
+                    # found match
                     self.unblock_tasks(unblock)
                     return self.pop(i)
             _log.warning(f'task_id {task_id} not in queue')

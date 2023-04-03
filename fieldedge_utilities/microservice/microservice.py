@@ -202,7 +202,8 @@ class MicroserviceProxy(ABC):
         self._initialized = False
         self._initializing = False
         if callable(self._init_callback):
-            self._init_callback(False, task_meta.get('initialize', None))
+            self._init_callback(success=False,
+                                tag=task_meta.get('initialize', None))
     
     def _handle_task(self, response: dict) -> bool:
         """"""
@@ -286,7 +287,8 @@ class MicroserviceProxy(ABC):
             self._cached_properties.cache(cache_all, 'all', cache_lifetime)
         self.complete_task(task_meta)
         if new_init and callable(self._init_callback):
-            self._init_callback(True, task_meta.get('initialize', None))
+            self._init_callback(success=True,
+                                tag=task_meta.get('initialize', None))
         
     def complete_task(self, task_meta: dict = None):
         _log.debug(f'Completing task {task_meta.get("task_id", "no metadata")}')
@@ -384,7 +386,7 @@ class Microservice(ABC):
                                        subscribe_default=self._subscriptions,
                                        on_message=self._on_isc_message,
                                        auto_connect=auto_connect)
-        self._default_publish_topic = f'fieldedge/{tag}'
+        self._default_publish_topic = f'fieldedge/{self._tag}'
         self._properties: 'list[str]' = None
         self._hidden_properties: 'list[str]' = []
         self._isc_properties: 'list[str]' = None
@@ -699,6 +701,9 @@ class Microservice(ABC):
             self.properties_notify(message)
         elif topic.endswith(f'/{self.tag}/request/properties/set'):
             self.properties_change(message)
+            report = message.get('reportChange', False)
+            if report:   # pass message to downstream handler
+                self.on_isc_message(topic, message)
         else:
             if self._features:
                 for tag, feature in self._features.items():

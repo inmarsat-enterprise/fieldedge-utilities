@@ -100,6 +100,7 @@ def test_complex() -> TestService:
     c._ms_proxies['proxy'] = TestProxy(tag='test',
                                        publish_callback=c.notify,
                                        subscribe_callback=c.subscribe,
+                                       init_callback=complex_ms_init_callback,
                                     #    cache_lifetime=2,
                                        )
     return c
@@ -344,8 +345,18 @@ def test_sub_proxy():
     assert proxy_call_two_count == 2
 
 
+init_success = None
+
+
+def complex_ms_init_callback(success: bool, tag: str):
+    global init_success
+    init_success = success
+    logger.info(f'Initialization of {tag} success = {success}')
+
+
 def test_complex_ms(test_complex: TestService, test_service: TestService):
     """Requires live connection to a MQTT broker."""
+    global init_success
     complex_props = test_complex.properties
     assert 'feature_test_prop' in complex_props
     complex_isc_props = test_complex.isc_properties
@@ -368,7 +379,24 @@ def test_complex_ms(test_complex: TestService, test_service: TestService):
         attempts += 1
         time.sleep(0.5)
     assert proxy.is_initialized
+    assert init_success == True
     assert proxy.property_get('configProp') == 2
     proxy.property_set('configProp', 3)
     time.sleep(2.5)
     assert proxy.property_get('configProp') == 3
+
+
+def test_proxy_init_fail(test_complex: TestService):
+    """Requires live connection to a MQTT broker."""
+    global init_success
+    timeout = 2
+    proxy = test_complex._ms_proxies['proxy']
+    proxy._init_timeout = timeout
+    test_complex._mqttc_local.connect()
+    while not test_complex._mqttc_local.is_connected:
+        time.sleep(0.5)
+    with pytest.raises(OSError) as e_info:
+        assert isinstance(proxy.properties, dict)
+    proxy.initialize()
+    time.sleep(timeout + 1)
+    assert init_success == False

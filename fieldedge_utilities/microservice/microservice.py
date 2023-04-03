@@ -82,6 +82,8 @@ class MicroserviceProxy(ABC):
                  tag: str,
                  publish_callback: Callable,
                  subscribe_callback: Callable,
+                 init_callback: Callable = None,
+                 init_timeout: int = 10,
                  cache_lifetime: int = 5,
                  isc_poll_interval: int = 1) -> None:
         """Initialize the proxy.
@@ -92,26 +94,40 @@ class MicroserviceProxy(ABC):
                 which expects `topic` (str) and `message` (dict)
             publish_callback (Callable): The parent's MQTT subscribe function
                 which expects a `topic` (str)
+            init_callback (Callable): Optional callback after initialized will
+                receive boolean success and the tag of the initialized proxy.
+            init_timeout (int): Time in seconds allowed for initialization.
             cache_lifetime (int): The proxy property cache time.
             isc_poll_interval (int): The time between checks for task expiry.
         
         """
         if not isinstance(tag, str):
             raise ValueError('Tag must be a valid microservice name')
+        if not callable(publish_callback):
+            raise ValueError('publish_callback must be callable')
+        if not callable(subscribe_callback):
+            raise ValueError('subscribe_callback must be callable')
+        if init_callback is not None and not callable(init_callback):
+            raise ValueError('init_callback must be callable or None')
+        if init_timeout is not None:
+            if not isinstance(init_timeout, (int, float)) or init_timeout <= 1:
+                raise ValueError('init_timeout must be None or number >= 1')
         self._tag: str = tag
         self._isc_queue = IscTaskQueue(blocking=True)
         self._isc_timer = RepeatingTimer(seconds=isc_poll_interval,
                                          target=self._isc_queue.remove_expired,
                                          name='IscTaskExpiryTimer',
                                          auto_start=True)
-        if not callable(publish_callback):
-            raise ValueError('publish_callback must be callable')
         self._publish: Callable = publish_callback
         self._subscribe: Callable = subscribe_callback
+        self._init_callback: 'Callable|None' = init_callback
+        self._init_timeout: 'int|float|None' = init_timeout
         self._proxy_properties: dict = None
         self._cached_properties: PropertyCache = PropertyCache()
         self._cache_lifetime = int(cache_lifetime)
         self._initialized: bool = False
+        self._initializing: bool = False
+        self._base_topic: str = f'fieldedge/{self.tag}'
     
     @property
     def tag(self) -> str:
@@ -122,18 +138,22 @@ class MicroserviceProxy(ABC):
         return self._initialized
     
     @property
-    def properties(self) -> dict:
+    def properties(self) -> 'dict|None':
         """The microservice properties.
         
         If cached returns immediately, otherwise blocks waiting for an update
         via the MQTT thread.
+        Raises `OSError` if the proxy has not been initialized.
         
         """
-        cached = self._cached_properties.get_cached('proxy_properties')
+        if not self.is_initialized or self._initializing:
+            raise OSError('Proxy not initialized')
+        cached = self._cached_properties.get_cached('all')
         if cached:
-            return cached
+            return self._proxy_properties
         self._proxy_properties = None
-        self.query_properties(['all'])
+        task_meta = { 'properties': 'all' }
+        self.query_properties(['all'], task_meta)
         attempts = 0
         while self._proxy_properties is None and attempts < 3:
             attempts += 1
@@ -143,6 +163,9 @@ class MicroserviceProxy(ABC):
     
     def property_get(self, property_name: str) -> Any:
         """Gets the proxy property value."""
+        cached = self._cached_properties.get_cached(property_name)
+        if cached:
+            return cached
         return self.properties.get(property_name)
     
     def property_set(self, property_name: str, value: Any):
@@ -161,12 +184,25 @@ class MicroserviceProxy(ABC):
         
     def initialize(self) -> None:
         """Requests properties of the microservice to create the proxy."""
-        topic = f'fieldedge/{self.tag}/#'
-        subscribed = self._subscribe(topic)
-        if not subscribed:
-            raise ValueError(f'Unable to subscribe to {topic}')
-        task_meta = { 'initialize': self.tag }
+        topics = [f'{self._base_topic}/event/#', f'{self._base_topic}/info/#']
+        for topic in topics:
+            subscribed = self._subscribe(topic)
+            if not subscribed:
+                raise ValueError(f'Unable to subscribe to {topic}')
+        task_meta = {
+            'initialize': self.tag,
+            'timeout': self._init_timeout,
+            'timeout_callback': self._init_fail,
+        }
+        self._initializing = True
         self.query_properties(['all'], task_meta)
+    
+    def _init_fail(self, task_meta: dict = {}):
+        """Calls back with a failure on initialization failure/timeout."""
+        self._initialized = False
+        self._initializing = False
+        if callable(self._init_callback):
+            self._init_callback(False, task_meta.get('initialize', None))
     
     def _handle_task(self, response: dict) -> bool:
         """"""
@@ -202,10 +238,12 @@ class MicroserviceProxy(ABC):
         else:
             method = 'get'
         _log.debug(f'{method}ting properties {properties}')
+        lifetime = task_meta.get('timeout', 10)
         prop_task = IscTask(task_type=f'property_{method}',
                             task_meta=task_meta,
-                            callback=self.update_proxy_properties)
-        topic = f'fieldedge/{self.tag}/request/properties/{method}'
+                            callback=self.update_proxy_properties,
+                            lifetime=lifetime)
+        topic = f'{self._base_topic}/request/properties/{method}'
         message = {
             'uid': prop_task.uid,
             'properties': properties,
@@ -221,6 +259,19 @@ class MicroserviceProxy(ABC):
         if not isinstance(properties, dict):
             _log.error(f'Unable to process properties: {properties}')
             return
+        cache_lifetime = self._cache_lifetime
+        cache_all = False
+        new_init = False
+        if isinstance(task_meta, dict):
+            if 'initialize' in task_meta:
+                self._initialized = True
+                new_init = True
+                cache_all = True
+                _log.info(f'{self.tag} proxy initialized')
+            if 'cache_lifetime' in task_meta:
+                cache_lifetime = task_meta.get('cache_liftime')
+            if task_meta.get('properties', None) == 'all':
+                cache_all = True
         if self._proxy_properties is None:
             self._proxy_properties = {}
         for prop, val in properties.items():
@@ -228,17 +279,14 @@ class MicroserviceProxy(ABC):
                 self._proxy_properties[prop] != val):
                 _log.debug(f'Updating {prop} = {val}')
                 self._proxy_properties[prop] = val
-        cache_lifetime = self._cache_lifetime
-        if isinstance(task_meta, dict):
-            if 'initialize' in task_meta:
-                self._initialized = True
-                _log.info(f'{self.tag} proxy initialized')
-            if 'cache_lifetime' in task_meta:
-                cache_lifetime = task_meta.get('cache_liftime')
-        self._cached_properties.cache(self._proxy_properties,
-                                      'proxy_properties',
-                                      cache_lifetime)
+                self._cached_properties.cache(self._proxy_properties[prop],
+                                              prop,
+                                              cache_lifetime)
+        if cache_all:
+            self._cached_properties.cache(cache_all, 'all', cache_lifetime)
         self.complete_task(task_meta)
+        if new_init and callable(self._init_callback):
+            self._init_callback(True, task_meta.get('initialize', None))
         
     def complete_task(self, task_meta: dict = None):
         _log.debug(f'Completing task {task_meta.get("task_id", "no metadata")}')
@@ -266,8 +314,10 @@ class MicroserviceProxy(ABC):
         if topic.endswith('info/properties/values'):
             handled = self._handle_task(message)
             if handled:
+                # pass also to downstream handler but override result upstream
+                self.on_mqtt_message(topic, message)
                 return True
-        self.on_mqtt_message(topic, message)
+        return self.on_mqtt_message(topic, message)
     
     @abstractmethod
     def on_mqtt_message(self, topic: str, message: dict) -> bool:

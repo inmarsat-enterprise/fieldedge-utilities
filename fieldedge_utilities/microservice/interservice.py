@@ -6,6 +6,8 @@ import time
 from typing import Any, Callable
 from uuid import uuid4
 
+from fieldedge_utilities.logger import verbose_logging
+
 __all__ = ['IscException', 'IscTaskQueueFull', 'IscTask', 'IscTaskQueue']
 
 _log = logging.getLogger(__name__)
@@ -127,6 +129,10 @@ class IscTaskQueue(list):
         if self._blocking:
             return self._task_blocking
         
+    @property
+    def _vlog(self) -> bool:
+        return verbose_logging('isctaskqueue')
+    
     def unblock_tasks(self, unblock: bool = True):
         """"""
         if self._blocking and unblock is True:
@@ -158,6 +164,8 @@ class IscTaskQueue(list):
             if not self.task_blocking.is_set():
                 raise IscTaskNotReleased
             self.task_blocking.clear()
+        if self._vlog:
+            _log.debug(f'Queued task: {task.__dict__}')
         super().append(task)
     
     def is_queued(self,

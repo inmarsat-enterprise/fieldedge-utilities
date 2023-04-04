@@ -707,14 +707,20 @@ class Microservice(ABC):
         else:
             if self._features:
                 for tag, feature in self._features.items():
-                    handled = feature.on_mqtt_message(topic, message)
-                    if handled:
-                        return
+                    if (hasattr(feature, 'on_mqtt_message') and
+                        callable(feature.on_mqtt_message)):
+                        handled = feature.on_mqtt_message(topic, message)
+                        # check public handlers
+                        if handled:
+                            return
             if self._ms_proxies:
                 for tag, proxy in self._ms_proxies.items():
-                    handled = proxy._on_mqtt_message(topic, message)
-                    if handled:
-                        return
+                    if (hasattr(proxy, '_on_mqtt_message') and
+                        callable(proxy._on_mqtt_message)):
+                        # check private then public handlers
+                        handled = proxy._on_mqtt_message(topic, message)
+                        if handled:
+                            return
             self.on_isc_message(topic, message)
         
     @abstractmethod

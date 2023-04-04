@@ -168,6 +168,28 @@ class IscTaskQueue(list):
             _log.debug(f'Queued task: {task.__dict__}')
         super().append(task)
     
+    def peek(self,
+             task_id: str = None,
+             task_type: str = None,
+             task_meta: 'tuple[str, Any]' = None) -> 'IscTask|None':
+        """Returns the task based on search criteria or None."""
+        if not task_id and not task_type and not task_meta:
+            raise ValueError('Missing search criteria')
+        if isinstance(task_meta, tuple) and len(task_meta) != 2:
+            raise ValueError('cb_meta must be a key/value pair')
+        for task in self:
+            assert isinstance(task, IscTask)
+            if ((task_id and task.uid == task_id) or
+                (task_type and task.task_type == task_type)):
+                return task
+            if isinstance(task_meta, tuple):
+                if not isinstance(task.task_meta, dict):
+                    continue
+                for k, v in task.task_meta.items():
+                    if k == task_meta[0] and v == task_meta[1]:
+                        return task
+        return None
+    
     def is_queued(self,
                   task_id: str = None,
                   task_type: str = None,
@@ -183,22 +205,7 @@ class IscTaskQueue(list):
             True if the specified task is in the queue.
         
         """
-        if not task_id and not task_type and not task_meta:
-            raise ValueError('Missing search criteria')
-        if isinstance(task_meta, tuple) and len(task_meta) != 2:
-            raise ValueError('cb_meta must be a key/value pair')
-        for task in self:
-            assert isinstance(task, IscTask)
-            if ((task_id and task.uid == task_id) or
-                (task_type and task.task_type == task_type)):
-                return True
-            if isinstance(task_meta, tuple):
-                if not isinstance(task.task_meta, dict):
-                    continue
-                for k, v in task.task_meta.items():
-                    if k == task_meta[0] and v == task_meta[1]:
-                        return True
-        return False
+        return isinstance(self.peek(task_id, task_type, task_meta), IscTask)
             
     def get(self,
             task_id: str = None,

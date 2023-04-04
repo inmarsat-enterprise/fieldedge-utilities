@@ -146,7 +146,7 @@ class MicroserviceProxy(ABC):
         Raises `OSError` if the proxy has not been initialized.
         
         """
-        if not self.is_initialized or self._initializing:
+        if not self.is_initialized and not self._initializing:
             raise OSError('Proxy not initialized')
         cached = self._cached_properties.get_cached('all')
         if cached:
@@ -207,9 +207,9 @@ class MicroserviceProxy(ABC):
     
     def _handle_task(self, response: dict) -> bool:
         """"""
-        task_id = response.pop('uid')
-        if not self._isc_queue.is_queued(task_id):
-            _log.warning(f'No task ID {task_id} queued - ignoring')
+        task_id = response.get('uid', None)
+        if not task_id or not self._isc_queue.is_queued(task_id):
+            _log.debug(f'No task ID {task_id} queued - ignoring')
             return False
         task = self._isc_queue.get(task_id)
         if not task.task_meta:
@@ -314,11 +314,7 @@ class MicroserviceProxy(ABC):
         if not topic.startswith(f'fieldedge/{self.tag}/'):
             return False
         if topic.endswith('info/properties/values'):
-            handled = self._handle_task(message)
-            if handled:
-                # pass also to downstream handler but override result upstream
-                self.on_mqtt_message(topic, message)
-                return True
+            return self._handle_task(message)
         return self.on_mqtt_message(topic, message)
     
     @abstractmethod

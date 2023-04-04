@@ -870,9 +870,7 @@ class Microservice(ABC):
             if not subtopic.startswith('/'):
                 topic += '/'
             topic += subtopic
-        if not isinstance(message, dict):
-            raise ValueError('Invalid message content must be dict')
-        json_message = json_compatible(message)
+        json_message = json_compatible(message, camel_keys=True)
         if 'ts' not in json_message:
             json_message['ts'] = int(time.time() * 1000)
         if not self._mqttc_local or not self._mqttc_local.is_connected:

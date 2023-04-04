@@ -131,38 +131,36 @@ def json_compatible(obj: object,
 
     """
     res = obj
-    if camel_keys:
-        if isinstance(obj, dict):
-            res = {}
-            for k, v in obj.items():
-                if ((isinstance(k, str) and k.isupper() and skip_caps) or
-                    not isinstance(k, str)):
-                    # no change
-                    camel_key = k
-                else:
-                    camel_key = snake_to_camel(str(k))
-                if camel_key != k and verbose_logging('tags'):
-                    _log.debug(f'Changed {k} to {camel_key}')
-                res[camel_key] = json_compatible(v, camel_keys, skip_caps)
-        elif isinstance(obj, list):
-            res = []
-            for item in obj:
-                res.append(json_compatible(item, camel_keys, skip_caps))
+    if camel_keys and isinstance(obj, dict):
+        res = {}
+        for k, v in obj.items():
+            if ((isinstance(k, str) and k.isupper() and skip_caps) or
+                not isinstance(k, str)):
+                # no change
+                camel_key = k
+            else:
+                camel_key = snake_to_camel(str(k))
+            if camel_key != k and verbose_logging('tags'):
+                _log.debug(f'Changed {k} to {camel_key}')
+            res[camel_key] = json_compatible(v, camel_keys, skip_caps)
     try:
         json.dumps(res)
     except TypeError:
         try:
-            if isinstance(res, list):
-                _temp = []
-                for element in res:
-                    _temp.append(json_compatible(element,
-                                                 camel_keys,
-                                                 skip_caps))
-                res = _temp
-            if hasattr(res, '__dict__'):
-                res = json_compatible(get_instance_properties_values(res))
-            if isinstance(res, dict):
-                res = json_compatible(res, camel_keys, skip_caps)
+            if callable(res):
+                res = f'<function:{res.__name__}>'
+            elif isinstance(res, list):
+                res = [json_compatible(v, camel_keys, skip_caps)
+                       for v in res]
+            elif hasattr(res, '__dict__'):
+                res = json_compatible(get_instance_properties_values(res),
+                                      camel_keys,
+                                      skip_caps)
+            elif isinstance(res, dict):
+                res = {k:json_compatible(v, camel_keys, skip_caps)
+                       for k, v in res.items()}
+            else:
+                res = f'<non-serializable>'
         except Exception as err:
             _log.error(err)
     finally:

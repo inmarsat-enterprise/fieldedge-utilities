@@ -304,12 +304,12 @@ def untag_class_property(property_name: str,
             property value in snake_case, and the tag
 
     """
-    if '_' not in camel_to_snake(property_name):
-        raise ValueError(f'Invalid camelCase {property_name}')
+    prop = camel_to_snake(property_name)
+    tag = None
     if is_tagged:
-        tag, prop = camel_to_snake(property_name).split('_', 1)
-    else:
-        tag, prop = None, camel_to_snake(property_name)
+        if '_' not in prop:
+            raise ValueError(f'Invalid tagged {property_name}')
+        tag, prop = prop.split('_', 1)
     if not include_tag:
         return prop
     return (prop, tag)

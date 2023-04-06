@@ -1,5 +1,6 @@
 """FieldEdge class/property helpers
 
+*DEPRECATED*.
 Moved into microservice.properties module
 
 """

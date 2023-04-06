@@ -1,4 +1,4 @@
-"""Microservice and related helper classes.
+"""Microservice and related meta/classes.
 """
 import logging
 import time
@@ -57,7 +57,7 @@ class Feature(ABC):
         """Returns a dictionary of key status summary information."""
     
     @abstractmethod
-    def on_mqtt_message(self, topic: str, message: dict) -> bool:
+    def on_isc_message(self, topic: str, message: dict) -> bool:
         """Called by a parent Microservice to pass relevant MQTT messages.
         
         Args:
@@ -151,12 +151,14 @@ class MicroserviceProxy(ABC):
         cached = self._cached_properties.get_cached('all')
         if cached:
             return self._proxy_properties
-        self._proxy_properties = None
-        task_meta = { 'properties': 'all' }
-        self.query_properties(['all'], task_meta)
-        attempts = 0
-        while self._proxy_properties is None and attempts < 3:
-            attempts += 1
+        pending = self._isc_queue.peek(task_meta=('properties', 'all'))
+        if pending:
+            _log.debug(f'Prior query pending')
+        else:
+            self._proxy_properties = None
+            task_meta = { 'properties': 'all' }
+            self.query_properties(['all'], task_meta)
+        while self._isc_queue.peek(task_meta=('properties', 'all')):
             _log.debug('Waiting for property update')
             time.sleep(1)
         return self._proxy_properties
@@ -206,7 +208,9 @@ class MicroserviceProxy(ABC):
                                 tag=task_meta.get('initialize', None))
     
     def _handle_task(self, response: dict) -> bool:
-        """"""
+        """Returns True if the task_id is in the queue after any task
+        callbacks are completed.
+        """
         task_id = response.get('uid', None)
         if not task_id or not self._isc_queue.is_queued(task_id):
             _log.debug(f'No task ID {task_id} queued - ignoring')
@@ -285,13 +289,16 @@ class MicroserviceProxy(ABC):
                                               cache_lifetime)
         if cache_all:
             self._cached_properties.cache(cache_all, 'all', cache_lifetime)
-        self.complete_task(task_meta)
+        self.task_complete(task_meta)
         if new_init and callable(self._init_callback):
             self._init_callback(success=True,
                                 tag=task_meta.get('initialize', None))
         
-    def complete_task(self, task_meta: dict = None):
-        _log.debug(f'Completing task {task_meta.get("task_id", "no metadata")}')
+    def task_complete(self, task_meta: dict = None):
+        task_id = None
+        if isinstance(task_meta, dict):
+            task_id = task_meta.get('task_id', None)
+        _log.debug(f'Completing task ({task_id})')
         self._isc_queue.task_blocking.set()
     
     def publish(self, topic: str, message: dict, qos: int = 0):
@@ -302,11 +309,11 @@ class MicroserviceProxy(ABC):
         """Subscribes to a MQTT topic via the parent."""
         self._subscribe(topic)
     
-    def _on_mqtt_message(self, topic: str, message: dict) -> bool:
+    def _on_isc_message(self, topic: str, message: dict) -> bool:
         """Called by a parent Microservice.
         
         Handles property value responses for proxy properties.
-        Passes unhandled topic/message to the public `on_mqtt_message` method.
+        Passes unhandled topic/message to the public `on_isc_message` method.
         
         """
         if verbose_logging(self.tag):
@@ -315,13 +322,13 @@ class MicroserviceProxy(ABC):
             return False
         if topic.endswith('info/properties/values'):
             return self._handle_task(message)
-        return self.on_mqtt_message(topic, message)
+        return self.on_isc_message(topic, message)
     
     @abstractmethod
-    def on_mqtt_message(self, topic: str, message: dict) -> bool:
+    def on_isc_message(self, topic: str, message: dict) -> bool:
         """Processes MQTT messages for the proxy.
         
-        Called by an internal _on_mqtt_message which was called by the parent.
+        Called by an internal _on_isc_message which was called by the parent.
         
         Args:
             topic (str): The message topic.
@@ -393,6 +400,10 @@ class Microservice(ABC):
             'isc_properties',
             'isc_properties_by_type',
             'rollcall_properties',
+            'isc_queue',
+            'features',
+            'ms_proxies',
+            'sub_proxies',
         ]
         self._rollcall_properties: 'list[str]' = []
         self._isc_poll_interval: int = isc_poll_interval
@@ -511,32 +522,30 @@ class Microservice(ABC):
     @property
     def isc_properties_by_type(self) -> 'dict[str, list[str]]':
         """ISC exposed properties tagged `info` or `config`."""
+        # subfunction
+        def feature_prop(prop) -> 'tuple[object, str]':
+            fprop, ftag = untag_class_property(prop, True, True)
+            feature = self._features.get(ftag, None)
+            if feature and hasattr(feature, ftag):
+                return (feature, fprop)
+            raise ValueError(f'Unknown tag {prop}')
+        # main function
         categorized = {}
         for isc_prop in self.isc_properties:
-            prop, tag = untag_class_property(isc_prop, self._isc_tags, True)
             if self._isc_tags:
+                prop, tag = untag_class_property(isc_prop, self._isc_tags, True)
                 if tag == self.tag:
                     if hasattr(self, prop):
                         obj = self
                     else:
-                        fprop, ftag = untag_class_property(prop, True, True)
-                        feature = self._features.get(ftag, None)
-                        if feature and hasattr(feature, fprop):
-                            obj = feature
-                            prop = fprop
-                        else:
-                            raise ValueError(f'Unknown tag {tag}_{ftag}')
+                        obj, prop = feature_prop(prop)
                 else:
                     raise ValueError(f'Unknown tag {tag}')
             else:
-                if hasattr(self, prop):
+                if hasattr(self, isc_prop):
                     obj = self
                 else:
-                    feature = self._features.get(tag, None)
-                    if feature and hasattr(feature, prop):
-                        obj = feature
-                    else:
-                        raise ValueError(f'Unknown tag {tag}')
+                    obj, prop = feature_prop(isc_prop)
             self._categorize_prop(obj, prop, categorized, isc_prop)
         return categorized
     
@@ -595,17 +604,17 @@ class Microservice(ABC):
         """Property key/values that will be sent in the rollcall response."""
         return self._rollcall_properties
     
-    def rollcall_property_add(self, prop_name: str):
+    def rollcall_property_add(self, isc_prop_name: str):
         """Add a property to the rollcall response."""
-        if prop_name not in self.properties:
-            raise ValueError(f'Invalid prop_name {prop_name}')
-        if prop_name not in self._rollcall_properties:
-            self._rollcall_properties.append(prop_name)
+        if isc_prop_name not in self.properties:
+            raise ValueError(f'Invalid prop_name {isc_prop_name}')
+        if isc_prop_name not in self._rollcall_properties:
+            self._rollcall_properties.append(isc_prop_name)
     
-    def rollcall_property_remove(self, prop_name: str):
+    def rollcall_property_remove(self, isc_prop_name: str):
         """Remove a property from the rollcall response."""
-        if prop_name in self._rollcall_properties:
-            self._rollcall_properties.remove(prop_name)
+        if isc_prop_name in self._rollcall_properties:
+            self._rollcall_properties.remove(isc_prop_name)
         
     def rollcall(self):
         """Publishes a rollcall broadcast to other microservices with UUID."""
@@ -633,11 +642,9 @@ class Microservice(ABC):
         if 'uid' not in message:
             _log.warning('Rollcall request missing unique ID')
         response = { 'uid': message.get('uid', None) }
-        tag = self.tag if self._isc_tags else None
-        for prop in self._rollcall_properties:
-            if prop in self.properties:
-                tagged_prop = tag_class_property(prop, tag)
-                response[tagged_prop] = getattr(self, prop)
+        for isc_prop in self._rollcall_properties:
+            if isc_prop in self.isc_properties:
+                response[isc_prop] = self.isc_get_property(isc_prop)
         self.notify(message=response, subtopic=subtopic)
         
     def isc_topic_subscribe(self, topic: str) -> bool:
@@ -703,18 +710,18 @@ class Microservice(ABC):
         else:
             if self._features:
                 for tag, feature in self._features.items():
-                    if (hasattr(feature, 'on_mqtt_message') and
-                        callable(feature.on_mqtt_message)):
-                        handled = feature.on_mqtt_message(topic, message)
+                    if (hasattr(feature, 'on_isc_message') and
+                        callable(feature.on_isc_message)):
+                        handled = feature.on_isc_message(topic, message)
                         # check public handlers
                         if handled:
                             return
             if self._ms_proxies:
                 for tag, proxy in self._ms_proxies.items():
-                    if (hasattr(proxy, '_on_mqtt_message') and
-                        callable(proxy._on_mqtt_message)):
+                    if (hasattr(proxy, '_on_isc_message') and
+                        callable(proxy._on_isc_message)):
                         # check private then public handlers
-                        handled = proxy._on_mqtt_message(topic, message)
+                        handled = proxy._on_isc_message(topic, message)
                         if handled:
                             return
             self.on_isc_message(topic, message)
@@ -878,7 +885,7 @@ class Microservice(ABC):
                             f'{topic}: {message}')
             return
         _log.info(f'Publishing ISC {topic}: {json_message}')
-        self._mqttc_local.publish(topic, message, qos)
+        self._mqttc_local.publish(topic, json_message, qos)
     
     def task_add(self, task: IscTask) -> None:
         """Adds a task to the task queue."""
@@ -916,18 +923,6 @@ class Microservice(ABC):
             self._isc_timer.start_timer()
         else:
             self._isc_timer.stop_timer()
-    
-    def subscribe(self, topic: str, qos: int = 0) -> bool:
-        """"""
-        if topic in self._mqttc_local.subscriptions:
-            _log.debug(f'{topic} already subscribed')
-            return True
-        try:
-            self._mqttc_local.subscribe(topic)
-            return True
-        except Exception as err:
-            _log.error(f'Failed to subscribe to {topic}: {err}')
-            return False
 
 
 class SubscriptionProxy:

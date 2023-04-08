@@ -15,6 +15,8 @@ from typing import Any
 
 from fieldedge_utilities.logger import verbose_logging
 
+__all__ = ['CachedProperty', 'PropertyCache']
+
 _log = logging.getLogger(__name__)
 
 
@@ -29,13 +31,15 @@ class CachedProperty:
     name: 'str|None' = None
     lifetime: 'float|None' = 1.0
     cache_time: float = field(default_factory=time.time)
-    
+
     @property
     def age(self) -> float:
+        """The age of the cached value in seconds."""
         return round(time.time() - self.cache_time, 3)
-    
+
     @property
     def is_valid(self) -> bool:
+        """Returns True if the age is within the lifetime."""
         if self.lifetime is None:
             return True
         return self.age <= self.lifetime
@@ -49,7 +53,7 @@ class PropertyCache:
     """
     def __init__(self) -> None:
         self._cache: 'dict[str, CachedProperty]' = {}
-    
+
     def cache(self, value: Any, tag: str, lifetime: 'float|None' = 1.0) -> None:
         """Timestamps and adds a property value to the cache.
         
@@ -64,16 +68,16 @@ class PropertyCache:
         """
         if value is None:
             _log.warning('Request to cache None value')
-        if tag in self._cache.keys():
-            _log.warning(f'Overwriting {tag}')
-        cp = CachedProperty(value, name=tag, lifetime=lifetime)
-        self._cache[tag] = cp
-    
+        if tag in self._cache:
+            _log.debug(f'Overwriting cached {tag}')
+        to_cache = CachedProperty(value, name=tag, lifetime=lifetime)
+        self._cache[tag] = to_cache
+
     def clear(self) -> None:
         """Removes all entries from the cache."""
-        _log.debug(f'Clearing property cache')
+        _log.debug('Clearing property cache')
         self._cache = {}
-        
+
     def remove(self, tag: str) -> None:
         """Removes a property value from the cache.
         
@@ -90,7 +94,7 @@ class PropertyCache:
                 _log.debug(f'Removed {tag} aged {cached.age} seconds')
             else:
                 _log.debug(f'{tag} was not cached')
-    
+
     def get_cached(self, tag: str) -> Any:
         """Retrieves the cached property value if valid.
         
@@ -103,7 +107,7 @@ class PropertyCache:
             The cached property value, or `None` if the tag is not found.
             
         """
-        if tag not in self._cache.keys():
+        if tag not in self._cache:
             if self._vlog():
                 _log.debug(f'{tag} not cached')
             return None
@@ -114,6 +118,6 @@ class PropertyCache:
                            f' (age {cached.age} seconds)')
             return cached.value
         self.remove(tag)
-    
+
     def _vlog(self) -> bool:
         return verbose_logging('cache')

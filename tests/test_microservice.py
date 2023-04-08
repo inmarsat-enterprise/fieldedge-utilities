@@ -5,10 +5,10 @@ import time
 import unittest
 
 import fieldedge_utilities   # required for mocking
-from fieldedge_utilities.microservice.microservice import *
-from fieldedge_utilities.microservice.interservice import IscTask, IscTaskQueue
+from fieldedge_utilities.microservice import *
+# from fieldedge_utilities.microservice.interservice import IscTask, IscTaskQueue
 from fieldedge_utilities.mqtt import MqttClient
-from fieldedge_utilities.class_properties import get_class_tag, get_class_properties
+from fieldedge_utilities.microservice.properties import get_class_tag, get_class_properties
 
 
 logger = logging.getLogger()
@@ -46,8 +46,14 @@ class TestService(Microservice):
     #     await asyncio.sleep(1)
     #     return self._info_prop
     
+    def rollcall(self):
+        return super().rollcall()
+    
+    def rollcall_respond(self, topic: str, message: dict):
+        return super().rollcall_respond(topic, message)
+    
     def on_isc_message(self, topic: str, message: dict) -> None:
-        logger.info(f'Received ISC message {topic}: {message}')
+        logger.info(f'Microservice received ISC message {topic}: {message}')
     
     def task_progress(self, **kwargs):
         logger.info(f'Task info: {kwargs}')
@@ -68,7 +74,8 @@ class TestFeature(Feature):
     def properties_list(self) -> 'list[str]':
         return ['test_prop']
     
-    def on_mqtt_message(self, topic: str, message: dict) -> bool:
+    def on_isc_message(self, topic: str, message: dict) -> bool:
+        logger.info(f'Feature received ISC {topic}: {message}')
         feature_relevant = message.get('feature', None)
         if feature_relevant:
             logger.info('Feature handled')
@@ -78,7 +85,11 @@ class TestFeature(Feature):
 
 class TestProxy(MicroserviceProxy):
     """"""
-    def on_mqtt_message(self, topic: str, message: dict) -> bool:
+    def on_isc_message(self, topic: str, message: dict) -> bool:
+        logger.info(f'Proxy received ISC {topic}: {message}')
+        handled = super().on_isc_message(topic, message)
+        if handled:
+            return True
         proxy_relevant = message.get('proxy', None)
         if proxy_relevant:
             logger.info('Proxy handled')
@@ -94,12 +105,12 @@ def test_service() -> TestService:
 @pytest.fixture
 def test_complex() -> TestService:
     c = TestService(tag='complex')
-    c._features['feature'] = TestFeature(task_queue=c._isc_queue,
+    c.features['feature'] = TestFeature(task_queue=c._isc_queue,
                                          task_notify_callback=c.task_progress,
                                          task_complete_callback=c.task_completed)
-    c._ms_proxies['proxy'] = TestProxy(tag='test',
-                                       publish_callback=c.notify,
-                                       subscribe_callback=c.subscribe,
+    c.ms_proxies['proxy'] = TestProxy(tag='test',
+                                       publish=c.notify,
+                                       subscribe=c.isc_topic_subscribe,
                                        init_callback=complex_ms_init_callback,
                                     #    cache_lifetime=2,
                                        )
@@ -282,19 +293,20 @@ def test_isc_task_queue_expiry(isc_task: IscTask):
 
 
 def test_ms_cached_property(test_service: TestService, mocker):
+    TEST_PROP = 'sub_prop'
     ref_time = time.time()
     cache_lifetime = 1
-    test_service.property_cache('sub_prop', cache_lifetime)
-    while test_service.property_is_cached('sub_prop'):
-        pass
+    test_service._property_cache.cache('something', TEST_PROP, cache_lifetime)
+    while test_service._property_cache.get_cached(TEST_PROP):
+        time.sleep(0.5)
     elapsed = time.time() - ref_time
     logger.info(f'Time elapsed: {elapsed}')
     assert elapsed >= cache_lifetime
-    assert not test_service.property_is_cached('sub_prop')
+    assert not test_service._property_cache.get_cached(TEST_PROP)
 
 
-class StubMqtt:
-    def __init__(self) -> None:
+class StubMqtt(MqttClient):
+    def __init__(self, auto_connect=False) -> None:
         pass
     
     def subscribe(self, topic, qos):
@@ -372,7 +384,7 @@ def test_complex_ms(test_complex: TestService, test_service: TestService):
         time.sleep(0.5)
     test_complex.rollcall()
     time.sleep(0.5)
-    proxy = test_complex._ms_proxies['proxy']
+    proxy = test_complex.ms_proxies['proxy']
     proxy.initialize()
     attempts = 0
     while not proxy.is_initialized and attempts < 3:
@@ -382,7 +394,10 @@ def test_complex_ms(test_complex: TestService, test_service: TestService):
     assert init_success == True
     assert proxy.property_get('configProp') == 2
     proxy.property_set('configProp', 3)
-    time.sleep(2.5)
+    attempts = 0
+    while not proxy.property_get('configProp') == 3 and attempts < 3:
+        attempts += 1
+        time.sleep(0.5)
     assert proxy.property_get('configProp') == 3
 
 
@@ -390,7 +405,7 @@ def test_proxy_init_fail(test_complex: TestService):
     """Requires live connection to a MQTT broker."""
     global init_success
     timeout = 2
-    proxy = test_complex._ms_proxies['proxy']
+    proxy = test_complex.ms_proxies['proxy']
     proxy._init_timeout = timeout
     test_complex._mqttc_local.connect()
     while not test_complex._mqttc_local.is_connected:

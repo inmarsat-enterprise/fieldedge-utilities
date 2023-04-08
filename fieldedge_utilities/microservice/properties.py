@@ -68,12 +68,13 @@ def snake_to_camel(snake_str: str, skip_caps: bool = False) -> str:
 
 
 def get_class_tag(cls: type) -> str:
+    """Returns a lowercase name to use as the tag for a class."""
     if isinstance(cls, type):
         return cls.__name__.lower()
     return cls.__class__.__name__.lower()
 
 
-def get_class_properties(cls: type, ignore: 'list[str]' = []) -> 'list[str]':
+def get_class_properties(cls: type, ignore: 'list[str]' = None) -> 'list[str]':
     """Returns non-hidden, non-callable properties/values of a Class instance.
     
     Also ignores CAPITAL_CASE attributes which are assumed to be constants.
@@ -92,7 +93,9 @@ def get_class_properties(cls: type, ignore: 'list[str]' = []) -> 'list[str]':
     if not dir(cls):
         raise ValueError('Invalid cls_instance - must have dir() method')
     if isinstance(cls, type) and '__slots__' not in dir(cls):
-        _log.warning(f'No __slots__: attributes in __init__ will be missed')
+        _log.warning('No __slots__: attributes in __init__ will be missed')
+    if not isinstance(ignore, list):
+        ignore = []
     attrs = [attr for attr in dir(cls)
              if not attr.startswith(('_',)) and
              attr not in ignore and
@@ -133,18 +136,19 @@ def json_compatible(obj: object,
     res = obj
     if camel_keys and isinstance(obj, dict):
         res = {}
-        for k, v in obj.items():
-            if ((isinstance(k, str) and k.isupper() and skip_caps) or
-                not isinstance(k, str)):
+        for key, val in obj.items():
+            if ((isinstance(key, str) and key.isupper() and skip_caps) or
+                not isinstance(key, str)):
                 # no change
-                camel_key = k
+                camel_key = key
             else:
-                camel_key = snake_to_camel(str(k))
-            if camel_key != k and verbose_logging('tags'):
-                _log.debug(f'Changed {k} to {camel_key}')
-            res[camel_key] = json_compatible(v, camel_keys, skip_caps)
+                camel_key = snake_to_camel(str(key))
+            if camel_key != key and verbose_logging('tags'):
+                _log.debug(f'Changed {key} to {camel_key}')
+            res[camel_key] = json_compatible(val, camel_keys, skip_caps)
     try:
         json.dumps(res)
+        return res
     except TypeError:
         try:
             if callable(res):
@@ -160,11 +164,10 @@ def json_compatible(obj: object,
                 res = {k:json_compatible(v, camel_keys, skip_caps)
                        for k, v in res.items()}
             else:
-                res = f'<non-serializable>'
-        except Exception as err:
-            _log.error(err)
-    finally:
-        return res
+                res = '<non-serializable>'
+        except Exception as exc:
+            _log.error(exc)
+            raise exc
 
 
 def hasattr_static(obj: object, attr: str) -> bool:
@@ -186,6 +189,7 @@ def hasattr_static(obj: object, attr: str) -> bool:
 
 
 def property_is_read_only(instance: object, property_name: str) -> bool:
+    """Returns True if the instance attribute has no fset method."""
     if not hasattr_static(instance, property_name):
         raise ValueError(f'Object has no property {property_name}')
     prop = inspect.getattr_static(instance, property_name)
@@ -196,6 +200,7 @@ def property_is_read_only(instance: object, property_name: str) -> bool:
 
 
 def property_is_async(instance: object, property_name: str) -> bool:
+    """Returns True if an object is awaitable."""
     if not hasattr_static(instance, property_name):
         raise ValueError(f'Object has no property {property_name}')
     return inspect.isawaitable(getattr(instance, property_name))
@@ -204,9 +209,9 @@ def property_is_async(instance: object, property_name: str) -> bool:
 def tag_class_properties(cls: type,
                          tag: str = None,
                          auto_tag: bool = True,
-                         json: bool = True,
+                         use_json: bool = True,
                          categorize: bool = False,
-                         ignore: 'list[str]' = [],
+                         ignore: 'list[str]' = None,
                          ) -> 'list|dict':
     """Retrieves the class public properties tagged with a routing prefix.
     
@@ -249,26 +254,25 @@ def tag_class_properties(cls: type,
     #     _log.debug('Processing for microservice')
     if auto_tag and not tag:
         tag = get_class_tag(cls)
-    class_props = get_class_properties(cls,
-                                       ignore)
+    class_props = get_class_properties(cls, ignore)
     if not categorize:
-        return [tag_class_property(prop, tag, json) for prop in class_props]
+        return [tag_class_property(prop, tag, use_json) for prop in class_props]
     result = {}
     for prop in class_props:
         if property_is_read_only(cls, prop):
             if READ_ONLY not in result:
                 result[READ_ONLY] = []
-            result[READ_ONLY].append(tag_class_property(prop, tag, json))
+            result[READ_ONLY].append(tag_class_property(prop, tag, use_json))
         else:
             if READ_WRITE not in result:
                 result[READ_WRITE] = []
-            result[READ_WRITE].append(tag_class_property(prop, tag, json))
+            result[READ_WRITE].append(tag_class_property(prop, tag, use_json))
     return result
 
 
 def tag_class_property(prop: str,
                        tag_or_cls: 'str|type' = None,
-                       json: bool = True) -> str:
+                       use_json: bool = True) -> str:
     """Converts a property for ISC adding an optional tag."""
     if tag_or_cls is None:
         tagged = prop
@@ -280,7 +284,7 @@ def tag_class_property(prop: str,
         else:
             raise ValueError('tag_or_cls must be a string or class type')
         tagged = f'{tag.lower()}_{prop}'
-    if json:
+    if use_json:
         return snake_to_camel(f'{tagged}')
     return f'{tag}_{prop}'
 
@@ -344,29 +348,29 @@ def tag_merge(*args) -> 'list|dict':
     else:
         for arg in args:
             assert isinstance(arg, dict)
-            for k, v in arg.items():
-                merged[k] = v      
+            for key, val in arg.items():
+                merged[key] = val
     return merged
 
 
 def _nested_tag_merge(add: dict, merged: dict) -> dict:
-    for k, v in add.items():
-        if k not in merged:
-            merged[k] = v
+    for key, val in add.items():
+        if key not in merged:
+            merged[key] = val
         else:
-            if isinstance(merged[k], list):
-                merged[k] = merged[k] + v
+            if isinstance(merged[key], list):
+                merged[key] = merged[key] + val
             else:
-                assert isinstance(merged[k], dict)
-                assert isinstance(v, dict)
-                for nk, nv in v.items():
-                    merged[k][nk] = nv
+                assert isinstance(merged[key], dict)
+                assert isinstance(val, dict)
+                for nested_key, nested_val in val.items():
+                    merged[key][nested_key] = nested_val
     return merged
 
 
 def equivalent_attributes(ref: object,
                           other: object,
-                          exclude: 'list[str]' = [],
+                          exclude: 'list[str]' = None,
                           dbg: str = '',
                           ) -> bool:
     """Confirms attribute equivalence between objects of the same type.
@@ -380,10 +384,12 @@ def equivalent_attributes(ref: object,
         True if all (non-excluded) attribute name/values match.
 
     """
-    if type(ref) != type(other):
+    if isinstance(other, type(ref)):
         return False
     if not hasattr(ref, '__dict__') or not hasattr(other, '__dict__'):
         return ref == other
+    if not isinstance(exclude, list):
+        exclude = []
     if dbg:
         dbg += '.'
     for attr in dir(ref):

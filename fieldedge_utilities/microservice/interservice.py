@@ -69,13 +69,14 @@ class IscTask:
         self._ts: float = round(time.time(), 3)
         self.uid: str = uid or str(uuid4())
         self.task_type: str = task_type
-        self._lifetime: float = float(lifetime)
+        self._lifetime: 'float|None' = None
+        self.lifetime = lifetime
         self.task_meta = task_meta
         if (isinstance(task_meta, dict) and
             'timeout_callback' in task_meta and
             not callable(task_meta['timeout_callback'])):
             # Generate warning
-            _log.warning(f'Task timeout_callback is not callable')
+            _log.warning('Task timeout_callback is not callable')
         if callback is not None and not callable(callback):
             raise ValueError('Next task callback must be callable if not None')
         self.callback: Callable = callback
@@ -85,12 +86,17 @@ class IscTask:
         return self._ts
     
     @property
-    def lifetime(self) -> float:
+    def lifetime(self) -> 'float|None':
+        if self._lifetime is None:
+            return None
         return round(self._lifetime, 3)
     
     @lifetime.setter
-    def lifetime(self, value: 'float|int'):
-        if not isinstance(value, (float, int)):
+    def lifetime(self, value: 'float|int|None'):
+        if value is None:
+            _log.warning('Task lifetime set to None (no expiry)')
+            self._lifetime = None
+        elif not isinstance(value, (float, int)):
             raise ValueError('Value must be float or int')
         self._lifetime = float(value)
 

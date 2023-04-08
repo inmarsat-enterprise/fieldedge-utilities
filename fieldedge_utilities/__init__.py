@@ -1,8 +1,4 @@
 """
-# FieldEdge Utilities
-
-This Python library contains common functionality used by many of the Inmarsat
-**FieldEdge** embedded microservices.
-
+.. include:: ../README.md
 """
 __docformat__ = 'google'

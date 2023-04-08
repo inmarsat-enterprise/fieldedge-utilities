@@ -23,7 +23,7 @@
 
             <h2>Contents</h2>
             <ul>
-  <li><a href="#fieldedge-utilities">FieldEdge Utilities</a></li>
+  <li><a href="#inmarsat-fieldedge-utilities">Inmarsat FieldEdge Utilities</a></li>
 </ul>
 
 
@@ -31,6 +31,7 @@
             <ul>
                     <li><a href="fieldedge_utilities/class_properties.html">class_properties</a></li>
                     <li><a href="fieldedge_utilities/hostpipe.html">hostpipe</a></li>
+                    <li><a href="fieldedge_utilities/ip.html">ip</a></li>
                     <li><a href="fieldedge_utilities/ip_interfaces.html">ip_interfaces</a></li>
                     <li><a href="fieldedge_utilities/ip_protocols.html">ip_protocols</a></li>
                     <li><a href="fieldedge_utilities/logger.html">logger</a></li>
@@ -61,10 +62,54 @@
                     <h1 class="modulename">
 fieldedge_utilities    </h1>
 
-                        <div class="docstring"><h1 id="fieldedge-utilities">FieldEdge Utilities</h1>
+                        <div class="docstring"><h1 id="inmarsat-fieldedge-utilities">Inmarsat FieldEdge Utilities</h1>
 
-<p>This Python library contains common functionality used by many of the Inmarsat
-<strong>FieldEdge</strong> embedded microservices.</p>
+<p>Inmarsat FieldEdge project supports <em>Internet of Things</em> (<strong>IoT</strong>) using
+satellite communications technology. Generally this library is meant to be used
+on single board computers capable of running Debian Linux.</p>
+
+<blockquote>
+  <p><em>While the authors recognize Python has several shortcomings for embedded use,</em>
+  <em>it provides a useful learning template.</em></p>
+</blockquote>
+
+<p>This library available on <a href="https://pypi.org/project/fieldedge-utilities/"><strong>PyPI</strong></a>
+provides:</p>
+
+<ul>
+<li>A common <strong><code>logger</code></strong> format and wrapping file facility with UTC timestamps.</li>
+<li>A <strong><code>timer.RepeatingTimer</code></strong> utility (thread) that can be started, stopped,
+restarted, and interval changed.</li>
+<li>A simplified <strong><code>mqtt</code></strong> client that automatically (re)onnects
+(by default to a local <code>fieldedge-broker</code>).</li>
+<li>Helper functions for managing files and <strong><code>path</code></strong> on different OS.</li>
+<li>An interface for the FieldEdge <strong><code>hostpipe</code></strong> service for sending host
+commands from a Docker container, with request/result captured in a logfile.</li>
+<li>Helper functions <strong><code>ip.interfaces</code></strong> for finding and validating IP interfaces
+and addresses/subnets.</li>
+<li>A defined set of common <strong><code>ip.protocols</code></strong> used for packet analysis and
+satellite data traffic optimisation.</li>
+<li>Helpers for managing <strong><code>serial</code></strong> ports on a host system.</li>
+<li>Utilities for converting <strong><code>timestamp</code></strong>s between unix and ISO 8601</li>
+<li>Classes useful for implementing <strong><code>microservice</code></strong>s based on MQTT
+inter-service communications and task workflows:
+<ul>
+<li><strong><code>interservice</code></strong> communications tasks and searchable queue.</li>
+<li><strong><code>microservice</code></strong> class for consistent abstraction and interaction.</li>
+<li><strong><code>msproxy</code></strong> microservice proxy class form a kind of twin of another
+microservice, as a child of a microservice.</li>
+<li><strong><code>feature</code></strong> class as a child of a microservice, with routing of MQTT
+topics and messages and interaction with a simple task queue.</li>
+<li><strong><code>properties</code></strong> manipulation and conversion between JSON and PEP style,
+and derived from classes or instances.</li>
+<li><strong><code>propertycache</code></strong> concept for caching frequently referenced object
+properties where the query may take time.</li>
+<li><strong><code>subscriptionproxy</code></strong> allows cascading of received MQTT messages to
+multiple modules within a project framing a microservice.</li>
+</ul></li>
+</ul>
+
+<p><a href="https://inmarsat-enterprise.github.io/fieldedge-utilities/">Docmentation</a></p>
 </div>
 
                 

@@ -31,7 +31,7 @@ Properties can also be categorized as either `info` (read-only) or `config`
 This is useful for reporting status and accepting configuration changes by
 other microservices using MQTT.
 
-### `_cached_properties`
+### `_property_cache`
 
 A `PropertyCache` class is made available as a private method for caching
 properties of the `Microservice` subclass.
@@ -63,11 +63,10 @@ layer of handling MQTT messages from the subscribed topic(s) that processes:
     the properties and responds with a dictionary of changes.
     If the message includes key `reportChange` the message is also routed to
     the user `on_mqtt_message()` function.
-    * Cycles through `self._features` passing to each `on_mqtt_message()` until
+    * Cycles through `self.features` passing to each `on_mqtt_message()` until
     `True` is returned indicating the feature handled the message.
-    * Cycles through `self._ms_proxies` passing to each `_on_mqtt_message()`
-    then `on_mqtt_message()` until `True` is returned indicating the proxy
-    handled the message.
+    * Cycles through `self.ms_proxies` passing to each `on_mqtt_message()`
+    until `True` is returned indicating the proxy handled the message.
 
 ### `notify()`
 
@@ -88,17 +87,17 @@ They are initialized with a reference to the `_isc_queue` and callbacks to the
 parent `notify()` and optional user-defined task completion or task failure
 handlers.
 
-### `properties_list()`
+### `properties_list()` (@abstractmethod)
 
 Feature properties that should be exposed to the parent's ISC properties
 must be listed in the `properties_list()` abstractmethod return value.
 
-### `status()`
+### `status()` (@abstractmethod)
 
 The `status()` abstractmethod should return a dictionary of relevant
 feature summary attributes or configurations.
 
-### `on_isc_message()`
+### `on_isc_message()` (@abstractmethod)
 
 The `on_isc_message()` abstractmethod defines any MQTT topic handling,
 effectively the API for other microservices to access methods of the Feature.
@@ -147,7 +146,9 @@ next task to be added.
 These methods allow the user to flexibly send MQTT queries and subscribe to
 additional topics that will be handled by `on_isc_message()`.
 
-### `on_isc_message()` abstractmethod
+### `on_isc_message()` (@abstractmethod)
 
 This method is required and must return `False` by default. It should return
-`True` for any handled messages.
+`True` for any handled messages. The `super().on_isc_message()` should be used
+to handle incoming `info/properties/values` messages which may be part of the
+task handling for the SISO task queue.

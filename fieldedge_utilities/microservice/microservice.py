@@ -579,6 +579,8 @@ class Microservice(ABC):
         json_message = json_compatible(message, camel_keys=True)
         if 'ts' not in json_message:
             json_message['ts'] = int(time.time() * 1000)
+        if 'uid' not in json_message:
+            json_message['uid'] = str(uuid4())
         if not self._mqttc_local or not self._mqttc_local.is_connected:
             _log.error('MQTT client not connected - failed to publish'
                        f' {topic}: {message}')

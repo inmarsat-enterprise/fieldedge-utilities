@@ -165,6 +165,7 @@ def json_compatible(obj: object,
                        for k, v in res.items()}
             else:
                 res = '<non-serializable>'
+            return res
         except Exception as exc:
             _log.error(exc)
             raise exc

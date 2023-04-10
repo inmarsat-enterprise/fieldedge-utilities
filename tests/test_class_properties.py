@@ -286,19 +286,18 @@ class SatModemBaseAttribute:
 
 class Location(SatModemBaseAttribute):
     def __init__(self, **kwargs) -> None:
-        self.timestamp: int = kwargs.get('timestamp', None)
-        self.latitude: float = kwargs.get('latitude', None)
-        self.longitude: float = kwargs.get('longitude', None)
-        self.altitude: float = kwargs.get('altitude', None)
-        self.speed: float = kwargs.get('speed', None)
-        self.heading: float = kwargs.get('heading', None)
+        self.timestamp: int = kwargs.get('timestamp', time())
+        self.latitude: float = kwargs.get('latitude', 44.1)
+        self.longitude: float = kwargs.get('longitude', -75.2)
+        self.altitude: float = kwargs.get('altitude', 22)
+        self.speed: float = kwargs.get('speed', 0)
+        self.heading: float = kwargs.get('heading', 90)
         self.gnss_satellites: int = kwargs.get('gnss_satellites', None)
         self.pdop: int = kwargs.get('pdop', None)
         self.hdop: int = kwargs.get('hdop', None)
         self.vdop: int = kwargs.get('vdop', None)
         self.fix_type: str = kwargs.get('fix_type', None)
         self.fix_allowed: str = kwargs.get('fix_allowed', None)
-        self.fix_time: str = kwargs.get('')
 
 
 class PdpContext:
@@ -349,5 +348,6 @@ def test_obj_eq():
 def test_location():
     location = Location()
     jsonable = json_compatible(location)
+    assert isinstance(jsonable, dict)
     assert isinstance(json.dumps(jsonable), str)
     

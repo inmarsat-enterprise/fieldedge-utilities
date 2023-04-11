@@ -212,7 +212,7 @@ class Microservice(ABC):
         def feature_prop(prop) -> 'tuple[object, str]':
             fprop, ftag = untag_class_property(prop, True, True)
             feature = self.features.get(ftag, None)
-            if feature and hasattr(feature, ftag):
+            if feature and fprop in feature.properties_list():
                 return (feature, fprop)
             raise ValueError(f'Unknown tag {prop}')
         # main function
@@ -221,14 +221,14 @@ class Microservice(ABC):
             prop, tag = untag_class_property(isc_prop, self._isc_tags, True)
             if self._isc_tags:
                 if tag == self.tag:
-                    if hasattr(self, prop):
+                    if hasattr_static(self, prop):
                         obj = self
                     else:
                         obj, prop = feature_prop(prop)
                 else:
                     raise ValueError(f'Unknown tag {tag}')
             else:
-                if hasattr(self, prop):
+                if hasattr_static(self, prop):
                     obj = self
                 else:
                     obj, prop = feature_prop(isc_prop)
@@ -504,7 +504,7 @@ class Microservice(ABC):
                 for prop in req_props:
                     res_props[prop] = self.isc_get_property(prop)
         _log.debug(f'Responding to request {request_id} for properties'
-                   f': {request["properties"] or "ALL"}')
+                   f': {request.get("properties", "ALL")}')
         self.notify(message=response, subtopic=subtopic)
 
     def properties_change(self, request: dict) -> 'None|dict':

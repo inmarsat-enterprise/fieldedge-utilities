@@ -308,14 +308,12 @@ class Microservice(ABC):
         if isc_prop_name in self._rollcall_properties:
             self._rollcall_properties.remove(isc_prop_name)
 
-    @abstractmethod
     def rollcall(self):
         """Publishes a rollcall broadcast to other microservices with UUID."""
         subtopic = 'rollcall'
         rollcall = { 'uid': str(uuid4()) }
         self.notify(message=rollcall, subtopic=subtopic)
 
-    @abstractmethod
     def rollcall_respond(self, topic: str, message: dict):
         """Processes an incoming rollcall request.
         
@@ -335,7 +333,8 @@ class Microservice(ABC):
         subtopic = 'rollcall/response'
         if 'uid' not in message:
             _log.warning('Rollcall request missing unique ID')
-        response = { 'uid': message.get('uid', None) }
+        requestor = topic.split('/')[1]
+        response = { 'uid': message.get('uid', None), 'requestor': requestor }
         for isc_prop in self._rollcall_properties:
             if isc_prop in self.isc_properties:
                 response[isc_prop] = self.isc_get_property(isc_prop)
@@ -480,29 +479,34 @@ class Microservice(ABC):
             else:
                 response['properties'] = self.isc_properties
         else:
-            subtopic = 'info/properties/values'
-            req_props: list = request.get('properties', [])
-            if not req_props or 'all' in req_props:
-                req_props = self.isc_properties
-            response['properties'] = {}
-            res_props = response['properties']
-            props_source = self.isc_properties
-            if categorized:
-                props_source = self.isc_properties_by_type
-                for prop in req_props:
-                    if (READ_WRITE in props_source and
-                        prop in props_source[READ_WRITE]):
-                        # config property
-                        if READ_WRITE not in res_props:
-                            res_props[READ_WRITE] = {}
-                        res_props[READ_WRITE][prop] = self.isc_get_property(prop)
-                    else:
-                        if READ_ONLY not in res_props:
-                            res_props[READ_ONLY] = {}
-                        res_props[READ_ONLY][prop] = self.isc_get_property(prop)
-            else:
-                for prop in req_props:
-                    res_props[prop] = self.isc_get_property(prop)
+            try:
+                subtopic = 'info/properties/values'
+                req_props: list = request.get('properties', [])
+                if not req_props or 'all' in req_props:
+                    req_props = self.isc_properties
+                response['properties'] = {}
+                res_props = response['properties']
+                props_source = self.isc_properties
+                if categorized:
+                    props_source = self.isc_properties_by_type
+                    for prop in req_props:
+                        if (READ_WRITE in props_source and
+                            prop in props_source[READ_WRITE]):
+                            # config property
+                            if READ_WRITE not in res_props:
+                                res_props[READ_WRITE] = {}
+                            res_props[READ_WRITE][prop] = (
+                                self.isc_get_property(prop))
+                        else:
+                            if READ_ONLY not in res_props:
+                                res_props[READ_ONLY] = {}
+                            res_props[READ_ONLY][prop] = (
+                                self.isc_get_property(prop))
+                else:
+                    for prop in req_props:
+                        res_props[prop] = self.isc_get_property(prop)
+            except AttributeError as exc:
+                response = { 'uid': request_id, 'error': {exc} }
         _log.debug(f'Responding to request {request_id} for properties'
                    f': {request.get("properties", "ALL")}')
         self.notify(message=response, subtopic=subtopic)

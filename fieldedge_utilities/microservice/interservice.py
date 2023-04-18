@@ -120,32 +120,31 @@ class IscTaskQueue(list):
         `OSError` for unsupported list operations: `insert`, `extend`.
     
     """
-    
     def __init__(self, blocking: bool = False, unblock_on_expiry: bool = True):
         super().__init__()
         self._blocking = blocking
         self._unblock_on_expiry = unblock_on_expiry
         self._task_blocking = threading.Event()
         self._task_blocking.set()
-    
+
     @property
     def task_blocking(self) -> 'threading.Event|None':
         """A threading.Event if the queue was initialized as blocking, or None.
         """
         if self._blocking:
             return self._task_blocking
-        
+
     @property
     def _vlog(self) -> bool:
         return verbose_logging('isctaskqueue')
-    
+
     def unblock_tasks(self, unblock: bool = True):
-        """"""
+        """Unblocks tasks if set."""
         if self._blocking and unblock is True:
             if not self.task_blocking.is_set():
                 _log.debug('Unblocking tasks - task_blocking.set()')
                 self.task_blocking.set()
-        
+
     def append(self, task: IscTask) -> None:
         """Add a task to the queue.
         
@@ -173,7 +172,7 @@ class IscTaskQueue(list):
         if self._vlog:
             _log.debug(f'Queued task: {task.__dict__}')
         super().append(task)
-    
+
     def peek(self,
              task_id: str = None,
              task_type: str = None,
@@ -195,7 +194,7 @@ class IscTaskQueue(list):
                     if k == task_meta[0] and v == task_meta[1]:
                         return task
         return None
-    
+
     def is_queued(self,
                   task_id: str = None,
                   task_type: str = None,
@@ -212,7 +211,7 @@ class IscTaskQueue(list):
         
         """
         return isinstance(self.peek(task_id, task_type, task_meta), IscTask)
-            
+
     def get(self,
             task_id: str = None,
             task_meta: 'tuple[str, Any]' = None,
@@ -252,7 +251,7 @@ class IscTaskQueue(list):
             _log.warning(f'task_id {task_id} not in queue')
         else:
             raise ValueError('task_id or meta_tag must be specified')
-    
+
     def remove_expired(self):
         """Removes expired tasks from the queue.
         
@@ -292,10 +291,15 @@ class IscTaskQueue(list):
                     timeout_meta[k] = v
                 rem.task_meta[cb_key](timeout_meta)
 
+    def clear(self):
+        """Removes all items from the queue."""
+        super().clear()
+        self.unblock_tasks(True)
+
     def insert(self, index, item):
         """Invalid operation."""
         raise OSError('ISC task queue does not support insertion')
-        
+
     def extend(self, other):
         """Invalid operation."""
         raise OSError('ISC task queue does not support insertion')

@@ -3,6 +3,7 @@
 import logging
 import time
 from abc import ABC, abstractmethod
+from enum import IntEnum
 from typing import Callable, Any
 
 from fieldedge_utilities.timer import RepeatingTimer
@@ -11,9 +12,16 @@ from fieldedge_utilities.logger import verbose_logging
 from .interservice import IscTaskQueue, IscTask, IscException
 from .propertycache import PropertyCache
 
-__all__ = ['MicroserviceProxy']
+__all__ = ['MicroserviceProxy', 'InitializationState']
 
 _log = logging.getLogger(__name__)
+
+
+class InitializationState(IntEnum):
+    """Initialization state of the MicroserviceProxy."""
+    NONE = 0
+    PENDING = 1
+    COMPLETE = 2
 
 
 class MicroserviceProxy(ABC):
@@ -69,8 +77,7 @@ class MicroserviceProxy(ABC):
                                          auto_start=True)
         self._proxy_properties: dict = None
         self._property_cache: PropertyCache = PropertyCache()
-        self._initialized: bool = False
-        self._initializing: bool = False
+        self._init: InitializationState = InitializationState.NONE
 
     @property
     def tag(self) -> str:
@@ -80,7 +87,7 @@ class MicroserviceProxy(ABC):
     @property
     def is_initialized(self) -> bool:
         """Returns True if the proxy has been initialized with properties."""
-        return self._initialized
+        return self._init == InitializationState.COMPLETE
 
     @property
     def _base_topic(self) -> str:
@@ -97,7 +104,7 @@ class MicroserviceProxy(ABC):
         Raises `OSError` if the proxy has not been initialized.
         
         """
-        if not self.is_initialized and not self._initializing:
+        if self._init < InitializationState.PENDING:
             raise OSError('Proxy not initialized')
         cached = self._property_cache.get_cached('all')
         if cached:
@@ -178,13 +185,19 @@ class MicroserviceProxy(ABC):
             'timeout': self._init_timeout,
             'timeout_callback': self._init_fail,
         }
-        self._initializing = True
+        self._init = InitializationState.PENDING
         self.query_properties(['all'], task_meta)
+
+    def deinitialize(self) -> None:
+        """De-initialize the proxy and clear the property cache and task queue.
+        """
+        self._init = InitializationState.NONE
+        self._property_cache.clear()
+        self._isc_queue.clear()
 
     def _init_fail(self, task_meta: dict = None):
         """Calls back with a failure on initialization failure/timeout."""
-        self._initialized = False
-        self._initializing = False
+        self._init = InitializationState.NONE
         if callable(self._init_callback):
             tag = None
             if isinstance(task_meta, dict):
@@ -245,8 +258,7 @@ class MicroserviceProxy(ABC):
         new_init = False
         if isinstance(task_meta, dict):
             if 'initialize' in task_meta:
-                self._initialized = True
-                self._initializing = True
+                self._init = InitializationState.COMPLETE
                 new_init = True
                 cache_all = True
                 _log.info(f'{self.tag} proxy initialized')

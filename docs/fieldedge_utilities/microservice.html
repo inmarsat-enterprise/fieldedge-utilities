@@ -98,6 +98,9 @@
                                 <a class="function" href="#IscTaskQueue.remove_expired">remove_expired</a>
                         </li>
                         <li>
+                                <a class="function" href="#IscTaskQueue.clear">clear</a>
+                        </li>
+                        <li>
                                 <a class="function" href="#IscTaskQueue.insert">insert</a>
                         </li>
                         <li>
@@ -243,6 +246,9 @@
                         </li>
                         <li>
                                 <a class="function" href="#MicroserviceProxy.initialize">initialize</a>
+                        </li>
+                        <li>
+                                <a class="function" href="#MicroserviceProxy.deinitialize">deinitialize</a>
                         </li>
                         <li>
                                 <a class="function" href="#MicroserviceProxy.query_properties">query_properties</a>
@@ -731,7 +737,9 @@ unblock.</li>
     </div>
     <a class="headerlink" href="#IscTaskQueue.unblock_tasks"></a>
     
-    
+            <div class="docstring"><p>Unblocks tasks if set.</p>
+</div>
+
 
                             </div>
                             <div id="IscTaskQueue.append" class="classattr">
@@ -865,6 +873,21 @@ will be called with the cb_meta kwargs.</p>
 
 
                             </div>
+                            <div id="IscTaskQueue.clear" class="classattr">
+                                <div class="attr function">
+            
+        <span class="def">def</span>
+        <span class="name">clear</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span></span><span class="return-annotation">):</span></span>
+
+        
+    </div>
+    <a class="headerlink" href="#IscTaskQueue.clear"></a>
+    
+            <div class="docstring"><p>Removes all items from the queue.</p>
+</div>
+
+
+                            </div>
                             <div id="IscTaskQueue.insert" class="classattr">
                                 <div class="attr function">
             
@@ -899,8 +922,7 @@ will be called with the cb_meta kwargs.</p>
                                 <h5>Inherited Members</h5>
                                 <dl>
                                     <div><dt>builtins.list</dt>
-                                <dd id="IscTaskQueue.clear" class="function">clear</dd>
-                <dd id="IscTaskQueue.copy" class="function">copy</dd>
+                                <dd id="IscTaskQueue.copy" class="function">copy</dd>
                 <dd id="IscTaskQueue.pop" class="function">pop</dd>
                 <dd id="IscTaskQueue.remove" class="function">remove</dd>
                 <dd id="IscTaskQueue.index" class="function">index</dd>
@@ -1712,6 +1734,21 @@ callbacks are completed.</p>
     <a class="headerlink" href="#MicroserviceProxy.initialize"></a>
     
             <div class="docstring"><p>Requests properties of the microservice to create the proxy.</p>
+</div>
+
+
+                            </div>
+                            <div id="MicroserviceProxy.deinitialize" class="classattr">
+                                <div class="attr function">
+            
+        <span class="def">def</span>
+        <span class="name">deinitialize</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span></span><span class="return-annotation">) -> <span class="kc">None</span>:</span></span>
+
+        
+    </div>
+    <a class="headerlink" href="#MicroserviceProxy.deinitialize"></a>
+    
+            <div class="docstring"><p>De-initialize the proxy and clear the property cache and task queue.</p>
 </div>
 
 

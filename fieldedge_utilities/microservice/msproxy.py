@@ -145,8 +145,11 @@ class MicroserviceProxy(ABC):
             raise err
 
     def task_handle(self, response: dict) -> bool:
-        """Returns True if the task_id is in the queue after any task
-        callbacks are completed.
+        """Returns True if the task was handled, after triggering any callback.
+        
+        Args:
+            response (dict): The response message from the microservice.
+        
         """
         task_id = response.get('uid', None)
         if not task_id or not self._isc_queue.is_queued(task_id):

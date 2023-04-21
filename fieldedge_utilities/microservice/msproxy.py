@@ -1,9 +1,10 @@
 """A proxy class for interfacing with other Microservices via MQTT.
 """
 import logging
-import time
+import os
 from abc import ABC, abstractmethod
 from enum import IntEnum
+from threading import Event
 from typing import Callable, Any
 
 from fieldedge_utilities.timer import RepeatingTimer
@@ -15,6 +16,8 @@ from .propertycache import PropertyCache
 __all__ = ['MicroserviceProxy', 'InitializationState']
 
 _log = logging.getLogger(__name__)
+
+PROXY_PROPERTY_TIMEOUT = int(os.getenv('PROXY_PROPERTY_TIMEOUT', '35'))
 
 
 class InitializationState(IntEnum):
@@ -77,6 +80,7 @@ class MicroserviceProxy(ABC):
                                          auto_start=True)
         self._proxy_properties: dict = None
         self._property_cache: PropertyCache = PropertyCache()
+        self._proxy_event: Event = Event()
         self._init: InitializationState = InitializationState.NONE
 
     @property
@@ -100,8 +104,12 @@ class MicroserviceProxy(ABC):
         """The microservice properties.
         
         If cached returns immediately, otherwise blocks waiting for an update
-        via the MQTT thread.
-        Raises `OSError` if the proxy has not been initialized.
+        via the MQTT thread. Some properties e.g. GNSS information may take
+        longer than 30 seconds to resolve.
+        
+        Raises:
+            `OSError` if the proxy has not been initialized, or if the request
+            times out after `PROXY_PROPERTY_TIMEOUT` seconds (default 35).
         
         """
         if self._init < InitializationState.PENDING:
@@ -115,12 +123,12 @@ class MicroserviceProxy(ABC):
         else:
             self._proxy_properties = None
             task_meta = { 'properties': 'all' }
+            if self._proxy_event.is_set():
+                self._proxy_event.clear()
             self.query_properties(['all'], task_meta)
-        attempts = 0
-        while self._isc_queue.peek(task_meta=('properties', 'all')):
-            attempts += 1
-            _log.debug(f'Waiting for property update ({attempts})')
-            time.sleep(1)
+        self._proxy_event.wait(PROXY_PROPERTY_TIMEOUT)
+        if not self._proxy_properties:
+            raise OSError('proxy_properties unsuccessful')
         return self._proxy_properties
 
     def property_get(self, property_name: str) -> Any:
@@ -279,6 +287,8 @@ class MicroserviceProxy(ABC):
                 self._property_cache.cache(val, prop, cache_lifetime)
         if cache_all:
             self._property_cache.cache(cache_all, 'all', cache_lifetime)
+            if not self._proxy_event.is_set():
+                self._proxy_event.set()
         self.task_complete(task_meta)
         if new_init and callable(self._init_callback):
             self._init_callback(success=True,

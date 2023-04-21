@@ -392,6 +392,10 @@ def test_complex_ms(test_complex: TestService, test_service: TestService):
         time.sleep(0.5)
     assert proxy.is_initialized
     assert init_success == True
+    proxy_props = proxy.properties
+    assert 'configProp' in proxy_props and proxy_props['configProp'] == 2
+    assert 'infoProp' in proxy_props and proxy_props['infoProp'] == 'test'
+    assert 'logLevel' in proxy_props and proxy_props['logLevel'] == 'DEBUG'
     assert proxy.property_get('configProp') == 2
     proxy.property_set('configProp', 3)
     attempts = 0

@@ -238,8 +238,6 @@ class Microservice(ABC):
     def isc_get_property(self, isc_property: str) -> Any:
         """Gets a property value based on its ISC name."""
         prop = untag_class_property(isc_property, self._isc_tags)
-        if prop not in self.properties:
-            raise AttributeError(f'{prop} not in properties')
         if hasattr_static(self, prop):
             return getattr(self, prop)
         else:
@@ -249,16 +247,14 @@ class Microservice(ABC):
                 fprop = prop.replace(f'{tag}_', '')
                 if hasattr_static(feature, fprop):
                     return getattr(feature, fprop)
-        _log.warning(f'ISC property {isc_property} not found')
+        raise AttributeError(f'ISC property {isc_property} not found')
 
     def isc_set_property(self, isc_property: str, value: Any) -> None:
         """Sets a property value based on its ISC name."""
         prop = untag_class_property(isc_property, self._isc_tags)
-        if prop not in self.properties:
-            raise AttributeError(f'{prop} not in properties')
-        if prop not in self.properties_by_type[READ_WRITE]:
-            raise AttributeError(f'{prop} is not writable')
         if hasattr_static(self, prop):
+            if property_is_read_only(self, prop):
+                raise AttributeError(f'{prop} is read-only')
             setattr(self, prop, value)
             return
         else:
@@ -267,9 +263,11 @@ class Microservice(ABC):
                     continue
                 fprop = prop.replace(f'{tag}_', '')
                 if hasattr_static(feature, fprop):
+                    if property_is_read_only(feature, fprop):
+                        raise AttributeError(f'{prop} is read-only')
                     setattr(feature, fprop, value)
                     return
-        _log.warning(f'ISC property {isc_property} not found')
+        raise AttributeError(f'ISC property {isc_property} not found')
 
     def isc_property_hide(self, isc_property: str) -> None:
         """Hides a property from ISC - does not appear in `isc_properties`."""

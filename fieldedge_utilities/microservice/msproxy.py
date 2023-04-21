@@ -138,10 +138,10 @@ class MicroserviceProxy(ABC):
             return cached
         return self.properties.get(property_name)
 
-    def property_set(self, property_name: str, value: Any):
+    def property_set(self, property_name: str, value: Any, **kwargs):
         """Sets the proxy property value."""
         task_meta = { 'set': property_name }
-        self.query_properties({ property_name: value }, task_meta)
+        self.query_properties({ property_name: value }, task_meta, kwargs)
 
     def task_add(self, task: IscTask) -> None:
         """Adds a task to the task queue."""
@@ -185,7 +185,7 @@ class MicroserviceProxy(ABC):
         _log.debug(f'Completing {task_type} ({task_id})')
         self._isc_queue.task_blocking.set()
 
-    def initialize(self) -> None:
+    def initialize(self, **kwargs) -> None:
         """Requests properties of the microservice to create the proxy."""
         topics = [f'{self._base_topic}/event/#', f'{self._base_topic}/info/#']
         for topic in topics:
@@ -199,7 +199,7 @@ class MicroserviceProxy(ABC):
             'timeout_callback': self._init_fail,
         }
         self._init = InitializationState.PENDING
-        self.query_properties(['all'], task_meta)
+        self.query_properties(['all'], task_meta, kwargs)
 
     def deinitialize(self) -> None:
         """De-initialize the proxy and clear the property cache and task queue.

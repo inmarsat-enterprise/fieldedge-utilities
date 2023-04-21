@@ -152,7 +152,7 @@ class MicroserviceProxy(ABC):
             self._isc_queue.task_blocking.set()
             raise err
 
-    def task_handle(self, response: dict) -> bool:
+    def task_handle(self, response: dict, unblock: bool = False) -> bool:
         """Returns True if the task was handled, after triggering any callback.
         
         Args:
@@ -163,7 +163,7 @@ class MicroserviceProxy(ABC):
         if not task_id or not self._isc_queue.is_queued(task_id):
             _log.debug(f'No task ID {task_id} queued - ignoring')
             return False
-        task = self._isc_queue.get(task_id)
+        task = self._isc_queue.get(task_id, unblock=unblock)
         if not isinstance(task.task_meta, dict):
             if task.task_meta is not None:
                 _log.warning(f'Overwriting {task.task_meta}')
@@ -172,6 +172,8 @@ class MicroserviceProxy(ABC):
         task.task_meta['task_type'] = task.task_type
         if callable(task.callback):
             task.callback(response, task.task_meta)
+        elif self._isc_queue.task_blocking:
+            _log.warning('Task queue still blocking with no callback')
         return True
 
     def task_complete(self, task_meta: dict = None):

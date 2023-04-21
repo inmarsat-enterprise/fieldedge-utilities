@@ -369,6 +369,18 @@ class Microservice(ABC):
         except:
             return False
 
+    def _kwarg_propagate(self,
+                         topic: str,
+                         message: dict,
+                         filter: 'list[str]') -> None:
+        if not isinstance(filter, list):
+            filter = [filter]
+        filter += ['uid', 'ts']
+        kwargs = {key: val for key, val in message.items()
+                  if key not in filter}
+        if kwargs:
+            self.on_isc_message(topic, message)
+
     def _on_isc_message(self, topic: str, message: dict) -> None:
         """Handles rollcall requests or passes to the `on_isc_message` method.
         
@@ -393,11 +405,10 @@ class Microservice(ABC):
         elif (topic.endswith(f'/{self.tag}/request/properties/list') or
               topic.endswith(f'/{self.tag}/request/properties/get')):
             self.properties_notify(message)
+            self._kwarg_propagate(topic, message, ['properties'])
         elif topic.endswith(f'/{self.tag}/request/properties/set'):
             self.properties_change(message)
-            report = message.get('reportChange', False)
-            if report:   # pass message to downstream handler
-                self.on_isc_message(topic, message)
+            self._kwarg_propagate(topic, message, ['properties'])
         else:
             if (self.features and
                 self._is_child_isc(self.features, topic, message)):

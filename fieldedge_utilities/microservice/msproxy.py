@@ -311,7 +311,7 @@ class MicroserviceProxy(ABC):
     def unsubscribe(self, topic: str):
         """Subscribes to a MQTT topic via the parent."""
         if not callable(self._unsubscribe):
-            raise ValueError('subscribe callback not defined')
+            raise ValueError('unsubscribe callback not defined')
         self._unsubscribe(topic)
 
     @abstractmethod

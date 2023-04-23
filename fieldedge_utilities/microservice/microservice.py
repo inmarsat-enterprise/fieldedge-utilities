@@ -24,6 +24,30 @@ __all__ = ['Microservice']
 _log = logging.getLogger(__name__)
 
 
+class DictTrigger(dict):
+    """A modified dictionary that monitors edits and executes a callback."""
+    def __init__(self, *args, **kwargs) -> None:
+        self._modify_callback = kwargs.pop('modify_callback', None)
+        self.update(*args, **kwargs)
+
+    def update(self, *args, **kwargs):
+        for k, v in dict(*args, **kwargs).items():
+            self[k] = v
+
+    def __setitem__(self, __key: Any, __value: Any) -> None:
+        if __value is None:
+            del self[__key]
+        else:
+            dict.__setitem__(self, __key, __value)
+        if callable(self._modify_callback):
+            self._modify_callback()
+
+    def __delitem__(self, __key: Any) -> None:
+        dict.__delitem__(self, __key)
+        if callable(self._modify_callback):
+            self._modify_callback()
+
+
 class Microservice(ABC):
     """Abstract base class for a FieldEdge microservice.
     
@@ -92,7 +116,8 @@ class Microservice(ABC):
         self._isc_timer = RepeatingTimer(seconds=isc_poll_interval,
                                          target=self._isc_queue.remove_expired,
                                          name='IscTaskExpiryTimer')
-        self.features: 'dict[str, Feature]' = {}
+        self.features: 'dict[str, Feature]' = DictTrigger(
+            modify_callback=self._refresh_properties)
         self.ms_proxies: 'dict[str, MicroserviceProxy]' = {}
         self._property_cache = PropertyCache()
 
@@ -128,6 +153,8 @@ class Microservice(ABC):
 
     def _refresh_properties(self) -> 'list[str]':
         """Refreshes the class properties."""
+        self._property_cache.remove('properties')
+        self._property_cache.remove('isc_properties')
         ignore = self._hidden_properties
         properties = get_class_properties(self.__class__, ignore)
         for tag, feature in self.features.items():

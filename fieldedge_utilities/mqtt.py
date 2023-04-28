@@ -19,7 +19,7 @@ import os
 import threading
 from atexit import register as on_exit
 from enum import IntEnum
-from socket import timeout  # : for Python < 3.10 compatibility vs TimeoutError
+from socket import timeout, gaierror  # : Python<3.10 vs TimeoutError
 from time import sleep, time
 from typing import Callable
 
@@ -187,7 +187,7 @@ class MqttClient:
     @property
     def is_connected(self) -> bool:
         return self._mqtt.is_connected()
-    
+
     @property
     def subscriptions(self) -> dict:
         """The dictionary of subscriptions.
@@ -235,7 +235,7 @@ class MqttClient:
         self._mqtt.user_data_set('terminate')
         self._mqtt.loop_stop()
         self._mqtt.disconnect()
-    
+
     def _unique_thread_name(self, before_names: 'list[str]') -> str:
         basename = 'MqttThread'
         if self._thread_name:
@@ -247,7 +247,7 @@ class MqttClient:
                 number += 1
                 name = f'{basename}-{number}'
         return name
-    
+
     def connect(self):
         """Attempts to establish a connection to the broker and re-subscribe."""
         try:
@@ -281,7 +281,7 @@ class MqttClient:
             new_thread.name = self._unique_thread_name(before_names)
             _log.debug(f'New MQTT client thread: {new_thread.name}')
             return
-        except (ConnectionError, timeout, TimeoutError) as err:
+        except (ConnectionError, TimeoutError, gaierror, timeout) as err:
             self._mqtt.loop_stop()
             self._failed_connect_attempts += 1
             _log.error(f'Failed attempt {self._failed_connect_attempts}'
@@ -308,14 +308,14 @@ class MqttClient:
         if rc == MqttResultCode.SUCCESS:
             if _vlog():
                 _log.debug(f'Established MQTT connection to {self._host}')
-            for sub in self.subscriptions:
-                self._mqtt_subscribe(sub, self.subscriptions[sub]['qos'])
+            for sub, meta in self.subscriptions.items():
+                self._mqtt_subscribe(sub, qos=meta.get('qos', None))
             if callable(self.on_connect):
                 self.on_connect(client, userdata, flags, rc)
         else:
             _log.error(f'MQTT broker connection result code: {rc}'
                        f' ({_get_mqtt_result(rc)})')
-    
+
     def _mqtt_subscribe(self, topic: str, qos: int = 0):
         """Internal subscription handler assigns id indicating *subscribed*."""
         (result, mid) = self._mqtt.subscribe(topic=topic, qos=qos)
@@ -363,7 +363,8 @@ class MqttClient:
         if not match:
             _log.error(f'Unable to match mid={mid} to pending subscription')
 
-    def is_subscribed(self, topic: str):
+    def is_subscribed(self, topic: str) -> bool:
+        """Returns True if the specified topic is an active subscription."""
         if (topic in self.subscriptions and
             self.subscriptions[topic]['mid'] > 0):
             return True

@@ -67,7 +67,7 @@ class PropertyCache:
             
         """
         if value is None:
-            _log.warning('Request to cache None value')
+            _log.warning(f'Request to cache None for {tag}')
         if tag in self._cache:
             _log.debug(f'Overwriting cached {tag}')
         to_cache = CachedProperty(value, name=tag, lifetime=lifetime)

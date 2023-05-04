@@ -481,8 +481,8 @@ task handling for the SISO task queue.</p>
     
             <div class="docstring"><p>Template for a microservice feature as a child of the microservice.</p>
 
-<p>Private objects and methods include _task_queue, _task_notify_callback,
-_task_complete_callback, _task_fail_callback.</p>
+<p>Private objects and methods include _task_queue, _task_notify,
+_task_complete, _task_fail_callback.</p>
 </div>
 
 
@@ -501,16 +501,16 @@ _task_complete_callback, _task_fail_callback.</p>
 
 <ul>
 <li><strong>task_queue (<code><a href="#IscTaskQueue">IscTaskQueue</a></code>):</strong>  The parent microservice ISC task queue.</li>
-<li><strong>task_notify_callback (<code>Callable[[str, dict]]</code>):</strong>  The parent <code>notify</code>
+<li><strong>task_notify (<code>Callable[[str, dict]]</code>):</strong>  The parent <code>notify</code>
 method for MQTT publish.</li>
-<li><strong>task_complete_callback (<code>Callable[[str, dict]]</code>):</strong>  A parent task
+<li><strong>task_complete (<code>Callable[[str, dict]]</code>):</strong>  A parent task
 completion function to receive task <code>uid</code> and <code>task_meta</code>.</li>
 </ul>
 
 <h6 id="keyword-args">Keyword Args:</h6>
 
 <blockquote>
-  <p>task_fail_callback (<code>Callable</code>): An optional parent
+  <p>task_fail (<code>Callable</code>): An optional parent
       function to call if the task fails.</p>
 </blockquote>
 </div>
@@ -1641,8 +1641,15 @@ before the next task can be queued.</p>
             <div class="docstring"><p>The microservice properties.</p>
 
 <p>If cached returns immediately, otherwise blocks waiting for an update
-via the MQTT thread.
-Raises <code>OSError</code> if the proxy has not been initialized.</p>
+via the MQTT thread. Some properties e.g. GNSS information may take
+longer than 30 seconds to resolve.</p>
+
+<h6 id="raises">Raises:</h6>
+
+<ul>
+<li><code>OSError</code> if the proxy has not been initialized, or if the request</li>
+<li>times out after <code>PROXY_PROPERTY_TIMEOUT</code> seconds (default 35).</li>
+</ul>
 </div>
 
 
@@ -1666,7 +1673,7 @@ Raises <code>OSError</code> if the proxy has not been initialized.</p>
                                 <div class="attr function">
             
         <span class="def">def</span>
-        <span class="name">property_set</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span>, </span><span class="param"><span class="n">property_name</span><span class="p">:</span> <span class="nb">str</span>, </span><span class="param"><span class="n">value</span><span class="p">:</span> <span class="n">Any</span></span><span class="return-annotation">):</span></span>
+        <span class="name">property_set</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span>, </span><span class="param"><span class="n">property_name</span><span class="p">:</span> <span class="nb">str</span>, </span><span class="param"><span class="n">value</span><span class="p">:</span> <span class="n">Any</span>, </span><span class="param"><span class="o">**</span><span class="n">kwargs</span></span><span class="return-annotation">):</span></span>
 
         
     </div>
@@ -1696,14 +1703,19 @@ Raises <code>OSError</code> if the proxy has not been initialized.</p>
                                 <div class="attr function">
             
         <span class="def">def</span>
-        <span class="name">task_handle</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span>, </span><span class="param"><span class="n">response</span><span class="p">:</span> <span class="nb">dict</span></span><span class="return-annotation">) -> <span class="nb">bool</span>:</span></span>
+        <span class="name">task_handle</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span>, </span><span class="param"><span class="n">response</span><span class="p">:</span> <span class="nb">dict</span>, </span><span class="param"><span class="n">unblock</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span></span><span class="return-annotation">) -> <span class="nb">bool</span>:</span></span>
 
         
     </div>
     <a class="headerlink" href="#MicroserviceProxy.task_handle"></a>
     
-            <div class="docstring"><p>Returns True if the task_id is in the queue after any task
-callbacks are completed.</p>
+            <div class="docstring"><p>Returns True if the task was handled, after triggering any callback.</p>
+
+<h6 id="arguments">Arguments:</h6>
+
+<ul>
+<li><strong>response (dict):</strong>  The response message from the microservice.</li>
+</ul>
 </div>
 
 
@@ -1727,7 +1739,7 @@ callbacks are completed.</p>
                                 <div class="attr function">
             
         <span class="def">def</span>
-        <span class="name">initialize</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span></span><span class="return-annotation">) -> <span class="kc">None</span>:</span></span>
+        <span class="name">initialize</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span>, </span><span class="param"><span class="o">**</span><span class="n">kwargs</span></span><span class="return-annotation">) -> <span class="kc">None</span>:</span></span>
 
         
     </div>

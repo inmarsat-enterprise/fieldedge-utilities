@@ -245,6 +245,7 @@ class MicroserviceProxy(ABC):
                             task_meta=task_meta,
                             callback=self.update_proxy_properties,
                             lifetime=lifetime)
+        self.task_add(prop_task)
         topic = f'{self._base_topic}/request/properties/{method}'
         message = {
             'uid': prop_task.uid,
@@ -254,7 +255,6 @@ class MicroserviceProxy(ABC):
             for key, val in query_meta.items():
                 message[key] = val
         self._publish(topic, message)
-        self.task_add(prop_task)
 
     def update_proxy_properties(self, message: dict, task_meta: dict = None):
         """Updates the proxy property dictionary with queried values.

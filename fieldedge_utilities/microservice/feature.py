@@ -9,8 +9,8 @@ __all__ = ['Feature']
 class Feature(ABC):
     """Template for a microservice feature as a child of the microservice.
     
-    Private objects and methods include _task_queue, _task_notify_callback,
-    _task_complete_callback, _task_fail_callback.
+    Private objects and methods include _task_queue, _task_notify,
+    _task_complete, _task_fail_callback.
     
     """
     def __init__(self,
@@ -22,13 +22,13 @@ class Feature(ABC):
         
         Args:
             task_queue (`IscTaskQueue`): The parent microservice ISC task queue.
-            task_notify_callback (`Callable[[str, dict]]`): The parent `notify`
+            task_notify (`Callable[[str, dict]]`): The parent `notify`
                 method for MQTT publish.
-            task_complete_callback (`Callable[[str, dict]]`): A parent task
+            task_complete (`Callable[[str, dict]]`): A parent task
                 completion function to receive task `uid` and `task_meta`.
 
         Keyword Args:
-            task_fail_callback (`Callable`): An optional parent
+            task_fail (`Callable`): An optional parent
                 function to call if the task fails.
              
         """

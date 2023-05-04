@@ -149,7 +149,21 @@ def test_json_camel():
         'in': 1,
         'out': 1
     }
-    tests = [TEST_1, TEST_2, TEST_3, TEST_4, TEST_5, TEST_6]
+    TEST_7 = { 'in': { 'disk_use': {} }, 'out': { 'diskUse': {} }}
+    TEST_8 = {
+        'in': { 'is_time_synchronized': True },
+        'out': { 'isTimeSynchronized': True },
+    }
+    tests = [
+        TEST_1,
+        TEST_2,
+        TEST_3,
+        TEST_4,
+        TEST_5,
+        TEST_6,
+        TEST_7,
+        TEST_8,
+    ]
     for test in tests:
         assert test['out'] == json_compatible(test['in'])
         assert isinstance(json.dumps(json_compatible(test)), str)

@@ -35,9 +35,9 @@ HOSTPIPE_LOG = os.getenv('HOSTPIPE_LOG', './logs/hostpipe.log')
 CMD_TAG = ',command='
 RES_TAG = ',result='
 
-HOSTPIPE_TIMEOUT = float(os.getenv('HOSTPIPE_TIMEOUT', 0.25))
-MAX_FILE_SIZE = int(os.getenv('HOSTPIPE_LOGFILE_SIZE', 2)) * 1024 * 1024
-HOSTPIPE_LOG_ITERATION_MAX = int(os.getenv('HOSTPIPE_LOG_ITERATION_MAX', 15))
+HOSTPIPE_TIMEOUT = float(os.getenv('HOSTPIPE_TIMEOUT', '0.25'))
+MAX_FILE_SIZE = int(os.getenv('HOSTPIPE_LOGFILE_SIZE', '2')) * 1024 * 1024
+HOSTPIPE_LOG_ITERATION_MAX = int(os.getenv('HOSTPIPE_LOG_ITERATION_MAX', '15'))
 
 
 def host_command(command: str,
@@ -78,10 +78,10 @@ def host_command(command: str,
             run(f'echo "{_escaped_command(modcommand)}" > {HOSTPIPE_PATH} &',
                 shell=True,
                 timeout=timeout)
-        except TimeoutExpired:
+        except TimeoutExpired as exc:
             err = f'Command {command} timed out waiting for hostpipe'
             _log.error(err)
-            raise TimeoutError(err)
+            raise TimeoutError(err) from exc
     else:
         _log.info(f'test_mode received command: {command}')
     if noresponse:
@@ -124,11 +124,11 @@ def _apply_preamble(command: str) -> str:
 
 def _escaped_command(command: str) -> str:
     escaped_command = ''
-    for c in command:
-        if c == '"':
+    for char in command:
+        if char == '"':
             escaped_command += r'\\\"'
         else:
-            escaped_command += c
+            escaped_command += char
     return escaped_command
 
 
@@ -236,7 +236,7 @@ def _maintain_pipelog(pipelog: str,
     Returns the number of lines deleted.
     """
     # TODO: spin a thread to do this in background? or manage in bash/linux
-    if not(os.path.isfile(pipelog)):
+    if not os.path.isfile(pipelog):
         raise FileNotFoundError(f'Could not find {pipelog}')
     to_delete = []
     if os.path.getsize(pipelog) > max_file_size:
@@ -250,13 +250,13 @@ def _maintain_pipelog(pipelog: str,
                         to_delete.append(line)
                     else:
                         break
-            with open(pipelog, 'w') as f:
+            with open(pipelog, 'w') as file:
                 for line in lines:
                     if line not in to_delete:
-                        f.write(line)
+                        file.write(line)
         if len(to_delete) > 0 and test_mode:
-            with open(pipelog, 'w') as f:
-                f.writelines(lines)
+            with open(pipelog, 'w') as file:
+                file.writelines(lines)
     return len(to_delete)
 
 

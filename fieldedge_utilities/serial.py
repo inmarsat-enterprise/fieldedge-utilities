@@ -26,27 +26,27 @@ class SerialDevice:
         self._vid: int = port_info.vid
         self._pid: int = port_info.pid
         self._serial_number: str = port_info.serial_number
-    
+
     @property
     def name(self) -> str:
         return self._name
-    
+
     @property
     def manufacturer(self) -> str:
         return self._manufacturer
-    
+
     @property
     def driver(self) -> str:
         return self._driver
-    
+
     @property
     def vid(self) -> int:
         return self._vid
-    
+
     @property
     def pid(self) -> int:
         return self._pid
-    
+
     @property
     def serial_number(self) -> str:
         return self._serial_number

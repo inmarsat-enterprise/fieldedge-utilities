@@ -1,3 +1,6 @@
+"""Methods for reading and writing user configuration file settings.
+
+"""
 import os
 from base64 import urlsafe_b64decode, urlsafe_b64encode
 
@@ -23,8 +26,8 @@ def read_user_config(filename: str = USER_CONFIG_FILE) -> dict:
     if not isinstance(filename, str):
         filename = USER_CONFIG_FILE
     if os.path.isfile(filename):
-        with open(filename) as f:
-            for line in f.readlines():
+        with open(filename) as file:
+            for line in file.readlines():
                 if line.startswith('#') or not line.strip():
                     continue
                 key, value = line.split('=', 1)
@@ -51,8 +54,8 @@ def write_user_config(config: dict, filename: str = USER_CONFIG_FILE) -> None:
     if not isinstance(filename, str) or not os.path.dirname(filename):
         filename = USER_CONFIG_FILE
     if os.path.isfile(filename):
-        with open(filename) as f:
-            for line in f.readlines():
+        with open(filename) as file:
+            for line in file.readlines():
                 if line.startswith('#') or not line.strip():
                     continue
                 file_key, file_value = line.strip().split('=', 1)
@@ -67,15 +70,15 @@ def write_user_config(config: dict, filename: str = USER_CONFIG_FILE) -> None:
                         lines_to_write.append(f'{file_key}={new_value}')
                         continue
                 lines_to_write.append(line.strip())
-    for k, v in config.items():
-        if k in keys_written:
+    for key, val in config.items():
+        if key in keys_written:
             continue
-        if 'PASSWORD' in k:
-            lines_to_write.append(f'{k}={obscure(v)}') 
+        if 'PASSWORD' in key:
+            lines_to_write.append(f'{key}={obscure(val)}')
         else:
-            lines_to_write.append(f'{k}={v}')
-    with open(filename, 'w') as f:
-        f.writelines('\n'.join(lines_to_write))
+            lines_to_write.append(f'{key}={val}')
+    with open(filename, 'w') as file:
+        file.writelines('\n'.join(lines_to_write))
 
 
 def obscure(value: str) -> str:

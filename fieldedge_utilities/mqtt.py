@@ -21,7 +21,7 @@ from atexit import register as on_exit
 from enum import IntEnum
 from socket import timeout, gaierror  # : Python<3.10 vs TimeoutError
 from time import sleep, time
-from typing import Callable
+from typing import Callable, Any
 
 from dotenv import load_dotenv
 from paho.mqtt.client import Client as PahoClient
@@ -64,10 +64,10 @@ class MqttResultCode(IntEnum):
     ERR_UNSUPPORTED_PACKET_TYPE = 20
 
 
-def _get_mqtt_result(rc: int) -> str:
+def _get_mqtt_result(result_code: int) -> str:
     try:
-        return MqttResultCode(rc).name
-    except:
+        return MqttResultCode(result_code).name
+    except ValueError:
         return 'UNKNOWN'
 
 
@@ -168,21 +168,21 @@ class MqttClient:
                 self.subscribe(sub, self._qos)
         if self.auto_connect:
             self.connect()
-    
+
     @property
     def client_id(self):
         return self._client_id
-    
+
     @client_id.setter
-    def client_id(self, id: str):
+    def client_id(self, uid: str):
         if not self._client_uid:
-            self._client_id = id
+            self._client_id = uid
         else:
-            if id != self._client_base_id:
+            if uid != self._client_base_id:
                 if verbose_logging('mqtt'):
-                    _log.debug(f'Updating client_id {id} with new timestamp')
-                id = self._client_base_id
-            self._client_id = f'{id}_{int(time())}'
+                    _log.debug(f'Updating client_id {uid} with new timestamp')
+                uid = self._client_base_id
+            self._client_id = f'{uid}_{int(time())}'
 
     @property
     def is_connected(self) -> bool:
@@ -219,8 +219,8 @@ class MqttClient:
 
     @connect_timeout.setter
     def connect_timeout(self, value: 'int|float'):
-        if (not(isinstance(value, (int, float))) or
-            not (0 < value <= 120)):
+        if (not isinstance(value, (int, float)) or
+            not 0 < value <= 120):
             # invalid value
             raise ValueError('Connect timeout must be 1..120 seconds')
         self._connect_timeout = value
@@ -228,10 +228,13 @@ class MqttClient:
 
     def _cleanup(self, *args):
         # TODO: logging raises an error since the log file was closed
-        # if _vlog():
-        #     for arg in args:
-        #         _log.debug(f'mqtt cleanup called with arg = {arg}')
-        #     _log.debug('Terminating MQTT connection')
+        if _vlog():
+            try:
+                for arg in args:
+                    _log.debug(f'mqtt cleanup called with arg = {arg}')
+                _log.debug('Terminating MQTT connection')
+            except:
+                pass
         self._mqtt.user_data_set('terminate')
         self._mqtt.loop_stop()
         self._mqtt.disconnect()
@@ -242,8 +245,8 @@ class MqttClient:
             basename += f'-{self._thread_name}'
         name = basename
         number = 1
-        for n in before_names:
-            if n.startswith(basename):
+        for name in before_names:
+            if name.startswith(basename):
                 number += 1
                 name = f'{basename}-{number}'
         return name
@@ -300,21 +303,21 @@ class MqttClient:
 
     def _mqtt_on_connect(self,
                          client: PahoClient,
-                         userdata: any,
+                         userdata: Any,
                          flags: dict,
-                         rc: int):
+                         reason_code: int):
         """Internal callback re-subscribes on (re)connection."""
         self._failed_connect_attempts = 0
-        if rc == MqttResultCode.SUCCESS:
+        if reason_code == MqttResultCode.SUCCESS:
             if _vlog():
                 _log.debug(f'Established MQTT connection to {self._host}')
             for sub, meta in self.subscriptions.items():
                 self._mqtt_subscribe(sub, qos=meta.get('qos', None))
             if callable(self.on_connect):
-                self.on_connect(client, userdata, flags, rc)
+                self.on_connect(client, userdata, flags, reason_code)
         else:
-            _log.error(f'MQTT broker connection result code: {rc}'
-                       f' ({_get_mqtt_result(rc)})')
+            _log.error(f'MQTT broker connection result code: {reason_code}'
+                       f' ({_get_mqtt_result(reason_code)})')
 
     def _mqtt_subscribe(self, topic: str, qos: int = 0):
         """Internal subscription handler assigns id indicating *subscribed*."""
@@ -350,15 +353,15 @@ class MqttClient:
 
     def _mqtt_on_subscribe(self,
                            client: PahoClient,
-                           userdata: any,
+                           userdata: Any,
                            mid: int,
                            granted_qos: 'list[int]'):
         match = ''
-        for sub in self.subscriptions:
-            if mid == self.subscriptions[sub]['mid']:
-                _log.info(f'Subscription to {sub} successful'
+        for topic, detail in self.subscriptions.items():
+            if mid == detail.get('mid', None):
+                _log.info(f'Subscription to {topic} successful'
                           f' (mid={mid}, granted_qos={granted_qos})')
-                match = sub
+                match = topic
                 break
         if not match:
             _log.error(f'Unable to match mid={mid} to pending subscription')
@@ -372,15 +375,15 @@ class MqttClient:
 
     def _mqtt_on_message(self,
                          client: PahoClient,
-                         userdata: any,
+                         userdata: Any,
                          message: PahoMessage):
         """Internal callback on message simplifies passback to topic/payload."""
         payload = message.payload.decode()
         try:
             payload = json.loads(payload)
-        except json.JSONDecodeError as e:
+        except json.JSONDecodeError as exc:
             if _vlog():
-                _log.debug(f'MQTT message payload non-JSON ({e})')
+                _log.debug(f'MQTT message payload non-JSON ({exc})')
         if _vlog():
             _log.debug(f'MQTT received message "{payload}"'
                        f' on topic "{message.topic}" with QoS {message.qos}')
@@ -410,13 +413,16 @@ class MqttClient:
         if self.is_connected:
             self._mqtt_unsubscribe(topic)
 
-    def _mqtt_on_disconnect(self, client: PahoClient, userdata: any, rc: int):
+    def _mqtt_on_disconnect(self,
+                            client: PahoClient,
+                            userdata: Any,
+                            reason_code: int):
         """Internal callback when disconnected, clears subscription status."""
         if callable(self.on_disconnect):
-            self.on_disconnect(client, userdata, rc)
+            self.on_disconnect(client, userdata, reason_code)
         if userdata != 'terminate':
             _log.warning('MQTT broker disconnected'
-                         f' - result code {rc} ({_get_mqtt_result(rc)})')
+                         f' - result code {reason_code} ({_get_mqtt_result(reason_code)})')
             # reconnect handling is managed automatically by Paho library
 
     def publish(self,
@@ -453,11 +459,13 @@ class MqttClient:
         if not isinstance(qos, int) or qos not in range(0, 3):
             _log.warning(f'Invalid MQTT QoS {qos} - using QoS 1')
             qos = 1
-        (rc, mid) = self._mqtt.publish(topic=topic, payload=message, qos=qos)
+        (reason_code, mid) = self._mqtt.publish(topic=topic,
+                                                payload=message,
+                                                qos=qos)
         if _vlog():
             _log.debug(f'MQTT published (mid={mid}) {topic} {message}')
-        if rc != MqttResultCode.SUCCESS:
-            errmsg = f'Publishing error {rc} ({_get_mqtt_result(rc)})'
+        if reason_code != MqttResultCode.SUCCESS:
+            errmsg = f'Publishing error {reason_code} ({_get_mqtt_result(reason_code)})'
             _log.error(errmsg)
             return False
         return True

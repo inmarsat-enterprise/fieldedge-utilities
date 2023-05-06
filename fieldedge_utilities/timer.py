@@ -35,8 +35,8 @@ class RepeatingTimer(threading.Thread):
     def __init__(self,
                  seconds: int,
                  target: Callable,
-                 args: tuple = (),
-                 kwargs: dict = {},
+                 args: tuple = None,
+                 kwargs: dict = None,
                  name: str = None,
                  sleep_chunk: float = 0.25,
                  max_drift: int = None,
@@ -72,8 +72,8 @@ class RepeatingTimer(threading.Thread):
             _log.warning(f'No target specified for RepeatingTimer {self.name}')
         self.target = target
         self._exception = None
-        self.args = args
-        self.kwargs = kwargs
+        self.args = args or ()
+        self.kwargs = kwargs or {}
         self.sleep_chunk = sleep_chunk
         self.defer = defer
         self._terminate_event = threading.Event()
@@ -90,13 +90,13 @@ class RepeatingTimer(threading.Thread):
     @property
     def interval(self) -> int:
         return self._interval
-    
+
     @interval.setter
     def interval(self, val: int):
         if val is None or not isinstance(val, int) or val < 0:
             raise ValueError('Interval must be a positive integer or zero')
         self._interval = val
-        
+
     @property
     def sleep_chunk(self) -> float:
         return self._sleep_chunk
@@ -114,7 +114,7 @@ class RepeatingTimer(threading.Thread):
     @property
     def max_drift(self) -> 'int|None':
         return self._max_drift
-    
+
     @max_drift.setter
     def max_drift(self, val: 'int|None'):
         if (val is not None and
@@ -122,7 +122,7 @@ class RepeatingTimer(threading.Thread):
             raise ValueError('max_drift must be None, 0'
                              ' or integer < interval')
         self._max_drift = val
-        
+
     def _resync(self) -> int:
         """Used to adjust the next countdown to account for drift."""
         if self.max_drift is not None:
@@ -160,8 +160,8 @@ class RepeatingTimer(threading.Thread):
                         self.target(*self.args, **self.kwargs)
                         drift_adjusted = self.interval - self._resync()
                         self._count = drift_adjusted / self.sleep_chunk
-                    except BaseException as e:
-                        self._exception = e
+                    except BaseException as exc:
+                        self._exception = exc
 
     def start_timer(self):
         """Initially start the repeating timer."""
@@ -224,9 +224,9 @@ class RepeatingTimer(threading.Thread):
         self.stop_timer()
         self._terminate_event.set()
         _log.info(f'{self.name} timer terminated')
-    
-    def join(self):
-        super(RepeatingTimer, self).join()
+
+    def join(self, timeout=None):
+        super().join(timeout)
         if self._exception:
             raise self._exception
         return self.target

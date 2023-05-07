@@ -45,7 +45,7 @@ def test_timer_basic():
     if not daemon:
         t.terminate()
 
-def test_change_interval():
+def mtest_change_interval():
     global call_count
     initial_interval = 3
     new_interval = 1

@@ -19,20 +19,22 @@ import os
 import threading
 from atexit import register as on_exit
 from enum import IntEnum
-from socket import timeout, gaierror  # : Python<3.10 vs TimeoutError
+from socket import gaierror, timeout  # : Python<3.10 vs TimeoutError
 from time import sleep, time
-from typing import Callable, Any
+from typing import Any, Callable
 
 from dotenv import load_dotenv
 from paho.mqtt.client import Client as PahoClient
 from paho.mqtt.client import MQTTMessage as PahoMessage
 
-from fieldedge_utilities.microservice.properties import json_compatible
 from fieldedge_utilities.logger import verbose_logging
+from fieldedge_utilities.properties import json_compatible
 
 MQTT_HOST = os.getenv('MQTT_HOST', 'fieldedge-broker')
 MQTT_USER = os.getenv('MQTT_USER')
 MQTT_PASS = os.getenv('MQTT_PASS')
+
+__all__ = ['MqttResultCode', 'MqttError', 'MqttClient']
 
 _log = logging.getLogger(__name__)
 
@@ -284,11 +286,11 @@ class MqttClient:
             new_thread.name = self._unique_thread_name(before_names)
             _log.debug(f'New MQTT client thread: {new_thread.name}')
             return
-        except (ConnectionError, TimeoutError, gaierror, timeout) as err:
+        except (ConnectionError, TimeoutError, gaierror, timeout) as exc:
             self._mqtt.loop_stop()
             self._failed_connect_attempts += 1
             _log.error(f'Failed attempt {self._failed_connect_attempts}'
-                       f' to connect to {self._host} ({err})')
+                       f' to connect to {self._host} ({exc})')
         # avoid recursing the exception in the stack
         if self.auto_connect and self.connect_retry_interval > 0:
             _log.debug(f'Retrying in {self.connect_retry_interval} s')

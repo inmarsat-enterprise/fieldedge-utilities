@@ -8,16 +8,19 @@ from uuid import uuid4
 
 from fieldedge_utilities.logger import verbose_logging
 from fieldedge_utilities.mqtt import MqttClient
+from fieldedge_utilities.properties import (READ_ONLY, READ_WRITE, camel_case,
+                                            get_class_properties,
+                                            get_class_tag, hasattr_static,
+                                            json_compatible,
+                                            property_is_read_only,
+                                            tag_class_property,
+                                            untag_class_property)
 from fieldedge_utilities.timer import RepeatingTimer
 
 from .feature import Feature
 from .interservice import IscTask, IscTaskQueue
-from .properties import (READ_ONLY, READ_WRITE, get_class_properties,
-                         get_class_tag, hasattr_static, json_compatible,
-                         property_is_read_only, snake_to_camel,
-                         tag_class_property, untag_class_property)
-from .propertycache import PropertyCache
 from .msproxy import MicroserviceProxy
+from .propertycache import PropertyCache
 
 __all__ = ['Microservice']
 
@@ -65,16 +68,10 @@ class Microservice(ABC):
 
     LOG_LEVELS = ['DEBUG', 'INFO']
 
-    def __init__(self,
-                 tag: str = None,
-                 mqtt_client_id: str = None,
-                 auto_connect: bool = False,
-                 isc_tags: bool = False,
-                 isc_poll_interval: int = 1,
-                 ) -> None:
+    def __init__(self, **kwargs) -> None:
         """Initialize the class instance.
         
-        Args:
+        Keyword Args:
             tag (str): The short name of the microservice used in MQTT topics
                 and interservice communication properties. If not provided, the
                 lowercase name of the class will be used.
@@ -87,10 +84,13 @@ class Microservice(ABC):
             isc_poll_interval (int): The interval at which to poll
         
         """
-        self._tag: str = tag or get_class_tag(self.__class__)
-        self._isc_tags: bool = isc_tags
-        if not mqtt_client_id:
-            mqtt_client_id = f'fieldedge_{self.tag}'
+        self._tag: str = (kwargs.get('tag', None) or
+                          get_class_tag(self.__class__))
+        self._isc_tags: bool = kwargs.get('isc_tags', False)
+        mqtt_client_id: str = (kwargs.get('mqtt_client_id', None) or
+                               f'fieldedge_{self.tag}')
+        auto_connect: bool = kwargs.get('auto_connect', False)
+        isc_poll_interval: int = kwargs.get('isc_poll_interval', 1)
         self._subscriptions = [ 'fieldedge/+/rollcall/#' ]
         self._subscriptions.append(f'fieldedge/{self.tag}/#')
         self._mqttc_local = MqttClient(client_id=mqtt_client_id,
@@ -321,7 +321,7 @@ class Microservice(ABC):
             prop_name not in self.isc_properties):
             # invalid
             raise ValueError(f'Invalid prop_name {prop_name}')
-        isc_prop_name = snake_to_camel(prop_name)
+        isc_prop_name = camel_case(prop_name)
         if isc_prop_name not in self.isc_properties:
             raise ValueError(f'{isc_prop_name} not in isc_properties')
         if prop_name not in self._rollcall_properties:
@@ -329,7 +329,7 @@ class Microservice(ABC):
 
     def rollcall_property_remove(self, prop_name: str):
         """Remove a property from the rollcall response."""
-        isc_prop_name = snake_to_camel(prop_name)
+        isc_prop_name = camel_case(prop_name)
         if isc_prop_name in self._rollcall_properties:
             self._rollcall_properties.remove(isc_prop_name)
 
@@ -475,6 +475,34 @@ class Microservice(ABC):
             message: The MQTT/JSON message received.
             
         """
+
+    def isc_error(self, topic: str, uid: str, **kwargs) -> None:
+        """Sends an error response on MQTT.
+
+        Optional kwargs keys/values will be included in the error message.
+        
+        Args:
+            topic (str): The MQTT topic that caused the error.
+            uid (str): The message uid that caused the error.
+        
+        Keyword Args:
+            qos (int): Optional MQTT QoS, default is 1.
+        
+        Raises:
+            `ValueError` if no topic or uid provided.
+            
+        """
+        if not isinstance(topic, str) or not topic:
+            raise ValueError('No topic to respond with error message')
+        if not isinstance(uid, str) or not uid:
+            raise ValueError('No request uid to correlate error response')
+        response = { 'uid': uid }
+        for rep in ['/request/', '/info/', '/event/']:
+            topic = topic.replace(rep, '/error/', 1)
+        qos = kwargs.pop('qos', 1)
+        for key, val in kwargs.items():
+            response[key] = val
+        self.notify(topic, response, qos)
 
     def properties_notify(self, request: dict) -> None:
         """Publishes the requested ISC property values to the local broker.

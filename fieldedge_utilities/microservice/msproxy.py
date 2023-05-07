@@ -51,31 +51,32 @@ class MicroserviceProxy(ABC):
             isc_poll_interval (int): The time between checks for task expiry.
         
         """
-        self._tag: str = self.__class__.__name__.lower()
-        self._publish: Callable[[str, dict], None] = None
-        self._subscribe: Callable[['str|list[str]'], bool] = None
-        self._unsubscribe: Callable[['str|list[str]'], bool] = None
-        self._init_callback: Callable[[bool, str], None] = None
-        self._init_timeout: int = 10
-        self._cache_lifetime: int = None
-        self._isc_poll_interval: int = 1
+        self._tag: str = (kwargs.get('tag', None) or
+                          self.__class__.__name__.lower())
+        if not self._tag:
+            raise ValueError('Invalid tag provided')
         callbacks = ['publish', 'subscribe', 'unsubscribe', 'init_callback']
+        int_config = ['init_timeout', 'cache_lifetime', 'isc_poll_interval']
         for key, val in kwargs.items():
-            if key == 'tag':
-                if not isinstance(val, str) or val == '':
-                    raise ValueError('tag must be a valid microservice name')
-                self._tag = val
-            elif key in callbacks:
+            if key in callbacks:
                 if not callable(val):
                     raise ValueError(f'{key} must be callable')
-                setattr(self, f'_{key}', val)
-            elif key in ['init_timeout', 'cache_lifetime', 'isc_poll_interval']:
+            elif key in int_config:
                 if not isinstance(val, int) or val <= 0:
                     raise ValueError(f'{key} must be integer > 0')
-                setattr(self, f'_{key}', val)
-        self._isc_queue = IscTaskQueue(blocking=True)
+        self._publish: Callable[[str, dict], None] = kwargs.get('publish', None)
+        self._subscribe: Callable[['str|list[str]'], bool] = (
+            kwargs.get('subscribe', None))
+        self._unsubscribe: Callable[['str|list[str]'], bool] = (
+            kwargs.get('unsubscribe', None))
+        self._init_callback: Callable[[bool, str], None] = (
+            kwargs.get('init_callback', None))
+        self._init_timeout: int = kwargs.get('init_timeout', 10)
+        self._cache_lifetime: 'int|None' = kwargs.get('cache_lifetime', None)
+        self._isc_poll_interval: int = kwargs.get('isc_poll_interval', 1)
+        self.isc_queue = IscTaskQueue(blocking=True)
         self._isc_timer = RepeatingTimer(seconds=self._isc_poll_interval,
-                                         target=self._isc_queue.remove_expired,
+                                         target=self.isc_queue.remove_expired,
                                          name='IscTaskExpiryTimer',
                                          auto_start=True)
         self._proxy_properties: dict = None
@@ -92,6 +93,11 @@ class MicroserviceProxy(ABC):
     def is_initialized(self) -> bool:
         """Returns True if the proxy has been initialized with properties."""
         return self._init == InitializationState.COMPLETE
+
+    @property
+    def initialization_state(self) -> InitializationState:
+        """The current initialization state."""
+        return self._init
 
     @property
     def _base_topic(self) -> str:
@@ -117,7 +123,7 @@ class MicroserviceProxy(ABC):
         cached = self._property_cache.get_cached('all')
         if cached:
             return self._proxy_properties
-        pending = self._isc_queue.peek(task_meta=('properties', 'all'))
+        pending = self.isc_queue.peek(task_meta=('properties', 'all'))
         if pending:
             _log.debug('Prior query pending')
         else:
@@ -145,11 +151,11 @@ class MicroserviceProxy(ABC):
 
     def task_add(self, task: IscTask) -> None:
         """Adds a task to the task queue."""
-        self._isc_queue.task_blocking.wait()
+        self.isc_queue.task_blocking.wait()
         try:
-            self._isc_queue.append(task)
+            self.isc_queue.append(task)
         except IscException as err:
-            self._isc_queue.task_blocking.set()
+            self.isc_queue.task_blocking.set()
             raise err
 
     def task_handle(self, response: dict, unblock: bool = False) -> bool:
@@ -160,10 +166,10 @@ class MicroserviceProxy(ABC):
         
         """
         task_id = response.get('uid', None)
-        if not task_id or not self._isc_queue.is_queued(task_id):
+        if not task_id or not self.isc_queue.is_queued(task_id):
             _log.debug(f'No task ID {task_id} queued - ignoring')
             return False
-        task = self._isc_queue.get(task_id, unblock=unblock)
+        task = self.isc_queue.get(task_id, unblock=unblock)
         if not isinstance(task.task_meta, dict):
             if task.task_meta is not None:
                 _log.warning(f'Overwriting {task.task_meta}')
@@ -172,7 +178,7 @@ class MicroserviceProxy(ABC):
         task.task_meta['task_type'] = task.task_type
         if callable(task.callback):
             task.callback(response, task.task_meta)
-        elif self._isc_queue.task_blocking:
+        elif self.isc_queue.task_blocking:
             _log.warning('Task queue still blocking with no callback')
         return True
 
@@ -183,7 +189,7 @@ class MicroserviceProxy(ABC):
             task_id = task_meta.get('task_id', None)
             task_type = task_meta.get('task_type', 'task')
         _log.debug(f'Completing {task_type} ({task_id})')
-        self._isc_queue.task_blocking.set()
+        self.isc_queue.task_blocking.set()
 
     def initialize(self, **kwargs) -> None:
         """Requests properties of the microservice to create the proxy."""
@@ -206,7 +212,7 @@ class MicroserviceProxy(ABC):
         """
         self._init = InitializationState.NONE
         self._property_cache.clear()
-        self._isc_queue.clear()
+        self.isc_queue.clear()
 
     def _init_fail(self, task_meta: dict = None):
         """Calls back with a failure on initialization failure/timeout."""

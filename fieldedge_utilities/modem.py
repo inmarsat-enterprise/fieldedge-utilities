@@ -19,7 +19,11 @@ _log = logging.getLogger(__name__)
 
 @dataclass
 class ConnectionManager:
-    """Counters for connection management."""
+    """Counters for connection management.
+    
+    The invoking application is expected to increment the counters accordingly.
+    
+    """
     retry_interval: int = 30
     backoff_interval: int = 30
     init_attempts: int = 0
@@ -31,6 +35,14 @@ class ConnectionManager:
     def __post_init__(self):
         if self.backoff_interval != self.retry_interval:
             self.backoff_interval = self.retry_interval
+
+    def timeouts_exceeded(self) -> bool:
+        """Returns True if at_timeouts >= max_at_timeouts."""
+        return self.at_timeouts >= self.max_at_timeouts
+
+    def crc_exceeded(self) -> bool:
+        """Returns True if at_crc_errors >= max_crc_errors."""
+        return self.at_crc_errors >= self.max_crc_errors
 
     def reset(self) -> None:
         """Resets all counters to zero."""
@@ -52,7 +64,11 @@ class ConnectionManager:
 
 
 class QosMetricsManager:
-    """Manages settings and counters for QoS metrics."""
+    """Manages settings and counters for QoS metrics.
+    
+    The invoking application is expected to increment the counters accordingly.
+    
+    """
     def __init__(self,
                  sample_interval: int = 12,
                  metrics_interval: int = 300) -> None:

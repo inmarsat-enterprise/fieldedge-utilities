@@ -37,6 +37,12 @@
                                 <a class="function" href="#ConnectionManager.__init__">ConnectionManager</a>
                         </li>
                         <li>
+                                <a class="function" href="#ConnectionManager.timeouts_exceeded">timeouts_exceeded</a>
+                        </li>
+                        <li>
+                                <a class="function" href="#ConnectionManager.crc_exceeded">crc_exceeded</a>
+                        </li>
+                        <li>
                                 <a class="function" href="#ConnectionManager.reset">reset</a>
                         </li>
                         <li>
@@ -106,6 +112,8 @@ intervals that are interdependent.</p>
     <a class="headerlink" href="#ConnectionManager"></a>
     
             <div class="docstring"><p>Counters for connection management.</p>
+
+<p>The invoking application is expected to increment the counters accordingly.</p>
 </div>
 
 
@@ -119,6 +127,36 @@ intervals that are interdependent.</p>
     <a class="headerlink" href="#ConnectionManager.__init__"></a>
     
     
+
+                            </div>
+                            <div id="ConnectionManager.timeouts_exceeded" class="classattr">
+                                <div class="attr function">
+            
+        <span class="def">def</span>
+        <span class="name">timeouts_exceeded</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span></span><span class="return-annotation">) -> <span class="nb">bool</span>:</span></span>
+
+        
+    </div>
+    <a class="headerlink" href="#ConnectionManager.timeouts_exceeded"></a>
+    
+            <div class="docstring"><p>Returns True if at_timeouts &gt;= max_at_timeouts.</p>
+</div>
+
+
+                            </div>
+                            <div id="ConnectionManager.crc_exceeded" class="classattr">
+                                <div class="attr function">
+            
+        <span class="def">def</span>
+        <span class="name">crc_exceeded</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span></span><span class="return-annotation">) -> <span class="nb">bool</span>:</span></span>
+
+        
+    </div>
+    <a class="headerlink" href="#ConnectionManager.crc_exceeded"></a>
+    
+            <div class="docstring"><p>Returns True if at_crc_errors &gt;= max_crc_errors.</p>
+</div>
+
 
                             </div>
                             <div id="ConnectionManager.reset" class="classattr">
@@ -166,6 +204,8 @@ of one day (86400 seconds).</p>
     <a class="headerlink" href="#QosMetricsManager"></a>
     
             <div class="docstring"><p>Manages settings and counters for QoS metrics.</p>
+
+<p>The invoking application is expected to increment the counters accordingly.</p>
 </div>
 
 

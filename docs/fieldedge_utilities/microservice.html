@@ -176,6 +176,9 @@
                                 <a class="function" href="#Microservice.on_isc_message">on_isc_message</a>
                         </li>
                         <li>
+                                <a class="function" href="#Microservice.isc_error">isc_error</a>
+                        </li>
+                        <li>
                                 <a class="function" href="#Microservice.properties_notify">properties_notify</a>
                         </li>
                         <li>
@@ -225,6 +228,9 @@
                         </li>
                         <li>
                                 <a class="variable" href="#MicroserviceProxy.is_initialized">is_initialized</a>
+                        </li>
+                        <li>
+                                <a class="variable" href="#MicroserviceProxy.initialization_state">initialization_state</a>
                         </li>
                         <li>
                                 <a class="variable" href="#MicroserviceProxy.properties">properties</a>
@@ -481,15 +487,15 @@ task handling for the SISO task queue.</p>
     
             <div class="docstring"><p>Template for a microservice feature as a child of the microservice.</p>
 
-<p>Private objects and methods include _task_queue, _task_notify,
-_task_complete, _task_fail_callback.</p>
+<p>References the parent microservice's IscTaskQueue and methods to callback
+for task notification/complete/fail as private attributes.</p>
 </div>
 
 
                             <div id="Feature.__init__" class="classattr">
                                 <div class="attr function">
             
-        <span class="name">Feature</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">task_queue</span><span class="p">:</span> <span class="n"><a href="#IscTaskQueue">fieldedge_utilities.microservice.IscTaskQueue</a></span> <span class="o">=</span> <span class="kc">None</span>,</span><span class="param">	<span class="n">task_notify</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">],</span> <span class="n">NoneType</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>,</span><span class="param">	<span class="n">task_complete</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">],</span> <span class="n">NoneType</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>,</span><span class="param">	<span class="o">**</span><span class="n">kwargs</span></span>)</span>
+        <span class="name">Feature</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">task_queue</span><span class="p">:</span> <span class="n"><a href="#IscTaskQueue">fieldedge_utilities.microservice.IscTaskQueue</a></span> <span class="o">=</span> <span class="kc">None</span>,</span><span class="param">	<span class="n">task_notify</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">],</span> <span class="n">NoneType</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>,</span><span class="param">	<span class="n">task_complete</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">],</span> <span class="n">NoneType</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>,</span><span class="param">	<span class="n">task_fail</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Any</span><span class="p">],</span> <span class="n">NoneType</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>,</span><span class="param">	<span class="o">**</span><span class="n">kwargs</span></span>)</span>
 
         
     </div>
@@ -505,14 +511,11 @@ _task_complete, _task_fail_callback.</p>
 method for MQTT publish.</li>
 <li><strong>task_complete (<code>Callable[[str, dict]]</code>):</strong>  A parent task
 completion function to receive task <code>uid</code> and <code>task_meta</code>.</li>
+<li><strong>task_fail (<code>Callable</code>):</strong>  An optional parent function to call if the
+task fails.</li>
 </ul>
 
-<h6 id="keyword-args">Keyword Args:</h6>
-
-<blockquote>
-  <p>task_fail (<code>Callable</code>): An optional parent
-      function to call if the task fails.</p>
-</blockquote>
+<p>Keyword Args:</p>
 </div>
 
 
@@ -953,7 +956,7 @@ will be called with the cb_meta kwargs.</p>
                             <div id="Microservice.__init__" class="classattr">
                                 <div class="attr function">
             
-        <span class="name">Microservice</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">tag</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span>,</span><span class="param">	<span class="n">mqtt_client_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span>,</span><span class="param">	<span class="n">auto_connect</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>,</span><span class="param">	<span class="n">isc_tags</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>,</span><span class="param">	<span class="n">isc_poll_interval</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span></span>)</span>
+        <span class="name">Microservice</span><span class="signature pdoc-code condensed">(<span class="param"><span class="o">**</span><span class="n">kwargs</span></span>)</span>
 
         
     </div>
@@ -961,20 +964,20 @@ will be called with the cb_meta kwargs.</p>
     
             <div class="docstring"><p>Initialize the class instance.</p>
 
-<h6 id="arguments">Arguments:</h6>
+<h6 id="keyword-args">Keyword Args:</h6>
 
-<ul>
-<li><strong>tag (str):</strong>  The short name of the microservice used in MQTT topics
-and interservice communication properties. If not provided, the
-lowercase name of the class will be used.</li>
-<li><strong>mqtt_client_id (str):</strong>  The name of the client ID when connecting to
-the local broker. If not provided, will be <code>fieldedge_&lt;tag&gt;</code>.</li>
-<li><strong>auto_connect (bool):</strong>  If set will automatically connect to the broker
-during initialization.</li>
-<li><strong>isc_tags (bool):</strong>  If set then isc_properties will include the class
-tag as a prefix. Disabled by default.</li>
-<li><strong>isc_poll_interval (int):</strong>  The interval at which to poll</li>
-</ul>
+<blockquote>
+  <p>tag (str): The short name of the microservice used in MQTT topics
+      and interservice communication properties. If not provided, the
+      lowercase name of the class will be used.
+  mqtt_client_id (str): The name of the client ID when connecting to
+      the local broker. If not provided, will be <code>fieldedge_&lt;tag&gt;</code>.
+  auto_connect (bool): If set will automatically connect to the broker
+      during initialization.
+  isc_tags (bool): If set then isc_properties will include the class
+      tag as a prefix. Disabled by default.
+  isc_poll_interval (int): The interval at which to poll</p>
+</blockquote>
 </div>
 
 
@@ -1288,6 +1291,42 @@ to its queries, tagged with a <code>uid</code> in the message body.</p>
 <ul>
 <li><strong>topic:</strong>  The MQTT topic received.</li>
 <li><strong>message:</strong>  The MQTT/JSON message received.</li>
+</ul>
+</div>
+
+
+                            </div>
+                            <div id="Microservice.isc_error" class="classattr">
+                                <div class="attr function">
+            
+        <span class="def">def</span>
+        <span class="name">isc_error</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span>, </span><span class="param"><span class="n">topic</span><span class="p">:</span> <span class="nb">str</span>, </span><span class="param"><span class="n">uid</span><span class="p">:</span> <span class="nb">str</span>, </span><span class="param"><span class="o">**</span><span class="n">kwargs</span></span><span class="return-annotation">) -> <span class="kc">None</span>:</span></span>
+
+        
+    </div>
+    <a class="headerlink" href="#Microservice.isc_error"></a>
+    
+            <div class="docstring"><p>Sends an error response on MQTT.</p>
+
+<p>Optional kwargs keys/values will be included in the error message.</p>
+
+<h6 id="arguments">Arguments:</h6>
+
+<ul>
+<li><strong>topic (str):</strong>  The MQTT topic that caused the error.</li>
+<li><strong>uid (str):</strong>  The message uid that caused the error.</li>
+</ul>
+
+<h6 id="keyword-args">Keyword Args:</h6>
+
+<blockquote>
+  <p>qos (int): Optional MQTT QoS, default is 1.</p>
+</blockquote>
+
+<h6 id="raises">Raises:</h6>
+
+<ul>
+<li><code>ValueError</code> if no topic or uid provided.</li>
 </ul>
 </div>
 
@@ -1626,6 +1665,19 @@ before the next task can be queued.</p>
     <a class="headerlink" href="#MicroserviceProxy.is_initialized"></a>
     
             <div class="docstring"><p>Returns True if the proxy has been initialized with properties.</p>
+</div>
+
+
+                            </div>
+                            <div id="MicroserviceProxy.initialization_state" class="classattr">
+                                <div class="attr variable">
+            <span class="name">initialization_state</span><span class="annotation">: fieldedge_utilities.microservice.msproxy.InitializationState</span>
+
+        
+    </div>
+    <a class="headerlink" href="#MicroserviceProxy.initialization_state"></a>
+    
+            <div class="docstring"><p>The current initialization state.</p>
 </div>
 
 

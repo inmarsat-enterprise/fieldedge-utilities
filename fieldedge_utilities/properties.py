@@ -8,7 +8,8 @@ import re
 
 from fieldedge_utilities.logger import verbose_logging
 
-__all__ = ['camel_to_snake', 'snake_to_camel', 'get_class_tag',
+__all__ = ['camel_case', 'snake_case', 'get_class_tag',
+           'camel_to_snake', 'snake_to_camel',
            'get_class_properties', 'get_instance_properties_values',
            'json_compatible', 'hasattr_static',
            'property_is_read_only', 'property_is_async', 'tag_class_properties',
@@ -24,6 +25,8 @@ _log = logging.getLogger(__name__)
 def camel_to_snake(camel_str: str, skip_caps: bool = False) -> str:
     """Converts a camelCase string to snake_case.
     
+    **DEPRECATED** use `snake_case` instead.
+
     Args:
         camel_str: The string to convert.
         skip_caps: A flag if `True` will return CAPITAL_CASE unchanged.
@@ -35,19 +38,13 @@ def camel_to_snake(camel_str: str, skip_caps: bool = False) -> str:
         `ValueError` if camel_str is not a valid string.
         
     """
-    if not isinstance(camel_str, str) or not camel_str:
-        raise ValueError('Invalid string input')
-    if camel_str.isupper() and skip_caps:
-        return camel_str
-    snake_str = re.compile(r'(?<!^)(?=[A-Z])').sub('_', camel_str).lower()
-    if '__' in snake_str:
-        words = snake_str.split('__')
-        snake_str = '_'.join(f'{word.replace("_", "")}' for word in words)
-    return snake_str
+    return snake_case(camel_str, skip_caps, skip_pascal=True)
 
 
 def snake_to_camel(snake_str: str, skip_caps: bool = False) -> str:
     """Converts a snake_case string to camelCase.
+    
+    **DEPRECATED** use `camel_case` instead.
     
     Args:
         snake_str: The string to convert.
@@ -57,14 +54,79 @@ def snake_to_camel(snake_str: str, skip_caps: bool = False) -> str:
         The input string in camelCase structure.
         
     """
-    if not isinstance(snake_str, str) or not snake_str:
+    return camel_case(snake_str, skip_caps, skip_pascal=True)
+
+
+def snake_case(original: str,
+               skip_caps: bool = False,
+               skip_pascal: bool = False) -> str:
+    """Converts a string to snake_case.
+    
+    Args:
+        original: The string to convert.
+        skip_caps: A flag if `True` will return CAPITAL_CASE unchanged.
+        skip_pascal: A flag if `True` will return PascalCase unchanged.
+        
+    Returns:
+        The original string converted to snake_case format.
+        
+    Raises:
+        `ValueError` if original is not a valid string.
+        
+    """
+    if not isinstance(original, str) or not original:
         raise ValueError('Invalid string input')
-    if snake_str.isupper() and skip_caps:
-        return snake_str
-    words = snake_str.split('_')
-    if len(words) == 1 and words[0] == snake_str:
-        return snake_str
+    if original.isupper() and skip_caps:
+        return original
+    snake = re.compile(r'(?<!^)(?=[A-Z])').sub('_', original).lower()
+    if '__' in snake:
+        words = snake.split('__')
+        snake = '_'.join(f'{word.replace("_", "")}' for word in words)
+    words = snake.split('_')
+    if original[0].isupper() and skip_pascal:
+        if all(word.title() in original for word in words):
+            return original
+    return snake
+
+
+def camel_case(original: str,
+               skip_caps: bool = False,
+               skip_pascal: bool = False) -> str:
+    """Converts a string to camelCase.
+    
+    Args:
+        original: The string to convert.
+        skip_caps: If `True` will return CAPITAL_CASE unchanged
+        skip_pascal: If `True` will return PascalCase unchanged
+    
+    Returns:
+        The input string in camelCase structure.
+        
+    """
+    if not isinstance(original, str) or not original:
+        raise ValueError('Invalid string input')
+    if original.isupper() and skip_caps:
+        return original
+    words = original.split('_')
+    if len(words) == 1:
+        regex = '.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)'
+        matches = re.finditer(regex, original)
+        words = [m.group(0) for m in matches]
+    if skip_pascal and all(word.title() == word for word in words):
+        return original
     return words[0].lower() + ''.join(w.title() for w in words[1:])
+
+
+def pascal_case(original: str, skip_caps: bool = False) -> str:
+    """Returns the string converted to PascalCase.
+    
+    Args:
+        original: The original string.
+        skip_caps: A flag that returns the original if CAPITAL_CASE.
+
+    """
+    camel = camel_case(original, skip_caps)
+    return camel[0].upper() + camel[1:]
 
 
 def get_class_tag(cls: type) -> str:
@@ -134,18 +196,21 @@ def json_compatible(obj: object,
 
     """
     res = obj
-    if camel_keys and isinstance(obj, dict):
-        res = {}
-        for key, val in obj.items():
-            if ((isinstance(key, str) and key.isupper() and skip_caps) or
-                not isinstance(key, str)):
-                # no change
-                camel_key = key
-            else:
-                camel_key = snake_to_camel(str(key))
-            if camel_key != key and verbose_logging('tags'):
-                _log.debug(f'Changed {key} to {camel_key}')
-            res[camel_key] = json_compatible(val, camel_keys, skip_caps)
+    if camel_keys:
+        if isinstance(obj, dict):
+            res = {}
+            for key, val in obj.items():
+                if ((isinstance(key, str) and key.isupper() and skip_caps) or
+                    not isinstance(key, str)):
+                    # no change
+                    camel_key = key
+                else:
+                    camel_key = camel_case(str(key))
+                if camel_key != key and verbose_logging('tags'):
+                    _log.debug(f'Changed {key} to {camel_key}')
+                res[camel_key] = json_compatible(val, camel_keys, skip_caps)
+        elif isinstance(obj, list):
+            res = [json_compatible(i) for i in obj]
     try:
         json.dumps(res)
         return res
@@ -286,7 +351,7 @@ def tag_class_property(prop: str,
             raise ValueError('tag_or_cls must be a string or class type')
         tagged = f'{tag.lower()}_{prop}'
     if use_json:
-        return snake_to_camel(f'{tagged}')
+        return camel_case(f'{tagged}')
     return f'{tag}_{prop}'
 
 
@@ -309,7 +374,7 @@ def untag_class_property(property_name: str,
             property value in snake_case, and the tag
 
     """
-    prop = camel_to_snake(property_name)
+    prop = snake_case(property_name)
     tag = None
     if is_tagged:
         if '_' not in prop:
@@ -385,7 +450,7 @@ def equivalent_attributes(ref: object,
         True if all (non-excluded) attribute name/values match.
 
     """
-    if isinstance(other, type(ref)):
+    if not isinstance(other, type(ref)):
         return False
     if not hasattr(ref, '__dict__') or not hasattr(other, '__dict__'):
         return ref == other

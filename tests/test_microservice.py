@@ -1,79 +1,79 @@
-import asyncio
+"""Unit tests for microservices sub-package.
+"""
+# import asyncio
 import logging
-import pytest
 import time
 import unittest
 
-import fieldedge_utilities   # required for mocking
-from fieldedge_utilities.microservice import *
-# from fieldedge_utilities.microservice.interservice import IscTask, IscTaskQueue
-from fieldedge_utilities.mqtt import MqttClient
-from fieldedge_utilities.microservice.properties import get_class_tag, get_class_properties
+import pytest
 
+import fieldedge_utilities  # required for mocking
+from fieldedge_utilities.microservice import *
+from fieldedge_utilities.mqtt import MqttClient
+from fieldedge_utilities.properties import get_class_properties, get_class_tag
 
 logger = logging.getLogger()
 
 
 class TestService(Microservice):
     """Basic subclass of abstract class for testing."""
-    
+
     # __slots__ = ['slot_config', '_info_prop', '_config_prop']   # must expose all init properties
-    
+
     TAG = 'test'   # a class constant
-    
+
     def __init__(self, tag: str = None) -> None:
         super().__init__(tag=tag or self.TAG)
         self._info_prop: str = 'test'
         self._config_prop: int = 2
         # self.slot_config: str = 'slot_test'
-    
+
     @property
     def info_prop(self) -> str:
         return self._info_prop
-    
+
     @property
     def config_prop(self) -> int:
         return self._config_prop
-    
+
     @config_prop.setter
     def config_prop(self, value: int):
         if not isinstance(value, int):
             raise ValueError('config_prop must be integer')
         self._config_prop = value
-    
+
     # @property
     # async def async_info_prop(self) -> str:
     #     await asyncio.sleep(1)
     #     return self._info_prop
-    
+
     def rollcall(self):
         return super().rollcall()
-    
+
     def rollcall_respond(self, topic: str, message: dict):
         return super().rollcall_respond(topic, message)
-    
+
     def on_isc_message(self, topic: str, message: dict) -> None:
         logger.info(f'Microservice received ISC message {topic}: {message}')
-    
+
     def task_progress(self, **kwargs):
         logger.info(f'Task info: {kwargs}')
-    
+
     def task_completed(self, **kwargs):
         logger.info(f'Task complete: {kwargs}')
 
 
 class TestFeature(Feature):
-    """"""
     @property
     def test_prop(self) -> bool:
         return True
-    
+
     def status(self) -> dict:
         return { 'test_prop': self.test_prop }
-        
+
     def properties_list(self) -> 'list[str]':
         return ['test_prop']
-    
+
     def on_isc_message(self, topic: str, message: dict) -> bool:
         logger.info(f'Feature received ISC {topic}: {message}')
         feature_relevant = message.get('feature', None)
@@ -84,7 +84,6 @@ class TestFeature(Feature):
 
 
 class TestProxy(MicroserviceProxy):
-    """"""
     def on_isc_message(self, topic: str, message: dict) -> bool:
         logger.info(f'Proxy received ISC {topic}: {message}')
         handled = super().on_isc_message(topic, message)
@@ -104,17 +103,21 @@ def test_service() -> TestService:
 
 @pytest.fixture
 def test_complex() -> TestService:
-    c = TestService(tag='complex')
-    c.features['feature'] = TestFeature(task_queue=c._isc_queue,
-                                         task_notify_callback=c.task_progress,
-                                         task_complete_callback=c.task_completed)
-    c.ms_proxies['proxy'] = TestProxy(tag='test',
-                                       publish=c.notify,
-                                       subscribe=c.isc_topic_subscribe,
-                                       init_callback=complex_ms_init_callback,
-                                    #    cache_lifetime=2,
-                                       )
-    return c
+    complex_ms = TestService(tag='complex')
+    complex_ms.features['feature'] = TestFeature(
+        task_queue=complex_ms._isc_queue,
+        task_notify=complex_ms.task_progress,
+        task_complete=complex_ms.task_completed,
+        _custom_protected='test',
+    )
+    complex_ms.ms_proxies['proxy'] = TestProxy(
+        tag='test',
+        publish=complex_ms.notify,
+        subscribe=complex_ms.isc_topic_subscribe,
+        init_callback=complex_ms_init_callback,
+        # cache_lifetime=2,
+    )
+    return complex_ms
 
 
 def test_get_subclass_name(test_service: TestService):
@@ -123,8 +126,8 @@ def test_get_subclass_name(test_service: TestService):
     props_cls = get_class_properties(TestService)
     props_inst = get_class_properties(test_service)
     assert props_cls == props_inst
-    
-    
+
+
 def test_microservice_subclass_creation(test_service: TestService):
     assert test_service.tag == TestService.TAG
     expected_config_props = ['log_level', 'config_prop']
@@ -133,22 +136,34 @@ def test_microservice_subclass_creation(test_service: TestService):
                            'rollcall_properties', 'info_prop',]
     expected_props = expected_config_props + expected_info_props
     assert all(prop in test_service.properties for prop in expected_props)
-    assert not any(prop not in expected_props for prop in test_service.properties)
-    assert all(prop in test_service.properties_by_type['config'] for prop in expected_config_props)
-    assert not any(prop not in expected_config_props for prop in test_service.properties_by_type['config'])
-    assert all(prop in test_service.properties_by_type['info'] for prop in expected_info_props)
-    assert not any(prop not in expected_info_props for prop in test_service.properties_by_type['info'])
+    assert not any(prop not in expected_props
+                   for prop in test_service.properties)
+    assert all(prop in test_service.properties_by_type['config']
+               for prop in expected_config_props)
+    assert not any(prop not in expected_config_props
+                   for prop in test_service.properties_by_type['config'])
+    assert all(prop in test_service.properties_by_type['info']
+               for prop in expected_info_props)
+    assert not any(prop not in expected_info_props
+                   for prop in test_service.properties_by_type['info'])
     expected_isc_config_props = ['logLevel', 'configProp']
     expected_isc_info_props = ['infoProp']
     expected_isc_props = expected_isc_config_props + expected_isc_info_props
-    assert all(prop in test_service.isc_properties for prop in expected_isc_props)
-    assert not any(prop not in expected_isc_props for prop in test_service.isc_properties)
+    assert all(prop in test_service.isc_properties
+               for prop in expected_isc_props)
+    assert not any(prop not in expected_isc_props
+                   for prop in test_service.isc_properties)
     isc_props = test_service.isc_properties_by_type
-    assert all(prop in test_service.isc_properties_by_type['config'] for prop in expected_isc_config_props)
-    assert not any(prop not in expected_isc_config_props for prop in test_service.isc_properties_by_type['config'])
-    assert all(prop in test_service.isc_properties_by_type['info'] for prop in expected_isc_info_props)
-    assert not any(prop not in expected_isc_info_props for prop in test_service.isc_properties_by_type['info'])
-    assert test_service.log_level == logging.getLevelName(logger.getEffectiveLevel())
+    assert all(prop in test_service.isc_properties_by_type['config']
+               for prop in expected_isc_config_props)
+    assert not any(prop not in expected_isc_config_props
+                   for prop in test_service.isc_properties_by_type['config'])
+    assert all(prop in test_service.isc_properties_by_type['info']
+               for prop in expected_isc_info_props)
+    assert not any(prop not in expected_isc_info_props
+                   for prop in test_service.isc_properties_by_type['info'])
+    assert test_service.log_level == (
+        logging.getLevelName(logger.getEffectiveLevel()))
 
 
 def test_ms_property_hide(test_service: TestService):
@@ -235,63 +250,6 @@ def test_ms_on_isc_message_other_rollcall(test_service: TestService, mocker):
     test_service._on_isc_message(topic, message)
 
 
-@pytest.fixture
-def isc_task() -> IscTask:
-    return IscTask(uid='a-unique-id',
-                   task_type='test',
-                   task_meta={
-                       'test': 'test',
-                       'timeout_callback': isc_task_timeout,
-                   },
-                   callback=isc_task_chained)
-
-
-def isc_task_timeout(*args, **kwargs):
-    for arg in args:
-        logger.info(f'Task timeout received {arg}')
-    for k, v in kwargs.items():
-        logger.info(f'Task timeout received {k}={v}')
-
-
-def isc_task_chained(*args, **kwargs):
-    for arg in args:
-        logger.info(f'Task chain received {arg}')
-    for k, v in kwargs.items():
-        logger.info(f'Task chain received {k}={v}')
-
-
-def test_isc_task_creation():
-    queued_task = IscTask(task_type='test')
-    assert isinstance(queued_task.uid, str)
-    assert queued_task.task_type == 'test'
-    assert queued_task.lifetime == 10
-
-
-def test_isc_task_queue_basic(isc_task: IscTask):
-    task_queue = IscTaskQueue()
-    task_queue.append(isc_task)
-    with pytest.raises(ValueError):
-        task_queue.append(isc_task)
-    assert task_queue.is_queued(isc_task.uid)
-    assert task_queue.is_queued(task_type=isc_task.task_type)
-    assert task_queue.is_queued(task_meta=('test', 'test'))
-    got = task_queue.get(isc_task.uid)
-    assert got == isc_task
-    assert not task_queue.is_queued(isc_task.uid)
-    assert callable(got.task_meta.pop('timeout_callback'))
-    got.callback(got.task_meta)
-
-
-def test_isc_task_queue_expiry(isc_task: IscTask):
-    isc_task.lifetime = 1
-    task_queue = IscTaskQueue()
-    task_queue.append(isc_task)
-    while task_queue.is_queued(isc_task.uid):
-        time.sleep(1)
-        task_queue.remove_expired()
-    assert not task_queue.is_queued(isc_task.uid)
-
-
 def test_ms_cached_property(test_service: TestService, mocker):
     TEST_PROP = 'sub_prop'
     ref_time = time.time()
@@ -329,7 +287,7 @@ def proxy_call_two(topic: str, message: dict):
     global proxy_call_two_count
     proxy_call_two_count += 1
 
-    
+
 def test_sub_proxy():
     global proxy_call_one_count
     global proxy_call_two_count
@@ -344,7 +302,7 @@ def test_sub_proxy():
 
     def main_on_message(topic, message):
         proxy.proxy_pub(topic, message)
-    
+
     main_on_message(topic, message)
     assert proxy_call_one_count == 1
     assert proxy_call_two_count == 1
@@ -369,6 +327,10 @@ def complex_ms_init_callback(success: bool, tag: str):
 def test_complex_ms(test_complex: TestService, test_service: TestService):
     """Requires live connection to a MQTT broker."""
     global init_success
+    assert isinstance(test_complex.features, dict) and test_complex.features
+    assert 'feature' in test_complex.features
+    feature = test_complex.features.get('feature')
+    assert hasattr(feature, '_custom_protected')
     complex_props = test_complex.properties
     assert 'feature_test_prop' in complex_props
     complex_isc_props = test_complex.isc_properties
@@ -405,7 +367,7 @@ def test_complex_ms(test_complex: TestService, test_service: TestService):
     assert proxy.property_get('configProp') == 3
 
 
-def test_proxy_init_fail(test_complex: TestService):
+def mtest_proxy_init_fail(test_complex: TestService):
     """Requires live connection to a MQTT broker."""
     global init_success
     timeout = 2

@@ -40,7 +40,13 @@
                                 <a class="function" href="#ConnectionManager.timeouts_exceeded">timeouts_exceeded</a>
                         </li>
                         <li>
+                                <a class="function" href="#ConnectionManager.timeout_increment_check">timeout_increment_check</a>
+                        </li>
+                        <li>
                                 <a class="function" href="#ConnectionManager.crc_exceeded">crc_exceeded</a>
+                        </li>
+                        <li>
+                                <a class="function" href="#ConnectionManager.crc_increment_check">crc_increment_check</a>
                         </li>
                         <li>
                                 <a class="function" href="#ConnectionManager.reset">reset</a>
@@ -65,6 +71,9 @@
                         </li>
                         <li>
                                 <a class="function" href="#QosMetricsManager.reset_counters">reset_counters</a>
+                        </li>
+                        <li>
+                                <a class="function" href="#QosMetricsManager.sample_increment_check">sample_increment_check</a>
                         </li>
                 </ul>
 
@@ -144,6 +153,21 @@ intervals that are interdependent.</p>
 
 
                             </div>
+                            <div id="ConnectionManager.timeout_increment_check" class="classattr">
+                                <div class="attr function">
+            
+        <span class="def">def</span>
+        <span class="name">timeout_increment_check</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span></span><span class="return-annotation">) -> <span class="nb">bool</span>:</span></span>
+
+        
+    </div>
+    <a class="headerlink" href="#ConnectionManager.timeout_increment_check"></a>
+    
+            <div class="docstring"><p>Increments at_timeouts and returns True if threshold exceeded.</p>
+</div>
+
+
+                            </div>
                             <div id="ConnectionManager.crc_exceeded" class="classattr">
                                 <div class="attr function">
             
@@ -155,6 +179,21 @@ intervals that are interdependent.</p>
     <a class="headerlink" href="#ConnectionManager.crc_exceeded"></a>
     
             <div class="docstring"><p>Returns True if at_crc_errors &gt;= max_crc_errors.</p>
+</div>
+
+
+                            </div>
+                            <div id="ConnectionManager.crc_increment_check" class="classattr">
+                                <div class="attr function">
+            
+        <span class="def">def</span>
+        <span class="name">crc_increment_check</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span></span><span class="return-annotation">) -> <span class="nb">bool</span>:</span></span>
+
+        
+    </div>
+    <a class="headerlink" href="#ConnectionManager.crc_increment_check"></a>
+    
+            <div class="docstring"><p>Increments at_crc_erros and returns True if threshold exceeded.</p>
 </div>
 
 
@@ -260,6 +299,33 @@ of one day (86400 seconds).</p>
     <a class="headerlink" href="#QosMetricsManager.reset_counters"></a>
     
             <div class="docstring"><p>Resets the metrics counters.</p>
+</div>
+
+
+                            </div>
+                            <div id="QosMetricsManager.sample_increment_check" class="classattr">
+                                <div class="attr function">
+            
+        <span class="def">def</span>
+        <span class="name">sample_increment_check</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="bp">self</span>,</span><span class="param">	<span class="n">reset_sample_count</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>,</span><span class="param">	<span class="n">increment_metrics_count</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span></span><span class="return-annotation">) -> <span class="nb">bool</span>:</span></span>
+
+        
+    </div>
+    <a class="headerlink" href="#QosMetricsManager.sample_increment_check"></a>
+    
+            <div class="docstring"><p>Increments the sample counter and returns True if metrics are due.</p>
+
+<p>Sample and metrics counters can be managed by setting flags in the
+method arguments.</p>
+
+<h6 id="arguments">Arguments:</h6>
+
+<ul>
+<li><strong>reset_sample_count:</strong>  If <code>True</code> and metrics are due, sample_count is
+reset to zero.</li>
+<li><strong>increment_metrics_count:</strong>  If <code>True</code> and metrics are due,
+metrics_count is incremented.</li>
+</ul>
 </div>
 
 

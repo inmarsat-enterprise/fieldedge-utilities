@@ -40,9 +40,19 @@ class ConnectionManager:
         """Returns True if at_timeouts >= max_at_timeouts."""
         return self.at_timeouts >= self.max_at_timeouts
 
+    def timeout_increment_check(self) -> bool:
+        """Increments at_timeouts and returns True if threshold exceeded."""
+        self.at_timeouts += 1
+        return self.timeouts_exceeded()
+
     def crc_exceeded(self) -> bool:
         """Returns True if at_crc_errors >= max_crc_errors."""
         return self.at_crc_errors >= self.max_crc_errors
+
+    def crc_increment_check(self) -> bool:
+        """Increments at_crc_erros and returns True if threshold exceeded."""
+        self.at_crc_errors += 1
+        return self.crc_exceeded()
 
     def reset(self) -> None:
         """Resets all counters to zero."""
@@ -112,3 +122,28 @@ class QosMetricsManager:
             value = int(self.metrics_interval / value)
             _log.warning('Adjusted sample_interval to %s', value)
         self._sample_interval = value
+
+    def sample_increment_check(self,
+                               reset_sample_count: bool = False,
+                               increment_metrics_count: bool = False) -> bool:
+        """Increments the sample counter and returns True if metrics are due.
+        
+        Sample and metrics counters can be managed by setting flags in the
+        method arguments.
+        
+        Args:
+            reset_sample_count: If `True` and metrics are due, sample_count is
+                reset to zero.
+            increment_metrics_count: If `True` and metrics are due,
+                metrics_count is incremented.
+        
+        """
+        self.sample_count += 1
+        count_threshold = int(self.metrics_interval / self.sample_interval)
+        metrics_due = self.sample_count % count_threshold == 0
+        if metrics_due:
+            if reset_sample_count:
+                self.sample_count = 0
+            if increment_metrics_count:
+                self.metrics_count += 1
+        return metrics_due

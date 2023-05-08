@@ -24,6 +24,8 @@ and addresses/subnets.
 satellite data traffic optimisation.
 * Helpers for managing **`serial`** ports on a host system.
 * Utilities for converting **`timestamp`**s between unix and ISO 8601
+* **`properties`** manipulation and conversion between JSON and PEP style,
+and derived from classes or instances.
 * Classes useful for implementing **`microservice`**s based on MQTT
 inter-service communications and task workflows:
     * **`interservice`** communications tasks and searchable queue.
@@ -32,8 +34,6 @@ inter-service communications and task workflows:
     microservice, as a child of a microservice.
     * **`feature`** class as a child of a microservice, with routing of MQTT
     topics and messages and interaction with a simple task queue.
-    * **`properties`** manipulation and conversion between JSON and PEP style,
-    and derived from classes or instances.
     * **`propertycache`** concept for caching frequently referenced object
     properties where the query may take time.
     * **`subscriptionproxy`** allows cascading of received MQTT messages to

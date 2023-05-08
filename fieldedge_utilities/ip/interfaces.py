@@ -6,6 +6,7 @@ override the default set of `eth` and `wlan` prefixes.
 import ipaddress
 import json
 import os
+from dataclasses import dataclass
 
 import ifaddr
 
@@ -13,7 +14,26 @@ VALID_PREFIXES = json.loads(os.getenv('INTERFACE_VALID_PREFIXES',
                                       '["eth","wlan"]'))
 
 __all__ = ['VALID_PREFIXES', 'get_interfaces', 'is_address_in_subnet',
-           'is_valid_ip']
+           'is_valid_ip', 'IfaddrAdapter']
+
+
+@dataclass
+class IfaddrIp:
+    """Type hint helper for ifaddr.IP within ifaddr.Adapter"""
+    ip: str
+    is_IPv4: bool
+    is_IPv6: bool
+    network_prefix: int
+    nice_name: str
+
+
+@dataclass
+class IfaddrAdapter:
+    """Type hint helper for ifaddr.Adapter"""
+    name: str
+    nice_name: str
+    index: int
+    ips: 'list[IfaddrIp]'
 
 
 def get_interfaces(valid_prefixes: 'list[str]' = VALID_PREFIXES,

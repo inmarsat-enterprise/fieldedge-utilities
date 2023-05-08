@@ -89,6 +89,8 @@ class QosMetricsManager:
         self.sample_interval = sample_interval
         self.sample_count: int = 0
         self.metrics_count: int = 0
+        self.last_sample_ts: int = 0
+        self.last_metrics_ts: int = 0
 
     @property
     def metrics_interval(self) -> int:

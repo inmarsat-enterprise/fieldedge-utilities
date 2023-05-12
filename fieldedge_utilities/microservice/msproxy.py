@@ -246,7 +246,10 @@ class MicroserviceProxy(ABC):
         else:
             method = 'get'
         _log.debug(f'{method}ting properties {properties}')
-        lifetime = task_meta.get('timeout', 10)
+        if isinstance(task_meta, dict):
+            lifetime = task_meta.get('timeout', 10)
+        else:
+            lifetime = 10
         prop_task = IscTask(task_type=f'property_{method}',
                             task_meta=task_meta,
                             callback=self.update_proxy_properties,

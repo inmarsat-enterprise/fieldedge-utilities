@@ -98,8 +98,7 @@ class MqttClient:
                  subscribe_default: 'str|list[str]' = None,
                  auto_connect: bool = True,
                  connect_retry_interval: int = 5,
-                 **kwargs,
-                 ):
+                 **kwargs) -> None:
         """Initializes a managed MQTT client.
         
         Args:
@@ -160,8 +159,9 @@ class MqttClient:
         self._connect_timeout = 5
         self.connect_timeout = int(kwargs.get('connect_timeout', 5))
         self._subscriptions = {}
+        self._connect_retry_interval: int = 0
         self.connect_retry_interval = connect_retry_interval
-        self.auto_connect = auto_connect
+        self.auto_connect: bool = auto_connect
         self._failed_connect_attempts = 0
         if subscribe_default:
             if not isinstance(subscribe_default, list):
@@ -228,6 +228,16 @@ class MqttClient:
         self._connect_timeout = value
         self._mqtt._connect_timeout = float(value)
 
+    @property
+    def connect_retry_interval(self) -> int:
+        return self._connect_retry_interval
+
+    @connect_retry_interval.setter
+    def connect_retry_interval(self, value: int):
+        if not isinstance(value, int) or value < 0:
+            raise ValueError('Retry interval must be integer 0 or higher')
+        self._connect_retry_interval = value
+
     def _cleanup(self, *args):
         # TODO: logging raises an error since the log file was closed
         if _vlog():
@@ -260,7 +270,7 @@ class MqttClient:
                 _log.debug(f'Attempting MQTT broker connection to {self._host}'
                            f' as {self.client_id}')
             self._mqtt.reinitialise(client_id=self.client_id)
-            self.connect_timeout = self._connect_timeout
+            self.connect_timeout = self._connect_timeout   #: just in case
             self._mqtt.user_data_set(None)
             self._mqtt.on_connect = self._mqtt_on_connect
             self._mqtt.on_disconnect = self._mqtt_on_disconnect
@@ -291,8 +301,8 @@ class MqttClient:
             self._failed_connect_attempts += 1
             _log.error(f'Failed attempt {self._failed_connect_attempts}'
                        f' to connect to {self._host} ({exc})')
-        # avoid recursing the exception in the stack
-        if self.auto_connect and self.connect_retry_interval > 0:
+            if not self.auto_connect or self.connect_retry_interval <= 0:
+                raise ConnectionError(str(exc)) from exc
             _log.debug(f'Retrying in {self.connect_retry_interval} s')
             sleep(self.connect_retry_interval)
             self.connect()

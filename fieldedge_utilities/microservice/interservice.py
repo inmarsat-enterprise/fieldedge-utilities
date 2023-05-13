@@ -170,7 +170,7 @@ class IscTaskQueue(list):
                 raise IscTaskNotReleased
             self.task_blocking.clear()
         if self._vlog:
-            _log.debug(f'Queued task: {task.__dict__}')
+            _log.debug('Queued task: %s', task.__dict__)
         super().append(task)
 
     def peek(self,
@@ -237,7 +237,7 @@ class IscTaskQueue(list):
                 if task.uid == task_id:
                     self.unblock_tasks(unblock)
                     return self.pop(i)
-            _log.warning(f'task_id {task_id} not in queue')
+            _log.warning('task_id %s not in queue', task_id)
         elif isinstance(task_meta, tuple):
             k, v = task_meta
             for i, task in enumerate(self):
@@ -248,7 +248,7 @@ class IscTaskQueue(list):
                     # found match
                     self.unblock_tasks(unblock)
                     return self.pop(i)
-            _log.warning(f'task_id {task_id} not in queue')
+            _log.warning('task_id %s not in queue', task_id)
         else:
             raise ValueError('task_id or meta_tag must be specified')
 
@@ -275,10 +275,10 @@ class IscTaskQueue(list):
             _log.warning(f'Removed expired task {rem.uid}')
             if self._blocking and not self.task_blocking.is_set():
                 if self._unblock_on_expiry:
-                    _log.info(f'Unblocking expired task {uid}')
+                    _log.info('Unblocking expired task %s', uid)
                     self.task_blocking.set()
                 else:
-                    _log.warning(f'Expired task {uid} still blocking')
+                    _log.warning('Expired task %s still blocking', uid)
             cb_key = 'timeout_callback'
             if (isinstance(rem.task_meta, dict) and
                 cb_key in rem.task_meta and

@@ -67,9 +67,9 @@ class PropertyCache:
             
         """
         if value is None:
-            _log.warning(f'Request to cache None for {tag}')
+            _log.warning('Request to cache None for %s', tag)
         if tag in self._cache:
-            _log.debug(f'Overwriting cached {tag}')
+            _log.debug('Overwriting cached %s', tag)
         to_cache = CachedProperty(value, name=tag, lifetime=lifetime)
         self._cache[tag] = to_cache
 
@@ -91,9 +91,9 @@ class PropertyCache:
         cached = self._cache.pop(tag, None)
         if self._vlog():
             if cached:
-                _log.debug(f'Removed {tag} aged {cached.age} seconds')
+                _log.debug('Removed %s aged %d seconds', tag, cached.age)
             else:
-                _log.debug(f'{tag} was not cached')
+                _log.debug('%s was not cached', tag)
 
     def get_cached(self, tag: str) -> Any:
         """Retrieves the cached property value if valid.
@@ -109,13 +109,13 @@ class PropertyCache:
         """
         if tag not in self._cache:
             if self._vlog():
-                _log.debug(f'{tag} not cached')
+                _log.debug('%s not cached', tag)
             return None
         cached = self._cache[tag]
         if cached.is_valid:
             if self._vlog():
-                _log.debug(f'Returning {tag} value {cached.value}'
-                           f' (age {cached.age} seconds)')
+                _log.debug('Returning %s value %s (age %.1f seconds)',
+                           tag, cached.value, cached.age)
             return cached.value
         self.remove(tag)
 

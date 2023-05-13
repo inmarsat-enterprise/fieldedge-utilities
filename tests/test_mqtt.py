@@ -61,13 +61,13 @@ connected = False
 def on_connect(*args):
     global connected
     connected = True
-    _log.info(f'Connected: {connected}')
+    _log.info('Connected: %s', connected)
     
 
 def on_disconnect(*args):
     global connected
     connected = False
-    _log.info(f'Connected: {connected}')
+    _log.info('Connected: %s', connected)
     
 
 # *** Below tests are manual, may require tools or generation of parameters

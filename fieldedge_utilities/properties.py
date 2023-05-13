@@ -207,7 +207,7 @@ def json_compatible(obj: object,
                 else:
                     camel_key = camel_case(str(key))
                 if camel_key != key and verbose_logging('tags'):
-                    _log.debug(f'Changed {key} to {camel_key}')
+                    _log.debug('Changed %s to %s', key, camel_key)
                 res[camel_key] = json_compatible(val, camel_keys, skip_caps)
         elif isinstance(obj, list):
             res = [json_compatible(i) for i in obj]
@@ -228,6 +228,9 @@ def json_compatible(obj: object,
             elif isinstance(res, dict):
                 res = {k:json_compatible(v, camel_keys, skip_caps)
                        for k, v in res.items()}
+            elif hasattr(res, '__slots__'):
+                res = {s: json_compatible(getattr(res, s, None))
+                       for s in res.__slots__}
             else:
                 res = '<non-serializable>'
             return res
@@ -462,7 +465,7 @@ def equivalent_attributes(ref: object,
         if attr.startswith('__') or attr in exclude:
             continue
         if not hasattr(other, attr):
-            _log.debug(f'Other missing {dbg}{attr}')
+            _log.debug('Other missing %s%s', dbg, attr)
             return False
         ref_val = getattr(ref, attr)
         if callable(ref_val):
@@ -472,6 +475,6 @@ def equivalent_attributes(ref: object,
             if not equivalent_attributes(ref_val, other_val, dbg=attr):
                 return False
         elif ref_val != other_val:
-            _log.debug(f'{dbg}{attr} mismatch')
+            _log.debug('%s%s mismatch', dbg, attr)
             return False
     return True

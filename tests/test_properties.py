@@ -22,7 +22,7 @@ class TestEnum(IntEnum):
 
 class TestObj:
     """A class for testing property manipulation for MQTT/JSON-based ISC."""
-    __slots__ = ('__dict__', '_one', 'two', 'three', 'four', '_five', '_six')
+    __slots__ = ('_one', 'two', 'three', 'four', '_five', '_six')
 
     CLASS_CONSTANT = 'a_constant'
 

@@ -167,12 +167,12 @@ class MicroserviceProxy(ABC):
         """
         task_id = response.get('uid', None)
         if not task_id or not self.isc_queue.is_queued(task_id):
-            _log.debug(f'No task ID {task_id} queued - ignoring')
+            _log.debug('No task ID %s queued - ignoring', task_id)
             return False
         task = self.isc_queue.get(task_id, unblock=unblock)
         if not isinstance(task.task_meta, dict):
             if task.task_meta is not None:
-                _log.warning(f'Overwriting {task.task_meta}')
+                _log.warning('Overwriting task_meta: %s', task.task_meta)
             task.task_meta = {}
         task.task_meta['task_id'] = task_id
         task.task_meta['task_type'] = task.task_type
@@ -188,7 +188,7 @@ class MicroserviceProxy(ABC):
         if isinstance(task_meta, dict):
             task_id = task_meta.get('task_id', None)
             task_type = task_meta.get('task_type', 'task')
-        _log.debug(f'Completing {task_type} ({task_id})')
+        _log.debug('Completing %s (%s)', task_type, task_id)
         self.isc_queue.task_blocking.set()
 
     def initialize(self, **kwargs) -> None:
@@ -245,7 +245,7 @@ class MicroserviceProxy(ABC):
             method = 'set'
         else:
             method = 'get'
-        _log.debug(f'{method}ting properties {properties}')
+        _log.debug('%sting %s properties %s', method, self.tag, properties)
         if isinstance(task_meta, dict):
             lifetime = task_meta.get('timeout', 10)
         else:
@@ -273,7 +273,7 @@ class MicroserviceProxy(ABC):
         """
         properties = message.get('properties', None)
         if not isinstance(properties, dict):
-            _log.error(f'Unable to process properties: {properties}')
+            _log.error('Unable to process properties: %s', properties)
             return
         cache_lifetime = self._cache_lifetime
         cache_all = False
@@ -283,7 +283,7 @@ class MicroserviceProxy(ABC):
                 self._init = InitializationState.COMPLETE
                 new_init = True
                 cache_all = True
-                _log.info(f'{self.tag} proxy initialized')
+                _log.info('%s proxy initialized', self.tag)
             if 'cache_lifetime' in task_meta:
                 cache_lifetime = task_meta.get('cache_liftime')
             if task_meta.get('properties', None) == 'all':
@@ -293,7 +293,7 @@ class MicroserviceProxy(ABC):
         for prop, val in properties.items():
             if (prop not in self._proxy_properties or
                 self._proxy_properties[prop] != val):
-                _log.debug(f'Updating {prop} = {val}')
+                _log.debug('Updating %s = %s', prop, val)
                 self._proxy_properties[prop] = val
                 self._property_cache.cache(val, prop, cache_lifetime)
         if cache_all:
@@ -340,7 +340,7 @@ class MicroserviceProxy(ABC):
             
         """
         if verbose_logging(self.tag):
-            _log.debug(f'Proxy received {topic}: {message}')
+            _log.debug('Proxy received %s: %s', topic, message)
         if not topic.startswith(f'fieldedge/{self.tag}/'):
             return False
         if topic.endswith('info/properties/values'):

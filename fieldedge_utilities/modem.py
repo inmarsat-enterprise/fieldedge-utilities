@@ -122,7 +122,7 @@ class QosMetricsManager:
             raise ValueError('value must be integer 0..metrics_interval')
         if value > 0 and self.metrics_interval % value != 0:
             value = int(self.metrics_interval / value)
-            _log.warning('Adjusted sample_interval to %s', value)
+            _log.warning('Adjusted sample_interval to %d', value)
         self._sample_interval = value
 
     def sample_increment_check(self,

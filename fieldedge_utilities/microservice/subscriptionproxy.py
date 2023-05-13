@@ -48,7 +48,8 @@ class SubscriptionProxy:
         for mod, topics in self._subscriptions.items():
             for top in topics:
                 if top == topic and mod == module:
-                    _log.warning(f'Topic {topic} already subscribed by {mod}')
+                    _log.warning('Topic %s already subscribed by %s',
+                                 topic, mod)
                     return False
         if module not in self._subscriptions:
             self._subscriptions[module] = {}
@@ -57,7 +58,7 @@ class SubscriptionProxy:
             self._subscriptions[module][topic] = callback
             return True
         except Exception as err:
-            _log.error(f'Failed to proxy subscribe: {err}')
+            _log.error('Failed to proxy subscribe: %s', err)
             return False
 
     def proxy_del(self, module: str, topic: str) -> bool:
@@ -78,7 +79,7 @@ class SubscriptionProxy:
                     self._mqttc.unsubscribe(topic)
                 return True
             except Exception as err:
-                _log.error(f'Failed to proxy unsubscribe: {err}')
+                _log.error('Failed to proxy unsubscribe: %s', err)
                 return False
         return True
 

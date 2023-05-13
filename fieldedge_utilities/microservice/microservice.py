@@ -377,17 +377,17 @@ class Microservice(ABC):
             except:
                 return False
         else:
-            _log.warning(f'Already subscribed to {topic}')
+            _log.warning('Already subscribed to %s', topic)
             return True
 
     def isc_topic_unsubscribe(self, topic: str) -> bool:
         """Unsubscribes from the specified ISC topic."""
         mandatory = ['fieldedge/+/rollcall/#', f'fieldedge/+/{self.tag}/#']
         if topic in mandatory:
-            _log.warning(f'Subscription to {topic} is mandatory')
+            _log.warning('Subscription to %s is mandatory', topic)
             return False
         if topic not in self._subscriptions:
-            _log.warning(f'Already not subscribed to {topic}')
+            _log.warning('Already not subscribed to %s', topic)
             return True
         try:
             self._mqttc_local.unsubscribe(topic)
@@ -420,7 +420,7 @@ class Microservice(ABC):
         
         """
         if self._vlog:
-            _log.debug(f'Received ISC {topic}: {message}')
+            _log.debug('Received ISC %s: %s', topic, message)
         if (topic.startswith(f'fieldedge/{self.tag}/') and
             '/request/' not in topic):
             # ignore own publishing
@@ -523,7 +523,7 @@ class Microservice(ABC):
         
         """
         if self._vlog:
-            _log.debug(f'Request to notify properties: {request}')
+            _log.debug('Request to notify properties: %s', request)
         if not isinstance(request, dict):
             raise ValueError('Request must be a dictionary')
         if ('properties' in request and
@@ -571,8 +571,8 @@ class Microservice(ABC):
                         res_props[prop] = self.isc_get_property(prop)
             except AttributeError as exc:
                 response = { 'uid': request_id, 'error': {exc} }
-        _log.debug(f'Responding to request {request_id} for properties'
-                   f': {request.get("properties", "ALL")}')
+        _log.debug('Responding to request %s for properties: %s',
+                   request_id, request.get('properties', 'ALL'))
         self.notify(message=response, subtopic=subtopic)
 
     def properties_change(self, request: dict) -> 'None|dict':
@@ -592,7 +592,7 @@ class Microservice(ABC):
         
         """
         if self._vlog:
-            _log.debug(f'Request to change properties: {request}')
+            _log.debug('Request to change properties: %s', request)
         if (not isinstance(request, dict) or
             'properties' not in request or
             not isinstance(request['properties'], dict)):
@@ -605,16 +605,16 @@ class Microservice(ABC):
             _log.warning('Request missing uid for response correlation')
         for key, val in request['properties'].items():
             if key not in self.isc_properties_by_type[READ_WRITE]:
-                _log.warning(f'{key} is not a config property')
+                _log.warning('%s is not a config property', key)
                 continue
             try:
                 self.isc_set_property(key, val)
                 response['properties'][key] = val
             except Exception as exc:
-                _log.warning(f'Failed to set {key}={val} ({exc})')
+                _log.warning('Failed to set %s=%s (%s)', key, val, exc)
         if not request_id:
             return response
-        _log.debug(f'Responding to property change request {request_id}')
+        _log.debug('Responding to property change request %s', request_id)
         self.notify(message=response, subtopic='info/properties/values')
 
     def notify(self,
@@ -650,16 +650,16 @@ class Microservice(ABC):
         if 'uid' not in json_message:
             json_message['uid'] = str(uuid4())
         if not self._mqttc_local or not self._mqttc_local.is_connected:
-            _log.error('MQTT client not connected - failed to publish'
-                       f' {topic}: {message}')
+            _log.error('MQTT client not connected - failed to publish %s: %s',
+                       topic, message)
             return
-        _log.info(f'Publishing ISC {topic}: {json_message}')
+        _log.info('Publishing ISC %s: %s', topic, json_message)
         self._mqttc_local.publish(topic, json_message, qos)
 
     def task_add(self, task: IscTask) -> None:
         """Adds a task to the task queue."""
         if self._isc_queue.is_queued(task_id=task.uid):
-            _log.warning(f'Task {task.uid} already queued')
+            _log.warning('Task %s already queued', task.uid)
         else:
             self._isc_queue.append(task)
         if not self._isc_timer.is_alive() or not self._isc_timer.is_running:

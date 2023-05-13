@@ -73,7 +73,7 @@ def host_command(command: str,
     modcommand = _apply_preamble(command)
     command_time = time()
     if not test_mode:
-        _log.debug(f'Sending {modcommand} to hostpipe via shell')
+        _log.debug('Sending %s to hostpipe via shell', modcommand)
         try:
             run(f'echo "{_escaped_command(modcommand)}" > {HOSTPIPE_PATH} &',
                 shell=True,
@@ -83,7 +83,7 @@ def host_command(command: str,
             _log.error(err)
             raise TimeoutError(err) from exc
     else:
-        _log.info(f'test_mode received command: {command}')
+        _log.info('test_mode received command: %s', command)
     if noresponse:
         return f'{command} sent'
     pipelog = pipelog or HOSTPIPE_LOG
@@ -97,7 +97,7 @@ def host_command(command: str,
                                      ).strip()
     deleted_count = _maintain_pipelog(pipelog)
     if deleted_count > 0:
-        _log.info(f'Removed {deleted_count} oldest lines from {pipelog}')
+        _log.info('Removed %d oldest lines from %s', deleted_count, pipelog)
     if _log.getEffectiveLevel() == DEBUG:
         if response_str == '':
             abv_response = '<no response>'
@@ -105,7 +105,7 @@ def host_command(command: str,
             abv_response = response_str.replace('\n', ';')
         else:
             abv_response = response_str[:20].replace("\n", ";") + '...'
-        _log.debug(f'Hostpipe: {command} -> {abv_response}')
+        _log.debug('Hostpipe: %s -> %s', command, abv_response)
     return response_str
 
 
@@ -168,14 +168,14 @@ def host_get_response(command: str,
         pipelog = './logs/hostpipe.log'
     if not os.path.isfile(pipelog):
         raise FileNotFoundError(f'Could not find file {pipelog}')
-    _log.debug(f'Searching {pipelog} for {modcommand}')
+    _log.debug('Searching %s for %s', pipelog, modcommand)
     response: 'list[str]' = []
     filepass = 0
     while len(response) == 0:
         # test_mode assumes manual step through will usually violate timeout
         if not test_mode and time() > calltime + timeout:
-            _log.warning(f'Response to {command} timed out'
-                         f' after {timeout} seconds')
+            _log.warning('Response to %s timed out after %d seconds',
+                         command, timeout)
             break
         filepass += 1
         if filepass > HOSTPIPE_LOG_ITERATION_MAX:
@@ -183,7 +183,7 @@ def host_get_response(command: str,
                          ' on hostpipe log')
             break
         if _vlog():
-            _log.debug(f'{pipelog} read iteration {filepass}')
+            _log.debug('%s read iteration %d', pipelog, filepass)
         lines = open(pipelog, 'r').readlines()
         for line in reversed(lines):
             if (not test_mode and
@@ -195,9 +195,9 @@ def host_get_response(command: str,
             if CMD_TAG in line:
                 logged_command = line.split(CMD_TAG)[1].strip()
                 if _vlog():
-                    _log.debug(f'Found command {logged_command} in {pipelog}'
-                               f'({_get_line_ts(line)})'
-                               f' with {len(response)} response lines')
+                    _log.debug('Found command %s in %s (at %.1f)'
+                               ' with %d response lines', logged_command,
+                               pipelog, _get_line_ts(line), len(response))
                 if logged_command != modcommand:
                     # wrong command/response so dump parsed lines so far
                     cts = _get_line_ts(line)
@@ -213,8 +213,8 @@ def host_get_response(command: str,
                 else:
                     # we reached the original command so can stop parsing response
                     if _vlog():
-                        _log.debug(f'Found target {modcommand}'
-                                   f' with {len(response)} response lines')
+                        _log.debug('Found target %s with %d response lines',
+                                   modcommand, len(response))
                     response = [l.split(RES_TAG, 1)[1].strip() for l in response]
                     break
             elif RES_TAG in line:

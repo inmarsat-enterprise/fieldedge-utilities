@@ -317,19 +317,19 @@ class MqttClient:
                          client: PahoClient,
                          userdata: Any,
                          flags: dict,
-                         reason_code: int):
+                         result_code: int):
         """Internal callback re-subscribes on (re)connection."""
         self._failed_connect_attempts = 0
-        if reason_code == MqttResultCode.SUCCESS:
+        if result_code == MqttResultCode.SUCCESS:
             if _vlog():
                 _log.debug('Established MQTT connection to %s', self._host)
             for sub, meta in self.subscriptions.items():
                 self._mqtt_subscribe(sub, qos=meta.get('qos', None))
             if callable(self.on_connect):
-                self.on_connect(client, userdata, flags, reason_code)
+                self.on_connect(client, userdata, flags, result_code)
         else:
             _log.error('MQTT broker connection result code: %d (%s)',
-                       reason_code, _get_mqtt_result(reason_code))
+                       result_code, _get_mqtt_result(result_code))
 
     def _mqtt_subscribe(self, topic: str, qos: int = 0):
         """Internal subscription handler assigns id indicating *subscribed*."""
@@ -367,12 +367,12 @@ class MqttClient:
                            client: PahoClient,
                            userdata: Any,
                            mid: int,
-                           granted_qos: 'list[int]'):
+                           granted_qos: 'tuple[int]'):
         match = ''
         for topic, detail in self.subscriptions.items():
             if mid == detail.get('mid', None):
-                _log.info('Subscription to %s successful'
-                          ' (mid=%d, granted_qos=%d)', topic, mid, granted_qos)
+                _log.info('Subscribed to %s (mid=%d, granted_qos=%s)',
+                          topic, mid, granted_qos)
                 match = topic
                 break
         if not match:
@@ -408,7 +408,7 @@ class MqttClient:
             _log.debug('%s unsubscribing to %s', self.client_id, topic)
         (result, mid) = self._mqtt.unsubscribe(topic)
         if result != MqttResultCode.SUCCESS:
-            _log.error('MQTT Error %s unsubscribing to %s (mid=%d)',
+            _log.error('MQTT Error %s unsubscribing from %s (mid=%d)',
                        result, topic, mid)
 
     def unsubscribe(self, topic: str) -> None:
@@ -471,14 +471,14 @@ class MqttClient:
         if not isinstance(qos, int) or qos not in range(0, 3):
             _log.warning('Invalid MQTT QoS %s - using QoS 1', qos)
             qos = 1
-        (reason_code, mid) = self._mqtt.publish(topic=topic,
+        (result_code, mid) = self._mqtt.publish(topic=topic,
                                                 payload=message,
                                                 qos=qos)
         if _vlog():
             _log.debug('MQTT published (mid=%d) %s: %s', mid, topic, message)
-        if reason_code != MqttResultCode.SUCCESS:
-            errmsg = f'Publishing error {reason_code} ({_get_mqtt_result(reason_code)})'
-            _log.error(errmsg)
+        if result_code != MqttResultCode.SUCCESS:
+            _log.error('Publishing error %d (%s)',
+                       result_code, _get_mqtt_result(result_code))
             return False
         return True
 

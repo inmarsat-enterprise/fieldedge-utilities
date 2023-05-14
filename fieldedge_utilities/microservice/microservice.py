@@ -139,11 +139,6 @@ class Microservice(ABC):
         logging.getLogger().setLevel(value.upper())
 
     @property
-    def _vlog(self) -> bool:
-        """True if environment variable LOG_VERBOSE includes the class tag."""
-        return verbose_logging(self.tag)
-
-    @property
     def properties(self) -> 'list[str]':
         """A list of public properties of the class."""
         cached = self._property_cache.get_cached('properties')
@@ -419,12 +414,12 @@ class Microservice(ABC):
             message: The MQTT/JSON message
         
         """
-        if self._vlog:
+        if _vlog(self.tag):
             _log.debug('Received ISC %s: %s', topic, message)
         if (topic.startswith(f'fieldedge/{self.tag}/') and
             '/request/' not in topic):
             # ignore own publishing
-            if self._vlog:
+            if _vlog(self.tag):
                 _log.debug('Ignoring own response/event')
             return
         elif topic.endswith('/rollcall'):
@@ -445,15 +440,19 @@ class Microservice(ABC):
                 return
             self.on_isc_message(topic, message)
 
-    @staticmethod
-    def _is_child_isc(children: 'dict[str, Feature|MicroserviceProxy]',
+    def _is_child_isc(self,
+                      children: 'dict[str, Feature|MicroserviceProxy]',
                       topic: str,
                       message: dict) -> bool:
         """Returns True if one of the children handled the message."""
         for child in children.values():
+            if _vlog(self.tag):
+                _log.debug('Checking %s for on_isc_message', child.tag)
             if (hasattr_static(child, 'on_isc_message') and
                 callable(child.on_isc_message)):
                 handled = child.on_isc_message(topic, message)
+                if _vlog(self.tag):
+                    _log.debug('%s handled %s: %s', child.tag, topic, handled)
                 if handled:
                     return True
         return False
@@ -522,7 +521,7 @@ class Microservice(ABC):
                 optional `categorized` flag.
         
         """
-        if self._vlog:
+        if _vlog(self.tag):
             _log.debug('Request to notify properties: %s', request)
         if not isinstance(request, dict):
             raise ValueError('Request must be a dictionary')
@@ -591,7 +590,7 @@ class Microservice(ABC):
                 select ISC property names and values to set.
         
         """
-        if self._vlog:
+        if _vlog(self.tag):
             _log.debug('Request to change properties: %s', request)
         if (not isinstance(request, dict) or
             'properties' not in request or
@@ -692,3 +691,7 @@ class Microservice(ABC):
             self._isc_timer.start_timer()
         else:
             self._isc_timer.stop_timer()
+
+
+def _vlog(tag: str) -> bool:
+    return verbose_logging(f'{tag}-microservice')

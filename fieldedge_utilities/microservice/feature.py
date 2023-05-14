@@ -48,6 +48,12 @@ class Feature(ABC):
             self.__slots__.append(key)
             setattr(self, key, val)
 
+    @property
+    def tag(self) -> str:
+        if hasattr(self, 'tag'):
+            return getattr(self, 'tag')
+        return self.__class__.__name__.lower()
+
     @abstractmethod
     def properties_list(self) -> 'list[str]':
         """Returns a lists of exposed property names."""

@@ -432,12 +432,16 @@ class Microservice(ABC):
             self.properties_change(message)
             self._kwarg_propagate(topic, message, ['properties'])
         else:
-            if (self.features and
-                self._is_child_isc(self.features, topic, message)):
-                return
-            if (self.ms_proxies and
-                self._is_child_isc(self.ms_proxies, topic, message)):
-                return
+            if self.features:
+                if _vlog(self.tag):
+                    _log.debug('Checking features for ISC handling')
+                if self._is_child_isc(self.features, topic, message):
+                    return
+            if self.ms_proxies:
+                if _vlog(self.tag):
+                    _log.debug('Checking ms proxies for ISC handling')
+                if self._is_child_isc(self.ms_proxies, topic, message):
+                    return
             self.on_isc_message(topic, message)
 
     def _is_child_isc(self,
@@ -445,14 +449,14 @@ class Microservice(ABC):
                       topic: str,
                       message: dict) -> bool:
         """Returns True if one of the children handled the message."""
-        for child in children.values():
+        for name, child in children.items():
             if _vlog(self.tag):
-                _log.debug('Checking %s for on_isc_message', child.tag)
+                _log.debug('Checking %s for on_isc_message', name)
             if (hasattr_static(child, 'on_isc_message') and
                 callable(child.on_isc_message)):
                 handled = child.on_isc_message(topic, message)
                 if _vlog(self.tag):
-                    _log.debug('%s handled %s: %s', child.tag, topic, handled)
+                    _log.debug('%s handled %s: %s', name, topic, handled)
                 if handled:
                     return True
         return False

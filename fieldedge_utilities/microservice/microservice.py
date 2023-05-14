@@ -434,12 +434,14 @@ class Microservice(ABC):
         else:
             if self.features:
                 if _vlog(self.tag):
-                    _log.debug('Checking features for ISC handling')
+                    _log.debug('Checking features for ISC handling (%s)',
+                               self.features.keys())
                 if self._is_child_isc(self.features, topic, message):
                     return
             if self.ms_proxies:
                 if _vlog(self.tag):
-                    _log.debug('Checking ms proxies for ISC handling')
+                    _log.debug('Checking ms proxies for ISC handling (%s)',
+                               self.ms_proxies.keys())
                 if self._is_child_isc(self.ms_proxies, topic, message):
                     return
             self.on_isc_message(topic, message)
@@ -455,9 +457,10 @@ class Microservice(ABC):
             if (hasattr_static(child, 'on_isc_message') and
                 callable(child.on_isc_message)):
                 handled = child.on_isc_message(topic, message)
-                if _vlog(self.tag):
-                    _log.debug('%s handled %s: %s', name, topic, handled)
                 if handled:
+                    if _vlog(self.tag):
+                        _log.debug('%s handled %s (%s)',
+                                   name, topic, message.get('uid', None))
                     return True
         return False
 

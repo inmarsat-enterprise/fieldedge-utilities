@@ -330,6 +330,7 @@ def test_complex_ms(test_complex: TestService, test_service: TestService):
     assert isinstance(test_complex.features, dict) and test_complex.features
     assert 'feature' in test_complex.features
     feature = test_complex.features.get('feature')
+    logger.info('Feature tag: %s', feature.tag)
     assert hasattr(feature, '_custom_protected')
     complex_props = test_complex.properties
     assert 'feature_test_prop' in complex_props

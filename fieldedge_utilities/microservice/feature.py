@@ -50,9 +50,10 @@ class Feature(ABC):
 
     @property
     def tag(self) -> str:
-        if hasattr(self, 'tag'):
-            return getattr(self, 'tag')
-        return self.__class__.__name__.lower()
+        try:
+            return getattr(self, '_tag')
+        except AttributeError:
+            return self.__class__.__name__.lower()
 
     @abstractmethod
     def properties_list(self) -> 'list[str]':

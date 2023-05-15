@@ -424,7 +424,7 @@ class Microservice(ABC):
         elif topic.endswith(f'/{self.tag}/request/properties/set'):
             self.properties_change(message)
             return self._propagate_request(message, filter=['properties'])
-        elif f'/{self.tag}/request/' in topic:
+        else:
             if self.features:
                 if _vlog(self.tag):
                     _log.debug('Checking features for ISC handling (%s)',

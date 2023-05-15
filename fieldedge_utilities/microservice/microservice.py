@@ -60,10 +60,9 @@ class Microservice(ABC):
 
     __slots__ = (
         '_tag', '_mqttc_local', '_default_publish_topic', '_subscriptions',
-        '_isc_queue', '_isc_timer', '_isc_tags', '_isc_ignore',
-        '_hidden_properties', '_property_cache',
-        '_isc_properties', '_hidden_isc_properties', '_rollcall_properties',
-        'features', 'ms_proxies',
+        'isc_queue', '_isc_timer', '_isc_tags', '_isc_ignore',
+        '_hidden_properties', '_hidden_isc_properties', '_rollcall_properties',
+        'features', 'ms_proxies', 'property_cache',
     )
 
     LOG_LEVELS = ['DEBUG', 'INFO']
@@ -95,14 +94,15 @@ class Microservice(ABC):
         self._subscriptions.append(f'fieldedge/{self.tag}/#')
         self._mqttc_local = MqttClient(client_id=mqtt_client_id,
                                        subscribe_default=self._subscriptions,
-                                       on_message=self._on_isc_message,
+                                       on_message=self.on_isc_message,
                                        auto_connect=auto_connect)
         self._default_publish_topic = f'fieldedge/{self._tag}'
         self._hidden_properties: 'list[str]' = [
             'features',
             'ms_proxies',
+            'isc_queue',
+            'property_cache',
         ]
-        self._isc_properties: 'list[str]' = None
         self._hidden_isc_properties: 'list[str]' = [
             'tag',
             'properties',
@@ -112,14 +112,14 @@ class Microservice(ABC):
             'rollcall_properties',
         ]
         self._rollcall_properties: 'list[str]' = []
-        self._isc_queue = IscTaskQueue()
+        self.isc_queue = IscTaskQueue()
         self._isc_timer = RepeatingTimer(seconds=isc_poll_interval,
-                                         target=self._isc_queue.remove_expired,
+                                         target=self.isc_queue.remove_expired,
                                          name='IscTaskExpiryTimer')
         self.features: 'dict[str, Feature]' = DictTrigger(
             modify_callback=self._refresh_properties)
         self.ms_proxies: 'dict[str, MicroserviceProxy]' = {}
-        self._property_cache = PropertyCache()
+        self.property_cache = PropertyCache()
 
     @property
     def tag(self) -> str:
@@ -141,22 +141,22 @@ class Microservice(ABC):
     @property
     def properties(self) -> 'list[str]':
         """A list of public properties of the class."""
-        cached = self._property_cache.get_cached('properties')
+        cached = self.property_cache.get_cached('properties')
         if cached:
             return cached
         return self._refresh_properties()
 
     def _refresh_properties(self) -> 'list[str]':
         """Refreshes the class properties."""
-        self._property_cache.remove('properties')
-        self._property_cache.remove('isc_properties')
+        self.property_cache.remove('properties')
+        self.property_cache.remove('isc_properties')
         ignore = self._hidden_properties
         properties = get_class_properties(self.__class__, ignore)
         for tag, feature in self.features.items():
             feature_props = feature.properties_list()
             for prop in feature_props:
                 properties.append(f'{tag}_{prop}')
-        self._property_cache.cache(properties, 'properties', None)
+        self.property_cache.cache(properties, 'properties', None)
         return properties
 
     @staticmethod
@@ -211,7 +211,7 @@ class Microservice(ABC):
     @property
     def isc_properties(self) -> 'list[str]':
         """ISC exposed properties."""
-        cached = self._property_cache.get_cached('isc_properties')
+        cached = self.property_cache.get_cached('isc_properties')
         if cached:
             return cached
         return self._refresh_isc_properties()
@@ -224,7 +224,7 @@ class Microservice(ABC):
         tag = self.tag if self._isc_tags else None
         isc_properties = [tag_class_property(prop, tag)
                           for prop in self.properties if prop not in ignore]
-        self._property_cache.cache(isc_properties, 'isc_properties', None)
+        self.property_cache.cache(isc_properties, 'isc_properties', None)
         return isc_properties
 
     @property
@@ -391,60 +391,74 @@ class Microservice(ABC):
         except:
             return False
 
-    def _kwarg_propagate(self,
-                         topic: str,
-                         message: dict,
-                         filter: 'list[str]') -> None:
-        if not isinstance(filter, list):
-            filter = [filter]
-        filter += ['uid', 'ts']
-        kwargs = {key: val for key, val in message.items()
-                  if key not in filter}
-        if kwargs:
-            self.on_isc_message(topic, message)
-
-    def _on_isc_message(self, topic: str, message: dict) -> None:
-        """Handles rollcall requests or passes to the `on_isc_message` method.
+    @abstractmethod
+    def on_isc_message(self, topic: str, message: dict) -> bool:
+        """Handles incoming ISC/MQTT requests.
         
-        This private method ensures rollcall requests are handled in a standard
-        way.
+        Messages are received from any topics subscribed to using the
+        `isc_subscribe` method. The default subscription `fieldedge/+/rollcall`
+        is handled in a standard way by the private version of this method.
+        The default subscription is `fieldedge/<self.tag>/request/#` which other
+        services use to query this one. After receiving a rollcall, this service
+        may subscribe to `fieldedge/<other>/info/#` topic to receive responses
+        to its queries, tagged with a `uid` in the message body.
         
         Args:
-            topic: The MQTT topic
-            message: The MQTT/JSON message
-        
+            topic: The MQTT topic received.
+            message: The MQTT/JSON message received.
+            
         """
-        if _vlog(self.tag):
-            _log.debug('Received ISC %s: %s', topic, message)
-        if (topic.startswith(f'fieldedge/{self.tag}/') and
-            '/request/' not in topic):
-            # ignore own publishing
+        if (topic.split('/')[1] == self.tag and '/request/' not in topic):
             if _vlog(self.tag):
                 _log.debug('Ignoring own response/event')
-            return
-        elif topic.endswith('/rollcall'):
+            return False
+        if _vlog(self.tag):
+            _log.debug('Received ISC %s: %s', topic, message)
+        if topic.endswith('/rollcall'):
             self.rollcall_respond(topic, message)
+            return True
         elif (topic.endswith(f'/{self.tag}/request/properties/list') or
               topic.endswith(f'/{self.tag}/request/properties/get')):
             self.properties_notify(message)
-            self._kwarg_propagate(topic, message, ['properties'])
+            return self._propagate_request(message, filter=['properties'])
         elif topic.endswith(f'/{self.tag}/request/properties/set'):
             self.properties_change(message)
-            self._kwarg_propagate(topic, message, ['properties'])
-        else:
+            return self._propagate_request(message, filter=['properties'])
+        elif f'/{self.tag}/request/' in topic:
             if self.features:
                 if _vlog(self.tag):
                     _log.debug('Checking features for ISC handling (%s)',
                                self.features.keys())
                 if self._is_child_isc(self.features, topic, message):
-                    return
+                    return True
             if self.ms_proxies:
                 if _vlog(self.tag):
                     _log.debug('Checking ms proxies for ISC handling (%s)',
                                self.ms_proxies.keys())
                 if self._is_child_isc(self.ms_proxies, topic, message):
-                    return
-            self.on_isc_message(topic, message)
+                    return True
+        return False
+
+    def _propagate_request(self,
+                           message: dict,
+                           filter: 'list[str]' = None) -> bool:
+        """Returns True if message contains keys requiring additional handling.
+        
+        Args:
+            message: The MQTT message payload.
+            filter: A list of keywords to ignore when assessing.
+        
+        """
+        default_filter = ['uid', 'ts']
+        filter = default_filter if filter is None else filter
+        if not isinstance(filter, list):
+            filter = [filter]
+        for key in default_filter:
+            if key not in filter:
+                filter.append(key)
+        kwargs = {key: val for key, val in message.items()
+                  if key not in filter}
+        return len(kwargs) > 0
 
     def _is_child_isc(self,
                       children: 'dict[str, Feature|MicroserviceProxy]',
@@ -463,24 +477,6 @@ class Microservice(ABC):
                                    name, topic, message.get('uid', None))
                     return True
         return False
-
-    @abstractmethod
-    def on_isc_message(self, topic: str, message: dict) -> None:
-        """Handles incoming ISC/MQTT requests.
-        
-        Messages are received from any topics subscribed to using the
-        `isc_subscribe` method. The default subscription `fieldedge/+/rollcall`
-        is handled in a standard way by the private version of this method.
-        The default subscription is `fieldedge/<self.tag>/request/#` which other
-        services use to query this one. After receiving a rollcall, this service
-        may subscribe to `fieldedge/<other>/info/#` topic to receive responses
-        to its queries, tagged with a `uid` in the message body.
-        
-        Args:
-            topic: The MQTT topic received.
-            message: The MQTT/JSON message received.
-            
-        """
 
     def isc_error(self, topic: str, uid: str, **kwargs) -> None:
         """Sends an error response on MQTT.
@@ -664,12 +660,36 @@ class Microservice(ABC):
 
     def task_add(self, task: IscTask) -> None:
         """Adds a task to the task queue."""
-        if self._isc_queue.is_queued(task_id=task.uid):
+        if self.isc_queue.is_queued(task_id=task.uid):
             _log.warning('Task %s already queued', task.uid)
         else:
-            self._isc_queue.append(task)
+            self.isc_queue.append(task)
         if not self._isc_timer.is_alive() or not self._isc_timer.is_running:
             _log.warning('Task queue expiry not being checked')
+
+    def task_handle(self, response: dict, unblock: bool = False) -> bool:
+        """Handle and return True if message is a response to a pending task.
+        
+        Args:
+            response: The MQTT message candidate response.
+        
+        """
+        task_id = response.get('uid', None)
+        if not task_id or not self.isc_queue.is_queued(task_id):
+            _log.debug('No task ID %s queued - not handling', task_id)
+            return False
+        task = self.isc_queue.get(task_id, unblock=unblock)
+        if not isinstance(task.task_meta, dict):
+            if task.task_meta is not None:
+                _log.warning('Overwriting task_meta: %s', task.task_meta)
+            task.task_meta = {}
+        task.task_meta['task_id'] = task_id
+        task.task_meta['task_type'] = task.task_type
+        if callable(task.callback):
+            task.callback(response, task.task_meta)
+        elif self.isc_queue.task_blocking:
+            _log.warning('Task queue still blocking with no callback')
+        return True
 
     def task_get(self,
                  task_id: str = None,
@@ -683,7 +703,7 @@ class Microservice(ABC):
             The `QueuedIscTask` if it was found in the queue, else `None`.
             
         """
-        return self._isc_queue.get(task_id, meta_tag)
+        return self.isc_queue.get(task_id, meta_tag)
 
     def task_expiry_enable(self, enable: bool = True):
         """Starts or stops periodic checking for expired ISC tasks.

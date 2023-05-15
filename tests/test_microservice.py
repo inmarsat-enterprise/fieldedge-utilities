@@ -105,7 +105,7 @@ def test_service() -> TestService:
 def test_complex() -> TestService:
     complex_ms = TestService(tag='complex')
     complex_ms.features['feature'] = TestFeature(
-        task_queue=complex_ms._isc_queue,
+        task_queue=complex_ms.isc_queue,
         task_notify=complex_ms.task_progress,
         task_complete=complex_ms.task_completed,
         _custom_protected='test',
@@ -254,13 +254,13 @@ def test_ms_cached_property(test_service: TestService, mocker):
     TEST_PROP = 'sub_prop'
     ref_time = time.time()
     cache_lifetime = 1
-    test_service._property_cache.cache('something', TEST_PROP, cache_lifetime)
-    while test_service._property_cache.get_cached(TEST_PROP):
+    test_service.property_cache.cache('something', TEST_PROP, cache_lifetime)
+    while test_service.property_cache.get_cached(TEST_PROP):
         time.sleep(0.5)
     elapsed = time.time() - ref_time
     logger.info(f'Time elapsed: {elapsed}')
     assert elapsed >= cache_lifetime
-    assert not test_service._property_cache.get_cached(TEST_PROP)
+    assert not test_service.property_cache.get_cached(TEST_PROP)
 
 
 class StubMqtt(MqttClient):

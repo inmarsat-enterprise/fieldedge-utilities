@@ -191,6 +191,9 @@
                                 <a class="function" href="#Microservice.task_add">task_add</a>
                         </li>
                         <li>
+                                <a class="function" href="#Microservice.task_handle">task_handle</a>
+                        </li>
+                        <li>
                                 <a class="function" href="#Microservice.task_get">task_get</a>
                         </li>
                         <li>
@@ -1270,7 +1273,7 @@ the second level of the topic e.g. <code>fieldedge/&lt;requestor&gt;/...</code><
                     <div class="decorator">@abstractmethod</div>
 
         <span class="def">def</span>
-        <span class="name">on_isc_message</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span>, </span><span class="param"><span class="n">topic</span><span class="p">:</span> <span class="nb">str</span>, </span><span class="param"><span class="n">message</span><span class="p">:</span> <span class="nb">dict</span></span><span class="return-annotation">) -> <span class="kc">None</span>:</span></span>
+        <span class="name">on_isc_message</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span>, </span><span class="param"><span class="n">topic</span><span class="p">:</span> <span class="nb">str</span>, </span><span class="param"><span class="n">message</span><span class="p">:</span> <span class="nb">dict</span></span><span class="return-annotation">) -> <span class="nb">bool</span>:</span></span>
 
         
     </div>
@@ -1429,6 +1432,27 @@ used if <code>topic</code> is not passed in.</li>
     <a class="headerlink" href="#Microservice.task_add"></a>
     
             <div class="docstring"><p>Adds a task to the task queue.</p>
+</div>
+
+
+                            </div>
+                            <div id="Microservice.task_handle" class="classattr">
+                                <div class="attr function">
+            
+        <span class="def">def</span>
+        <span class="name">task_handle</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span>, </span><span class="param"><span class="n">response</span><span class="p">:</span> <span class="nb">dict</span>, </span><span class="param"><span class="n">unblock</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span></span><span class="return-annotation">) -> <span class="nb">bool</span>:</span></span>
+
+        
+    </div>
+    <a class="headerlink" href="#Microservice.task_handle"></a>
+    
+            <div class="docstring"><p>Handle and return True if message is a response to a pending task.</p>
+
+<h6 id="arguments">Arguments:</h6>
+
+<ul>
+<li><strong>response:</strong>  The MQTT message candidate response.</li>
+</ul>
 </div>
 
 
@@ -1767,6 +1791,7 @@ longer than 30 seconds to resolve.</p>
 
 <ul>
 <li><strong>response (dict):</strong>  The response message from the microservice.</li>
+<li><strong>unblock (bool):</strong>  If True unblock if the queue is blocking.</li>
 </ul>
 </div>
 

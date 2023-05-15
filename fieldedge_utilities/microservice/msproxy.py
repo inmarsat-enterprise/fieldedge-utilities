@@ -5,12 +5,12 @@ import os
 from abc import ABC, abstractmethod
 from enum import IntEnum
 from threading import Event
-from typing import Callable, Any
+from typing import Any, Callable
 
-from fieldedge_utilities.timer import RepeatingTimer
 from fieldedge_utilities.logger import verbose_logging
+from fieldedge_utilities.timer import RepeatingTimer
 
-from .interservice import IscTaskQueue, IscTask, IscException
+from .interservice import IscException, IscTask, IscTaskQueue
 from .propertycache import PropertyCache
 
 __all__ = ['MicroserviceProxy', 'InitializationState']
@@ -163,11 +163,12 @@ class MicroserviceProxy(ABC):
         
         Args:
             response (dict): The response message from the microservice.
+            unblock (bool): If True unblock if the queue is blocking.
         
         """
         task_id = response.get('uid', None)
         if not task_id or not self.isc_queue.is_queued(task_id):
-            _log.debug('No task ID %s queued - ignoring', task_id)
+            _log.debug('No task ID %s queued - not handling', task_id)
             return False
         task = self.isc_queue.get(task_id, unblock=unblock)
         if not isinstance(task.task_meta, dict):

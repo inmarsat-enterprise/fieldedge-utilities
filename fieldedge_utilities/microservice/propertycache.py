@@ -89,7 +89,7 @@ class PropertyCache:
             
         """
         cached = self._cache.pop(tag, None)
-        if self._vlog():
+        if _vlog():
             if cached:
                 _log.debug('Removed %s aged %d seconds', tag, cached.age)
             else:
@@ -108,16 +108,16 @@ class PropertyCache:
             
         """
         if tag not in self._cache:
-            if self._vlog():
+            if _vlog():
                 _log.debug('%s not cached', tag)
             return None
         cached = self._cache[tag]
         if cached.is_valid:
-            if self._vlog():
-                _log.debug('Returning %s value %s (age %.1f seconds)',
+            if _vlog():
+                _log.debug('Returning %s value %s (age %.3f seconds)',
                            tag, cached.value, cached.age)
             return cached.value
         self.remove(tag)
 
-    def _vlog(self) -> bool:
-        return verbose_logging('cache')
+def _vlog() -> bool:
+    return verbose_logging('propertycache')

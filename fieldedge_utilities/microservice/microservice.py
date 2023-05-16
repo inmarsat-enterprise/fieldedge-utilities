@@ -406,12 +406,15 @@ class Microservice(ABC):
         Args:
             topic: The MQTT topic received.
             message: The MQTT/JSON message received.
-            
+        
+        Returns:
+            True if handled by a defined method.
+        
         """
         if (topic.split('/')[1] == self.tag and '/request/' not in topic):
             if _vlog(self.tag):
                 _log.debug('Ignoring own response/event')
-            return False
+            return True
         if _vlog(self.tag):
             _log.debug('Received ISC %s: %s', topic, message)
         if topic.endswith('/rollcall'):

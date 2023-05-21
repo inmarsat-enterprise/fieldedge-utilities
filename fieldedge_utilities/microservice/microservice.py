@@ -507,7 +507,7 @@ class Microservice(ABC):
         qos = kwargs.pop('qos', 1)
         for key, val in kwargs.items():
             response[key] = val
-        self.notify(topic, response, qos)
+        self.notify(topic, message=response, qos=qos)
 
     def properties_notify(self, request: dict) -> None:
         """Publishes the requested ISC property values to the local broker.

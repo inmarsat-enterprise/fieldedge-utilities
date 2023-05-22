@@ -95,7 +95,8 @@ class Microservice(ABC):
         self._mqttc_local = MqttClient(client_id=mqtt_client_id,
                                        subscribe_default=self._subscriptions,
                                        on_message=self.on_isc_message,
-                                       auto_connect=auto_connect)
+                                       auto_connect=auto_connect,
+                                       qos=kwargs.get('qos', 0))
         self._default_publish_topic = f'fieldedge/{self._tag}'
         self._hidden_properties: 'list[str]' = [
             'features',

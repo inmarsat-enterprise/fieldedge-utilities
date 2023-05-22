@@ -111,16 +111,24 @@ class MqttClient:
                 attempts if auto_connect is `True`.
             auto_connect (bool): Automatically attempts to connect when created
                 or reconnect after disconnection.
-            **kwargs: includes advanced feature overrides such as:
-            
-            * `client_uid` defaults to True, appends a timestamp to the
-            client_id to avoid being rejected by the host.
-            * `bind_address` to bind to a specific IP
-            * `on_connect`, `on_disconnect`, `on_log` callbacks
-            * `host`, `port` (default 1883) and `keepalive` (default 60)
-            * `username` and `password`
-            * `ca_certs`, `certfile`, `keyfile`
-            * `qos` (default = 0)
+        
+        Keyword Args: 
+            client_uid (str): defaults to True, appends a timestamp to the
+                client_id to avoid being rejected by the host.
+            bind_address (str): to bind to a specific IP (broken in Paho Python)
+            on_connect (Callable): optional callback when connecting to broker
+            on_disconnect (Callable): optional callback when disconnecting from
+                broker
+            on_log (Callable): optional callback for client logging
+            host (str): override hostname
+            port (int): defaults to 1883
+            keepalive (int): defaults to 60 seconds
+            username (str): override username
+            password (str): override password
+            ca_certs (str): path to the CA certificate
+            certfile (str): path to the PEM certificate for the client
+            keyfile (str): path to the PEM certificate for the client key
+            qos (int): MQTT QoS defaults to 0 (send at most once)
 
         Raises:
             `MqttError` if the client_id is not valid.
@@ -255,13 +263,13 @@ class MqttClient:
         basename = 'MqttThread'
         if self._thread_name:
             basename += f'-{self._thread_name}'
-        name = basename
+        new_name = basename
         number = 1
         for name in before_names:
             if name.startswith(basename):
                 number += 1
-                name = f'{basename}-{number}'
-        return name
+                new_name = f'{basename}-{number}'
+        return new_name
 
     def connect(self):
         """Attempts to establish a connection to the broker and re-subscribe."""

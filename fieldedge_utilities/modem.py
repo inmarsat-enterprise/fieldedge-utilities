@@ -26,6 +26,8 @@ class ConnectionManager:
     """
     retry_interval: int = 30
     backoff_interval: int = 30
+    backoff_increment: int = 3
+    backoff_starts_after: int = 0
     init_attempts: int = 0
     at_timeouts: int = 0
     max_at_timeouts: int = 3
@@ -64,11 +66,13 @@ class ConnectionManager:
     def backoff(self) -> None:
         """Increases the backoff_interval for initialization retries.
         
-        Every 3 attempts, the backoff_interval will double up to a maximum
-        of one day (86400 seconds).
+        Every `backoff_increment` attempts, the backoff_interval will double
+        up to a maximum of one day (86400 seconds).
+        Initial backoff can be deferred by `backoff_starts_after`.
         
         """
-        if self.init_attempts > 3 and self.init_attempts % 3 == 0:
+        if (self.init_attempts > self.backoff_starts_after and
+            self.init_attempts % self.backoff_increment == 0):
             if self.backoff_interval * 2 <= 86400:
                 self.backoff_interval = self.backoff_interval * 2
 

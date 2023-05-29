@@ -414,7 +414,7 @@ class Microservice(ABC):
         """
         if (topic.split('/')[1] == self.tag and '/request/' not in topic):
             if _vlog(self.tag):
-                _log.debug('Ignoring own response/event')
+                _log.debug('Ignoring own response/event (%s)', topic)
             return True
         if _vlog(self.tag):
             _log.debug('Received ISC %s: %s', topic, message)

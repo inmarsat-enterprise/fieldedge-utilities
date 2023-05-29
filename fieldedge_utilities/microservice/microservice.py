@@ -3,7 +3,7 @@
 import logging
 import time
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Callable
 from uuid import uuid4
 
 from fieldedge_utilities.logger import verbose_logging
@@ -49,6 +49,21 @@ class DictTrigger(dict):
         dict.__delitem__(self, __key)
         if callable(self._modify_callback):
             self._modify_callback()
+
+
+class QueuedCallback:
+    """A queued callback intended to be monitored from the MainThread."""
+    def __init__(self,
+                 callback: 'Callable[..., None]',
+                 *args,
+                 **kwargs) -> None:
+        self.callback: 'Callable[[Any], None]' = callback
+        self.args: tuple = args
+        self.kwargs: dict = kwargs
+
+    def execute(self):
+        if callable(self.callback):
+            self.callback(*self.args, **self.kwargs)
 
 
 class Microservice(ABC):

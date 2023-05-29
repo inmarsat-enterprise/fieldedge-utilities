@@ -382,3 +382,25 @@ def mtest_proxy_init_fail(test_complex: TestService):
     proxy.initialize()
     time.sleep(timeout + 1)
     assert init_success == False
+
+
+def event_callback(*args, **kwargs):
+    for arg in args:
+        logger.info('Got %s', arg)
+    for k, v in kwargs.items():
+        logger.info('Got %s = %s', k, v)
+
+    
+def test_queued_event():
+    simple_event = QueuedCallback(event_callback)
+    assert simple_event.args == ()
+    assert simple_event.kwargs == {}
+    simple_event.execute()
+    arg_event = QueuedCallback(event_callback, 1, None)
+    assert arg_event.args == (1, None)
+    arg_event.execute()
+    comp_event = QueuedCallback(event_callback, 1, kw_1=None)
+    assert comp_event.args == (1,)
+    assert comp_event.kwargs == {'kw_1': None}
+    comp_event.execute()
+    

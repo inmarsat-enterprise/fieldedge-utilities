@@ -3,10 +3,19 @@
 """
 from .feature import Feature
 from .interservice import IscException, IscTask, IscTaskQueue
-from .microservice import Microservice
-from .propertycache import PropertyCache
+from .microservice import Microservice, QueuedCallback
 from .msproxy import MicroserviceProxy
+from .propertycache import PropertyCache
 from .subscriptionproxy import SubscriptionProxy
 
-__all__ = ['Feature', 'IscException', 'IscTask', 'IscTaskQueue', 'Microservice',
-           'PropertyCache', 'MicroserviceProxy', 'SubscriptionProxy']
+__all__ = [
+    'Feature',
+    'IscException',
+    'IscTask',
+    'IscTaskQueue',
+    'Microservice',
+    'QueuedCallback',
+    'MicroserviceProxy',
+    'PropertyCache', 
+    'SubscriptionProxy',
+]

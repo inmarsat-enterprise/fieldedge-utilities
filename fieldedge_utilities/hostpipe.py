@@ -83,7 +83,7 @@ def host_command(command: str,
             _log.error(err)
             raise TimeoutError(err) from exc
     else:
-        _log.info('test_mode received command: %s', command)
+        _log.info('TEST_MODE received command: %s', command)
     if noresponse:
         return f'{command} sent'
     pipelog = pipelog or HOSTPIPE_LOG

@@ -1,0 +1,12 @@
+# /etc/systemd/system/hostrequest.service
+
+[Unit]
+Description=hostrequest: execution of host system commands from containers via HTTP
+After=multi-user.target
+
+[Service]
+Type=idle
+ExecStart=/usr/bin/python /opt/fieldedge/hostrequest.py
+
+[Install]
+WantedBy=multi-user.target

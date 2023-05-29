@@ -1,0 +1,12 @@
+# /etc/systemd/system/hostpipe.service
+
+[Unit]
+Description=hostpipe: execution of host system commands from containers via fifo pipe
+After=multi-user.target
+
+[Service]
+Type=idle
+ExecStart=/bin/bash /opt/fieldedge/hostpipe.sh
+
+[Install]
+WantedBy=multi-user.target

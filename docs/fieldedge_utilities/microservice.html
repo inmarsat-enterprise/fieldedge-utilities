@@ -203,19 +203,13 @@
 
             </li>
             <li>
-                    <a class="class" href="#PropertyCache">PropertyCache</a>
+                    <a class="class" href="#QueuedCallback">QueuedCallback</a>
                             <ul class="memberlist">
                         <li>
-                                <a class="function" href="#PropertyCache.cache">cache</a>
+                                <a class="function" href="#QueuedCallback.__init__">QueuedCallback</a>
                         </li>
                         <li>
-                                <a class="function" href="#PropertyCache.clear">clear</a>
-                        </li>
-                        <li>
-                                <a class="function" href="#PropertyCache.remove">remove</a>
-                        </li>
-                        <li>
-                                <a class="function" href="#PropertyCache.get_cached">get_cached</a>
+                                <a class="function" href="#QueuedCallback.execute">execute</a>
                         </li>
                 </ul>
 
@@ -276,6 +270,24 @@
                         </li>
                         <li>
                                 <a class="function" href="#MicroserviceProxy.on_isc_message">on_isc_message</a>
+                        </li>
+                </ul>
+
+            </li>
+            <li>
+                    <a class="class" href="#PropertyCache">PropertyCache</a>
+                            <ul class="memberlist">
+                        <li>
+                                <a class="function" href="#PropertyCache.cache">cache</a>
+                        </li>
+                        <li>
+                                <a class="function" href="#PropertyCache.clear">clear</a>
+                        </li>
+                        <li>
+                                <a class="function" href="#PropertyCache.remove">remove</a>
+                        </li>
+                        <li>
+                                <a class="function" href="#PropertyCache.get_cached">get_cached</a>
                         </li>
                 </ul>
 
@@ -1295,6 +1307,12 @@ to its queries, tagged with a <code>uid</code> in the message body.</p>
 <li><strong>topic:</strong>  The MQTT topic received.</li>
 <li><strong>message:</strong>  The MQTT/JSON message received.</li>
 </ul>
+
+<h6 id="returns">Returns:</h6>
+
+<blockquote>
+  <p>True if handled by a defined method.</p>
+</blockquote>
 </div>
 
 
@@ -1506,115 +1524,43 @@ used if <code>topic</code> is not passed in.</li>
 
                             </div>
                 </section>
-                <section id="PropertyCache">
+                <section id="QueuedCallback">
                     <div class="attr class">
             
     <span class="def">class</span>
-    <span class="name">PropertyCache</span>:
+    <span class="name">QueuedCallback</span>:
 
         
     </div>
-    <a class="headerlink" href="#PropertyCache"></a>
+    <a class="headerlink" href="#QueuedCallback"></a>
     
-            <div class="docstring"><p>A proxy dictionary for managing <code>CachedProperty</code> objects.</p>
-
-<p><code>LOG_VERBOSE</code> optional environment variable may include <code><a href="#PropertyCache.cache">cache</a></code>.</p>
+            <div class="docstring"><p>A queued callback intended to be monitored from the MainThread.</p>
 </div>
 
 
-                            <div id="PropertyCache.cache" class="classattr">
+                            <div id="QueuedCallback.__init__" class="classattr">
                                 <div class="attr function">
             
-        <span class="def">def</span>
-        <span class="name">cache</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span>, </span><span class="param"><span class="n">value</span><span class="p">:</span> <span class="n">Any</span>, </span><span class="param"><span class="n">tag</span><span class="p">:</span> <span class="nb">str</span>, </span><span class="param"><span class="n">lifetime</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="mf">1.0</span></span><span class="return-annotation">) -> <span class="kc">None</span>:</span></span>
+        <span class="name">QueuedCallback</span><span class="signature pdoc-code condensed">(<span class="param"><span class="n">callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">NoneType</span><span class="p">]</span>, </span><span class="param"><span class="o">*</span><span class="n">args</span>, </span><span class="param"><span class="o">**</span><span class="n">kwargs</span></span>)</span>
 
         
     </div>
-    <a class="headerlink" href="#PropertyCache.cache"></a>
+    <a class="headerlink" href="#QueuedCallback.__init__"></a>
     
-            <div class="docstring"><p>Timestamps and adds a property value to the cache.</p>
-
-<p>If the property is already cached, it will be overwritten.</p>
-
-<h6 id="arguments">Arguments:</h6>
-
-<ul>
-<li><strong>value:</strong>  The property value to be cached.</li>
-<li><strong>tag:</strong>  The name of the property (must be unique in the cache).</li>
-<li><strong>lifetime:</strong>  The lifetime/validity of the value. <code>None</code> means always
-valid.</li>
-</ul>
-</div>
-
+    
 
                             </div>
-                            <div id="PropertyCache.clear" class="classattr">
+                            <div id="QueuedCallback.execute" class="classattr">
                                 <div class="attr function">
             
         <span class="def">def</span>
-        <span class="name">clear</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span></span><span class="return-annotation">) -> <span class="kc">None</span>:</span></span>
+        <span class="name">execute</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span></span><span class="return-annotation">):</span></span>
 
         
     </div>
-    <a class="headerlink" href="#PropertyCache.clear"></a>
+    <a class="headerlink" href="#QueuedCallback.execute"></a>
     
-            <div class="docstring"><p>Removes all entries from the cache.</p>
-</div>
-
-
-                            </div>
-                            <div id="PropertyCache.remove" class="classattr">
-                                <div class="attr function">
-            
-        <span class="def">def</span>
-        <span class="name">remove</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span>, </span><span class="param"><span class="n">tag</span><span class="p">:</span> <span class="nb">str</span></span><span class="return-annotation">) -> <span class="kc">None</span>:</span></span>
-
-        
-    </div>
-    <a class="headerlink" href="#PropertyCache.remove"></a>
-    
-            <div class="docstring"><p>Removes a property value from the cache.</p>
-
-<h6 id="arguments">Arguments:</h6>
-
-<ul>
-<li><strong>tag:</strong>  The property name to be removed from the cache.</li>
-</ul>
-
-<h6 id="raises">Raises:</h6>
-
-<ul>
-<li><code>KeyError</code> if the tag is not in the cache.</li>
-</ul>
-</div>
-
-
-                            </div>
-                            <div id="PropertyCache.get_cached" class="classattr">
-                                <div class="attr function">
-            
-        <span class="def">def</span>
-        <span class="name">get_cached</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span>, </span><span class="param"><span class="n">tag</span><span class="p">:</span> <span class="nb">str</span></span><span class="return-annotation">) -> <span class="n">Any</span>:</span></span>
-
-        
-    </div>
-    <a class="headerlink" href="#PropertyCache.get_cached"></a>
-    
-            <div class="docstring"><p>Retrieves the cached property value if valid.</p>
-
-<p>If the property is aged/invalid, it is removed from the cache.</p>
-
-<h6 id="arguments">Arguments:</h6>
-
-<ul>
-<li><strong>tag:</strong>  The property name to be retrieved from the cache.</li>
-</ul>
-
-<h6 id="returns">Returns:</h6>
-
-<blockquote>
-  <p>The cached property value, or <code>None</code> if the tag is not found.</p>
-</blockquote>
+            <div class="docstring"><p>Executes the callback with the passed args and kwargs.</p>
 </div>
 
 
@@ -1956,6 +1902,120 @@ Should return False by default, True if the message was handled.</p>
 
 <blockquote>
   <p><code>True</code> if the message was processed or <code>False</code> otherwise.</p>
+</blockquote>
+</div>
+
+
+                            </div>
+                </section>
+                <section id="PropertyCache">
+                    <div class="attr class">
+            
+    <span class="def">class</span>
+    <span class="name">PropertyCache</span>:
+
+        
+    </div>
+    <a class="headerlink" href="#PropertyCache"></a>
+    
+            <div class="docstring"><p>A proxy dictionary for managing <code>CachedProperty</code> objects.</p>
+
+<p><code>LOG_VERBOSE</code> optional environment variable may include <code><a href="#PropertyCache.cache">cache</a></code>.</p>
+</div>
+
+
+                            <div id="PropertyCache.cache" class="classattr">
+                                <div class="attr function">
+            
+        <span class="def">def</span>
+        <span class="name">cache</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span>, </span><span class="param"><span class="n">value</span><span class="p">:</span> <span class="n">Any</span>, </span><span class="param"><span class="n">tag</span><span class="p">:</span> <span class="nb">str</span>, </span><span class="param"><span class="n">lifetime</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="mf">1.0</span></span><span class="return-annotation">) -> <span class="kc">None</span>:</span></span>
+
+        
+    </div>
+    <a class="headerlink" href="#PropertyCache.cache"></a>
+    
+            <div class="docstring"><p>Timestamps and adds a property value to the cache.</p>
+
+<p>If the property is already cached, it will be overwritten.</p>
+
+<h6 id="arguments">Arguments:</h6>
+
+<ul>
+<li><strong>value:</strong>  The property value to be cached.</li>
+<li><strong>tag:</strong>  The name of the property (must be unique in the cache).</li>
+<li><strong>lifetime:</strong>  The lifetime/validity of the value. <code>None</code> means always
+valid.</li>
+</ul>
+</div>
+
+
+                            </div>
+                            <div id="PropertyCache.clear" class="classattr">
+                                <div class="attr function">
+            
+        <span class="def">def</span>
+        <span class="name">clear</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span></span><span class="return-annotation">) -> <span class="kc">None</span>:</span></span>
+
+        
+    </div>
+    <a class="headerlink" href="#PropertyCache.clear"></a>
+    
+            <div class="docstring"><p>Removes all entries from the cache.</p>
+</div>
+
+
+                            </div>
+                            <div id="PropertyCache.remove" class="classattr">
+                                <div class="attr function">
+            
+        <span class="def">def</span>
+        <span class="name">remove</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span>, </span><span class="param"><span class="n">tag</span><span class="p">:</span> <span class="nb">str</span></span><span class="return-annotation">) -> <span class="kc">None</span>:</span></span>
+
+        
+    </div>
+    <a class="headerlink" href="#PropertyCache.remove"></a>
+    
+            <div class="docstring"><p>Removes a property value from the cache.</p>
+
+<h6 id="arguments">Arguments:</h6>
+
+<ul>
+<li><strong>tag:</strong>  The property name to be removed from the cache.</li>
+</ul>
+
+<h6 id="raises">Raises:</h6>
+
+<ul>
+<li><code>KeyError</code> if the tag is not in the cache.</li>
+</ul>
+</div>
+
+
+                            </div>
+                            <div id="PropertyCache.get_cached" class="classattr">
+                                <div class="attr function">
+            
+        <span class="def">def</span>
+        <span class="name">get_cached</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span>, </span><span class="param"><span class="n">tag</span><span class="p">:</span> <span class="nb">str</span></span><span class="return-annotation">) -> <span class="n">Any</span>:</span></span>
+
+        
+    </div>
+    <a class="headerlink" href="#PropertyCache.get_cached"></a>
+    
+            <div class="docstring"><p>Retrieves the cached property value if valid.</p>
+
+<p>If the property is aged/invalid, it is removed from the cache.</p>
+
+<h6 id="arguments">Arguments:</h6>
+
+<ul>
+<li><strong>tag:</strong>  The property name to be retrieved from the cache.</li>
+</ul>
+
+<h6 id="returns">Returns:</h6>
+
+<blockquote>
+  <p>The cached property value, or <code>None</code> if the tag is not found.</p>
 </blockquote>
 </div>
 

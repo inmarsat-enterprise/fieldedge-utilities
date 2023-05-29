@@ -129,7 +129,7 @@ intervals that are interdependent.</p>
                             <div id="ConnectionManager.__init__" class="classattr">
                                 <div class="attr function">
             
-        <span class="name">ConnectionManager</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">retry_interval</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">30</span>,</span><span class="param">	<span class="n">backoff_interval</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">30</span>,</span><span class="param">	<span class="n">init_attempts</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>,</span><span class="param">	<span class="n">at_timeouts</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>,</span><span class="param">	<span class="n">max_at_timeouts</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span>,</span><span class="param">	<span class="n">at_crc_errors</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>,</span><span class="param">	<span class="n">max_crc_errors</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span></span>)</span>
+        <span class="name">ConnectionManager</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">retry_interval</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">30</span>,</span><span class="param">	<span class="n">backoff_interval</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">30</span>,</span><span class="param">	<span class="n">backoff_increment</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span>,</span><span class="param">	<span class="n">backoff_starts_after</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>,</span><span class="param">	<span class="n">init_attempts</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>,</span><span class="param">	<span class="n">at_timeouts</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>,</span><span class="param">	<span class="n">max_at_timeouts</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span>,</span><span class="param">	<span class="n">at_crc_errors</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>,</span><span class="param">	<span class="n">max_crc_errors</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span></span>)</span>
 
         
     </div>
@@ -225,8 +225,9 @@ intervals that are interdependent.</p>
     
             <div class="docstring"><p>Increases the backoff_interval for initialization retries.</p>
 
-<p>Every 3 attempts, the backoff_interval will double up to a maximum
-of one day (86400 seconds).</p>
+<p>Every <code>backoff_increment</code> attempts, the backoff_interval will double
+up to a maximum of one day (86400 seconds).
+Initial backoff can be deferred by <code>backoff_starts_after</code>.</p>
 </div>
 
 

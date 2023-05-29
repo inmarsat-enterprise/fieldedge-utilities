@@ -62,6 +62,7 @@ class QueuedCallback:
         self.kwargs: dict = kwargs
 
     def execute(self):
+        """Executes the callback with the passed args and kwargs."""
         if callable(self.callback):
             self.callback(*self.args, **self.kwargs)
 

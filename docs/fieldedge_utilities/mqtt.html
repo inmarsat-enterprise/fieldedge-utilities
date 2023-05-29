@@ -541,31 +541,25 @@ established on re/connection.</li>
 attempts if auto_connect is <code>True</code>.</li>
 <li><strong>auto_connect (bool):</strong>  Automatically attempts to connect when created
 or reconnect after disconnection.</li>
-<li><strong>**kwargs:</strong>  includes advanced feature overrides such as:</li>
-<li><ul>
-<li><code>client_uid</code> defaults to True, appends a timestamp to the</li>
-</ul></li>
+</ul>
 
-<p><li>client_id to avoid being rejected by the host.</li>
-<li><ul>
-<li><code>bind_address</code> to bind to a specific IP</li>
-</ul></li>
-<li><ul>
-<li><code>on_connect</code>, <code>on_disconnect</code>, <code>on_log</code> callbacks</li>
-</ul></li>
-<li><ul>
-<li><code>host</code>, <code>port</code> (default 1883) and <code>keepalive</code> (default 60)</li>
-</ul></li>
-<li><ul>
-<li><code>username</code> and <code>password</code></li>
-</ul></li>
-<li><ul>
-<li><code>ca_certs</code>, <code>certfile</code>, <code>keyfile</code></li>
-</ul></li>
-<li><ul>
-<li><code>qos</code> (default = 0)</li>
-</ul></li>
-</ul></p>
+<p>Keyword Args: 
+    client_uid (str): defaults to True, appends a timestamp to the
+        client_id to avoid being rejected by the host.
+    bind_address (str): to bind to a specific IP (broken in Paho Python)
+    on_connect (Callable): optional callback when connecting to broker
+    on_disconnect (Callable): optional callback when disconnecting from
+        broker
+    on_log (Callable): optional callback for client logging
+    host (str): override hostname
+    port (int): defaults to 1883
+    keepalive (int): defaults to 60 seconds
+    username (str): override username
+    password (str): override password
+    ca_certs (str): path to the CA certificate
+    certfile (str): path to the PEM certificate for the client
+    keyfile (str): path to the PEM certificate for the client key
+    qos (int): MQTT QoS defaults to 0 (send at most once)</p>
 
 <h6 id="raises">Raises:</h6>
 

@@ -27,7 +27,7 @@ class ConnectionManager:
     retry_interval: int = 30
     backoff_interval: int = 30
     backoff_increment: int = 3
-    backoff_starts_after: int = 0
+    backoff_starts_after: int = 3
     init_attempts: int = 0
     at_timeouts: int = 0
     max_at_timeouts: int = 3

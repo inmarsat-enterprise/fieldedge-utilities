@@ -81,6 +81,20 @@ def test_exception_singleline(capsys):
     if newdir: os.rmdir(newdir)
 
 
+def test_obscured(capsys):
+    log = logger.get_fieldedge_logger(obscure=True)
+    log.info('password=testPass')
+    captured = capsys.readouterr()
+    assert 'testPass' not in captured.out and '***' in captured.out
+    log.info('password = testPass')
+    captured = capsys.readouterr()
+    assert 'testPass' not in captured.out and '***' in captured.out
+    log.info('{ "password": "testPass", "token": "testToken" }')
+    captured = capsys.readouterr()
+    assert 'testPass' not in captured.out and '***' in captured.out
+    assert 'testToken' not in captured.out
+
+
 def test_invalid_file_path(capsys):
     bad_path = '/bad/path/test.log'
     with pytest.raises(FileNotFoundError, match=f'Path {bad_path} not found'):

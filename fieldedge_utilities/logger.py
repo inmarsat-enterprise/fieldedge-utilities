@@ -21,6 +21,7 @@ Format is:
 "module":"main","function":"<module>","line":6,"message":"This is a test"}`
 
 """
+import json
 import logging
 import os
 import sys
@@ -42,6 +43,8 @@ FORMAT_JSON = ('{'
                 '}')
 DATEFMT = '%Y-%m-%dT%H:%M:%S'
 LOG_VERBOSE = os.getenv('LOG_VERBOSE')
+DEFAULT_OBSCURE = ['password', 'token', 'key', 'secret']
+OBSCURE = json.loads(os.getenv('OBSCURE', json.dumps(DEFAULT_OBSCURE)))
 
 
 class LogFilterLessThan(logging.Filter):
@@ -79,6 +82,57 @@ class LogFormatterOneLineException(logging.Formatter):
             err_type = type(record.msg).__name__
             result = result.replace(f'{record.msg}\n', f'{err_type}: ')
         return result
+
+
+class LogFormatterObscureSensitive(LogFormatterOneLineException):
+    """Formats all text to remove sensitive information."""
+    @staticmethod
+    def obscure(record: str) -> str:
+        keywords = OBSCURE
+        if not any(k in record.lower() for k in keywords):
+            return record
+        wrappers = ['"', '\'']
+        assignments = [': ', ':', '=', ' = ']
+        separators = [',', ' ', '}', ']']
+        to_replace = []
+        for k in keywords:
+            if k in record.lower():
+                index = 0
+                while index < len(record) - 1:
+                    tag = k
+                    index = record[index:].find(tag)
+                    if index == -1:
+                        break
+                    for w in wrappers:
+                        if record[index+len(tag)] == w:
+                            tag = tag + w
+                            break
+                    for a in assignments:
+                        if record[index+len(tag):index+len(tag)+len(a)] == a:
+                            tag = tag + a
+                            break
+                    start = index + len(tag)
+                    end = len(record) - start
+                    for s in separators:
+                        end = record[start:].find(s)
+                        if end > -1:
+                            break
+                        end = len(record) - start
+                    pattern = record[start:start+end]
+                    for w in wrappers:
+                        if pattern.startswith(w) and pattern.endswith(w):
+                            pattern = pattern[len(w):-len(w)]
+                            break
+                    if pattern not in to_replace:
+                        to_replace.append(pattern)
+                    index = start + end + 1
+        for r in to_replace:
+            record = record.replace(r, '***')
+        return record
+    
+    def format(self, record):
+        preformatted = super().format(record)
+        return self.obscure(preformatted)
 
 
 def get_logfile_name(logger: logging.Logger) -> str:
@@ -158,18 +212,24 @@ def apply_loglevel(logger: logging.Logger, level: int) -> None:
             h.setLevel(level)
 
 
-def get_formatter(format: str = 'csv') -> logging.Formatter:
+def get_formatter(format: str = 'csv',
+                  obscure: bool = False) -> logging.Formatter:
     """Returns a standardized log formatter.
     
     Args:
         format: `csv` or `json` are supported.
+        obscure: `True` will obscure logged text with keys matching environment
+            variable `OBSCURE` as a JSON-formatted array.
     
     Returns:
-        A logging.Formatter
+        A `logging.Formatter`
 
     """
     fmt = FORMAT_JSON if format == 'json' else FORMAT_CSV
-    log_formatter = LogFormatterOneLineException(fmt, DATEFMT)
+    if obscure:
+        log_formatter = LogFormatterObscureSensitive(fmt, DATEFMT)
+    else:
+        log_formatter = LogFormatterOneLineException(fmt, DATEFMT)
     log_formatter.converter = gmtime
     return log_formatter
 
@@ -284,10 +344,14 @@ def get_fieldedge_logger(filename: str = None,
         file_size: Max size of the file in megabytes, before wrapping.
         log_level: the logging level (default INFO)
         format: `csv` or `json`
-        kwargs: Optional overrides for RotatingFileHandler
-            mode (str): defaults to `a` (append)
-            maxBytes (int): overrides file_size
-            backupCount (int): defaults to 2
+    
+    Keyword Args:
+        mode (str): writing mode defaults to `a` (append)
+        maxBytes (int): overrides file_size
+        backupCount (int): defaults to 2
+        obscure (bool): Set `True` to obscure values in logs defined by the
+            `OBSCURE` environment variable as a JSON array of keywords. Default
+            keywords: `password`, `token`, `key`, `secret`.
     
     Returns:
         A `Logger` with console `StreamHandler` and (optional)
@@ -298,6 +362,10 @@ def get_fieldedge_logger(filename: str = None,
     
     """
     logger = logging.getLogger()
+    filehandler_kwargs = {}
+    for k, v in kwargs.items():
+        if k in ['mode', 'maxBytes', 'backupCount']:
+            filehandler_kwargs[k] = v
     if isinstance(log_level, str):
         log_level = log_level.upper()
     if filename is not None:
@@ -310,7 +378,7 @@ def get_fieldedge_logger(filename: str = None,
                                              **kwargs))
     add_handler(logger, get_handler_stdout())
     add_handler(logger, get_handler_stderr())
-    apply_formatter(logger, get_formatter(format))
+    apply_formatter(logger, get_formatter(format, kwargs.get('obscure', False)))
     logger.setLevel(log_level)
     return logger
 

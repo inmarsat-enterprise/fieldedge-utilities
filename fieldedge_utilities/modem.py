@@ -72,7 +72,7 @@ class ConnectionManager:
         
         """
         if (self.init_attempts > self.backoff_starts_after and
-            self.init_attempts % self.backoff_increment == 0):
+            self.init_attempts % self.backoff_increment == 1):
             if self.backoff_interval * 2 <= 86400:
                 self.backoff_interval = self.backoff_interval * 2
 

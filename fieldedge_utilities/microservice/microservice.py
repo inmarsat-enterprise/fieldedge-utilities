@@ -440,10 +440,10 @@ class Microservice(ABC):
         elif (topic.endswith(f'/{self.tag}/request/properties/list') or
               topic.endswith(f'/{self.tag}/request/properties/get')):
             self.properties_notify(message)
-            return self._propagate_request(message, filter=['properties'])
+            return self._processing_complete(message, filter=['properties'])
         elif topic.endswith(f'/{self.tag}/request/properties/set'):
             self.properties_change(message)
-            return self._propagate_request(message, filter=['properties'])
+            return self._processing_complete(message, filter=['properties'])
         else:
             if self.features:
                 if _vlog(self.tag):
@@ -459,14 +459,15 @@ class Microservice(ABC):
                     return True
         return False
 
-    def _propagate_request(self,
+    def _processing_complete(self,
                            message: dict,
                            filter: 'list[str]' = None) -> bool:
-        """Returns True if message contains keys requiring additional handling.
+        """Returns False if message contains keys requiring additional handling.
         
         Args:
             message: The MQTT message payload.
-            filter: A list of keywords to ignore when assessing.
+            filter: A list of message dictionary keys to ignore when assessing.
+                `uid` and `ts` are always ignored.
         
         """
         default_filter = ['uid', 'ts']
@@ -478,7 +479,7 @@ class Microservice(ABC):
                 filter.append(key)
         kwargs = {key: val for key, val in message.items()
                   if key not in filter}
-        return len(kwargs) > 0
+        return len(kwargs) == 0
 
     def _is_child_isc(self,
                       children: 'dict[str, Feature|MicroserviceProxy]',

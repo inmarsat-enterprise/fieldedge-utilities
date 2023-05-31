@@ -55,6 +55,18 @@
 
             </li>
             <li>
+                    <a class="class" href="#LogFormatterObscureSensitive">LogFormatterObscureSensitive</a>
+                            <ul class="memberlist">
+                        <li>
+                                <a class="function" href="#LogFormatterObscureSensitive.obscure">obscure</a>
+                        </li>
+                        <li>
+                                <a class="function" href="#LogFormatterObscureSensitive.format">format</a>
+                        </li>
+                </ul>
+
+            </li>
+            <li>
                     <a class="function" href="#get_logfile_name">get_logfile_name</a>
             </li>
             <li>
@@ -258,6 +270,77 @@ it is formatted using formatException() and appended to the message.</p>
                                 </dl>
                             </div>
                 </section>
+                <section id="LogFormatterObscureSensitive">
+                    <div class="attr class">
+            
+    <span class="def">class</span>
+    <span class="name">LogFormatterObscureSensitive</span><wbr>(<span class="base"><a href="#LogFormatterOneLineException">LogFormatterOneLineException</a></span>):
+
+        
+    </div>
+    <a class="headerlink" href="#LogFormatterObscureSensitive"></a>
+    
+            <div class="docstring"><p>Formats all text to remove sensitive information.</p>
+</div>
+
+
+                            <div id="LogFormatterObscureSensitive.obscure" class="classattr">
+                                <div class="attr function">
+                    <div class="decorator">@staticmethod</div>
+
+        <span class="def">def</span>
+        <span class="name">obscure</span><span class="signature pdoc-code condensed">(<span class="param"><span class="n">record</span><span class="p">:</span> <span class="nb">str</span></span><span class="return-annotation">) -> <span class="nb">str</span>:</span></span>
+
+        
+    </div>
+    <a class="headerlink" href="#LogFormatterObscureSensitive.obscure"></a>
+    
+    
+
+                            </div>
+                            <div id="LogFormatterObscureSensitive.format" class="classattr">
+                                <div class="attr function">
+            
+        <span class="def">def</span>
+        <span class="name">format</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span>, </span><span class="param"><span class="n">record</span></span><span class="return-annotation">):</span></span>
+
+        
+    </div>
+    <a class="headerlink" href="#LogFormatterObscureSensitive.format"></a>
+    
+            <div class="docstring"><p>Format the specified record as text.</p>
+
+<p>The record's attribute dictionary is used as the operand to a
+string formatting operation which yields the returned string.
+Before formatting the dictionary, a couple of preparatory steps
+are carried out. The message attribute of the record is computed
+using LogRecord.getMessage(). If the formatting string uses the
+time (as determined by a call to usesTime(), formatTime() is
+called to format the event time. If there is exception information,
+it is formatted using formatException() and appended to the message.</p>
+</div>
+
+
+                            </div>
+                            <div class="inherited">
+                                <h5>Inherited Members</h5>
+                                <dl>
+                                    <div><dt>logging.Formatter</dt>
+                                <dd id="LogFormatterObscureSensitive.__init__" class="function">Formatter</dd>
+                <dd id="LogFormatterObscureSensitive.converter" class="function">converter</dd>
+                <dd id="LogFormatterObscureSensitive.formatTime" class="function">formatTime</dd>
+                <dd id="LogFormatterObscureSensitive.usesTime" class="function">usesTime</dd>
+                <dd id="LogFormatterObscureSensitive.formatMessage" class="function">formatMessage</dd>
+                <dd id="LogFormatterObscureSensitive.formatStack" class="function">formatStack</dd>
+
+            </div>
+            <div><dt><a href="#LogFormatterOneLineException">LogFormatterOneLineException</a></dt>
+                                <dd id="LogFormatterObscureSensitive.formatException" class="function"><a href="#LogFormatterOneLineException.formatException">formatException</a></dd>
+
+            </div>
+                                </dl>
+                            </div>
+                </section>
                 <section id="get_logfile_name">
                     <div class="attr function">
             
@@ -374,7 +457,7 @@ it is formatted using formatException() and appended to the message.</p>
                     <div class="attr function">
             
         <span class="def">def</span>
-        <span class="name">get_formatter</span><span class="signature pdoc-code condensed">(<span class="param"><span class="nb">format</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;csv&#39;</span></span><span class="return-annotation">) -> <span class="n">logging</span><span class="o">.</span><span class="n">Formatter</span>:</span></span>
+        <span class="name">get_formatter</span><span class="signature pdoc-code condensed">(<span class="param"><span class="nb">format</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;csv&#39;</span>, </span><span class="param"><span class="n">obscure</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span></span><span class="return-annotation">) -> <span class="n">logging</span><span class="o">.</span><span class="n">Formatter</span>:</span></span>
 
         
     </div>
@@ -386,12 +469,14 @@ it is formatted using formatException() and appended to the message.</p>
 
 <ul>
 <li><strong>format:</strong>  <code>csv</code> or <code>json</code> are supported.</li>
+<li><strong>obscure:</strong>  <code>True</code> will obscure logged text with keys matching environment
+variable <code>OBSCURE</code> as a JSON-formatted array.</li>
 </ul>
 
 <h6 id="returns">Returns:</h6>
 
 <blockquote>
-  <p>A logging.Formatter</p>
+  <p>A <code>logging.Formatter</code></p>
 </blockquote>
 </div>
 
@@ -518,11 +603,18 @@ formatted file. Default is CSV.</li>
 <li><strong>file_size:</strong>  Max size of the file in megabytes, before wrapping.</li>
 <li><strong>log_level:</strong>  the logging level (default INFO)</li>
 <li><strong>format:</strong>  <code>csv</code> or <code>json</code></li>
-<li><strong>kwargs:</strong>  Optional overrides for RotatingFileHandler
-mode (str): defaults to <code>a</code> (append)
-maxBytes (int): overrides file_size
-backupCount (int): defaults to 2</li>
 </ul>
+
+<h6 id="keyword-args">Keyword Args:</h6>
+
+<blockquote>
+  <p>mode (str): writing mode defaults to <code>a</code> (append)
+  maxBytes (int): overrides file_size
+  backupCount (int): defaults to 2
+  obscure (bool): Set <code>True</code> to obscure values in logs defined by the
+      <code>OBSCURE</code> environment variable as a JSON array of keywords. Default
+      keywords: <code>password</code>, <code>token</code>, <code>key</code>, <code>secret</code>.</p>
+</blockquote>
 
 <h6 id="returns">Returns:</h6>
 

@@ -36,6 +36,9 @@
             <li>
                     <a class="function" href="#ssh_command">ssh_command</a>
             </li>
+            <li>
+                    <a class="function" href="#get_ssh_session">get_ssh_session</a>
+            </li>
     </ul>
 
 
@@ -77,13 +80,25 @@ execute natively on the host shell.</p>
                     <div class="attr function">
             
         <span class="def">def</span>
-        <span class="name">host_command</span><span class="signature pdoc-code condensed">(<span class="param"><span class="n">command</span><span class="p">:</span> <span class="nb">str</span>, </span><span class="param"><span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="kc">None</span></span><span class="return-annotation">) -> <span class="nb">str</span>:</span></span>
+        <span class="name">host_command</span><span class="signature pdoc-code condensed">(<span class="param"><span class="n">command</span><span class="p">:</span> <span class="nb">str</span>, </span><span class="param"><span class="o">**</span><span class="n">kwargs</span></span><span class="return-annotation">) -> <span class="nb">str</span>:</span></span>
 
         
     </div>
     <a class="headerlink" href="#host_command"></a>
     
             <div class="docstring"><p>Sends a Linux command to the host and returns the response.</p>
+
+<h6 id="arguments">Arguments:</h6>
+
+<ul>
+<li><strong>command (str):</strong>  The shell command to send.</li>
+</ul>
+
+<h6 id="keyword-args">Keyword Args:</h6>
+
+<blockquote>
+  <p>timeout (float): Optional timeout value if no response.</p>
+</blockquote>
 </div>
 
 
@@ -92,13 +107,36 @@ execute natively on the host shell.</p>
                     <div class="attr function">
             
         <span class="def">def</span>
-        <span class="name">ssh_command</span><span class="signature pdoc-code condensed">(<span class="param"><span class="n">command</span><span class="p">:</span> <span class="nb">str</span></span><span class="return-annotation">) -> <span class="nb">str</span>:</span></span>
+        <span class="name">ssh_command</span><span class="signature pdoc-code condensed">(<span class="param"><span class="n">command</span><span class="p">:</span> <span class="nb">str</span>, </span><span class="param"><span class="n">ssh_client</span><span class="p">:</span> <span class="n">paramiko</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">SSHClient</span> <span class="o">=</span> <span class="kc">None</span></span><span class="return-annotation">) -> <span class="nb">str</span>:</span></span>
 
         
     </div>
     <a class="headerlink" href="#ssh_command"></a>
     
             <div class="docstring"><p>Sends a host command via SSH.</p>
+</div>
+
+
+                </section>
+                <section id="get_ssh_session">
+                    <div class="attr function">
+            
+        <span class="def">def</span>
+        <span class="name">get_ssh_session</span><span class="signature pdoc-code condensed">(<span class="param"><span class="o">**</span><span class="n">kwargs</span></span><span class="return-annotation">) -> <span class="n">paramiko</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">SSHClient</span>:</span></span>
+
+        
+    </div>
+    <a class="headerlink" href="#get_ssh_session"></a>
+    
+            <div class="docstring"><p>Returns a connected SSH client.</p>
+
+<h6 id="keyword-args">Keyword Args:</h6>
+
+<blockquote>
+  <p>hostname (str): The hostname of the SSH target.
+  username (str): SSH login username.
+  password (str): SSH login password.</p>
+</blockquote>
 </div>
 
 

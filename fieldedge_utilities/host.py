@@ -39,31 +39,44 @@ SSH_PASS = os.getenv('SSH_PASS')
 TEST_MODE = os.getenv('TEST_MODE')
 
 
-def host_command(command: str, timeout: float = None) -> str:
-    """Sends a Linux command to the host and returns the response."""
+def host_command(command: str, **kwargs) -> str:
+    """Sends a Linux command to the host and returns the response.
+    
+    Args:
+        command (str): The shell command to send.
+    
+    Keyword Args:
+        timeout (float): Optional timeout value if no response.
+    
+    """
     result = ''
     method = None
     if DOCKER:
         if HOSTPIPE_LOG:
             method = 'HOSTPIPE'
-            kwargs = { 'test_mode': TEST_MODE is not None }
-            if timeout:
-                kwargs['timeout'] = timeout
-            result = hostpipe.host_command(command, **kwargs)
+            valid_kwargs = ['timeout', 'noresponse', 'pipelog', 'test_mode']
+            hostpipe_kwargs = {}
+            for key, val in kwargs.items():
+                if key in valid_kwargs:
+                    hostpipe_kwargs[key] = val
+                if key == 'test_mode':
+                    hostpipe_kwargs[key] = val is not None
+            result = hostpipe.host_command(command, **hostpipe_kwargs)
         elif HOSTREQUEST_PORT:
             method = 'HOSTREQUEST'
             try:
                 conn = http.client.HTTPConnection(host=HOSTREQUEST_HOST,
-                                                port=HOSTREQUEST_PORT)
+                                                  port=HOSTREQUEST_PORT)
                 headers = { 'Content-Type': 'text/plain' }
                 conn.request('POST', '/', command, headers)
                 result = conn.getresponse().read().decode()
             except ConnectionError:
                 _log.error('Failed to reach HTTP server')
-    elif SSH_HOST and SSH_USER and SSH_PASS:
+    elif ((SSH_HOST and SSH_USER and SSH_PASS) or
+          kwargs.get('ssh_client') is not None):
         method = 'SSH'
         try:
-            result = ssh_command(command)
+            result = ssh_command(command, kwargs.get('ssh_client', None))
         except (ModuleNotFoundError, ConnectionError):
             _log.error('Failed to access SSH')
     else:
@@ -78,15 +91,41 @@ def host_command(command: str, timeout: float = None) -> str:
     return result
 
 
-def ssh_command(command: str) -> str:
+def ssh_command(command: str, ssh_client: paramiko.SSHClient = None) -> str:
     """Sends a host command via SSH."""
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    client.connect(SSH_HOST, username=SSH_USER, password=SSH_PASS,
-                    look_for_keys=False)
-    _stdin, stdout, stderr = client.exec_command(command)
+    if not isinstance(ssh_client, paramiko.SSHClient):
+        close_client = True
+        ssh_client = paramiko.SSHClient()
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh_client.connect(SSH_HOST, username=SSH_USER, password=SSH_PASS,
+                           look_for_keys=False)
+    else:
+        close_client = False
+    _stdin, stdout, stderr = ssh_client.exec_command(command)
     res: 'list[str]' = stdout.readlines()
     if not res:
         res = stderr.readlines()
-    client.close()
+    _stdin.close()
+    stdout.close()
+    stderr.close()
+    if close_client:
+        ssh_client.close()
     return '\n'.join([l.strip() for l in res])
+
+
+def get_ssh_session(**kwargs) -> paramiko.SSHClient:
+    """Returns a connected SSH client.
+    
+    Keyword Args:
+        hostname (str): The hostname of the SSH target.
+        username (str): SSH login username.
+        password (str): SSH login password.
+    
+    """
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client.connect(hostname=kwargs.get('hostname', SSH_HOST),
+                   username=kwargs.get('username', SSH_USER),
+                   password=kwargs.get('password', SSH_PASS),
+                   look_for_keys=False)
+    return client

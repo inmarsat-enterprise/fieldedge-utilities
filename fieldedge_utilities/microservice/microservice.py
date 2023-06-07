@@ -386,7 +386,8 @@ class Microservice(ABC):
                 self._mqttc_local.subscribe(topic)
                 self._subscriptions.append(topic)
                 return True
-            except:
+            except Exception as exc:
+                _log.error('Failed to subscribe %s (%s)', topic, exc)
                 return False
         else:
             _log.warning('Already subscribed to %s', topic)
@@ -405,7 +406,8 @@ class Microservice(ABC):
             self._mqttc_local.unsubscribe(topic)
             self._subscriptions.remove(topic)
             return True
-        except:
+        except Exception as exc:
+            _log.error('Failed to unsubscribe %s (%s)', topic, exc)
             return False
 
     @abstractmethod

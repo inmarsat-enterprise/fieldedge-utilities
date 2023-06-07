@@ -129,6 +129,7 @@ class MqttClient:
             certfile (str): path to the PEM certificate for the client
             keyfile (str): path to the PEM certificate for the client key
             qos (int): MQTT QoS defaults to 0 (send at most once)
+            thread_name (str): Optional tag to identify thread in logging.
 
         Raises:
             `MqttError` if the client_id is not valid.
@@ -199,7 +200,7 @@ class MqttClient:
         return self._mqtt.is_connected()
 
     @property
-    def subscriptions(self) -> dict:
+    def subscriptions(self) -> 'dict[str, dict]':
         """The dictionary of subscriptions.
         
         Use subscribe or unsubscribe to change the dict.

@@ -77,7 +77,7 @@ def host_command(command: str, **kwargs) -> str:
         method = 'SSH'
         try:
             result = ssh_command(command, kwargs.get('ssh_client', None))
-        except (ModuleNotFoundError, ConnectionError):
+        except (ModuleNotFoundError, ConnectionError, NameError):
             _log.error('Failed to access SSH')
     else:
         method = 'DIRECT'
@@ -91,8 +91,17 @@ def host_command(command: str, **kwargs) -> str:
     return result
 
 
-def ssh_command(command: str, ssh_client: paramiko.SSHClient = None) -> str:
-    """Sends a host command via SSH."""
+def ssh_command(command: str, ssh_client = None) -> str:
+    """Sends a host command via SSH.
+    
+    Args:
+        command (str): The shell command to send.
+        ssh_client (paramiko.SSHClient): Optional SSH client session.
+    
+    Returns:
+        A string with the response, typically multiline separated by `\n`.
+        
+    """
     if not isinstance(ssh_client, paramiko.SSHClient):
         close_client = True
         ssh_client = paramiko.SSHClient()
@@ -113,13 +122,16 @@ def ssh_command(command: str, ssh_client: paramiko.SSHClient = None) -> str:
     return '\n'.join([l.strip() for l in res])
 
 
-def get_ssh_session(**kwargs) -> paramiko.SSHClient:
+def get_ssh_session(**kwargs):   # -> paramiko.SSHClient:
     """Returns a connected SSH client.
     
     Keyword Args:
         hostname (str): The hostname of the SSH target.
         username (str): SSH login username.
         password (str): SSH login password.
+    
+    Returns:
+        A `paramiko.SSHClient` if paramiko is installed.
     
     """
     client = paramiko.SSHClient()

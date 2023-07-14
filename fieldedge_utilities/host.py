@@ -51,8 +51,8 @@ def host_command(command: str, **kwargs) -> str:
     """
     result = ''
     method = None
-    if DOCKER:
-        if HOSTPIPE_LOG:
+    if DOCKER or 'test_mode' in kwargs:
+        if HOSTPIPE_LOG or 'pipelog' in kwargs:
             method = 'HOSTPIPE'
             valid_kwargs = ['timeout', 'noresponse', 'pipelog', 'test_mode']
             hostpipe_kwargs = {}

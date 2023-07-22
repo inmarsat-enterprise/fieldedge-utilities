@@ -107,9 +107,10 @@ class Microservice(ABC):
         auto_connect: bool = kwargs.get('auto_connect', False)
         isc_poll_interval: int = kwargs.get('isc_poll_interval', 1)
         self._subscriptions = [ 'fieldedge/+/rollcall/#' ]
-        self._subscriptions.append(f'fieldedge/{self.tag}/#')
+        self._subscriptions.append(f'fieldedge/{self.tag}/request/#')
         self._mqttc_local = MqttClient(client_id=mqtt_client_id,
                                        subscribe_default=self._subscriptions,
+                                       on_connect=self._on_isc_connect,
                                        on_message=self.on_isc_message,
                                        auto_connect=auto_connect,
                                        qos=kwargs.get('qos', 0))
@@ -179,7 +180,7 @@ class Microservice(ABC):
     @staticmethod
     def _categorize_prop(obj: object,
                          prop: str,
-                         categorized: dict,
+                         categorized: 'dict[str, list[str]]',
                          alias: str = None):
         """"""
         if property_is_read_only(obj, prop):
@@ -409,6 +410,10 @@ class Microservice(ABC):
         except Exception as exc:
             _log.error('Failed to unsubscribe %s (%s)', topic, exc)
             return False
+
+    def _on_isc_connect(self, *args) -> None:
+        """Performs a rollcall when re/connecting."""
+        self.rollcall()
 
     @abstractmethod
     def on_isc_message(self, topic: str, message: dict) -> bool:

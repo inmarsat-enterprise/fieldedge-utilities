@@ -439,12 +439,14 @@ class MqttClient:
                             userdata: Any,
                             result_code: int):
         """Internal callback when disconnected, clears subscription status."""
-        if callable(self.on_disconnect):
-            self.on_disconnect(client, userdata, result_code)
+        for subscription in self.subscriptions.values():
+            subscription['mid'] = 0
         if userdata != 'terminate':
             _log.warning('MQTT broker disconnected - result code %d (%s)',
                          result_code, _get_mqtt_result(result_code))
             # reconnect handling is managed automatically by Paho library
+        if callable(self.on_disconnect):
+            self.on_disconnect(client, userdata, result_code)
 
     def publish(self,
                 topic: str,

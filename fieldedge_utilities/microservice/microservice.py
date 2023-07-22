@@ -412,7 +412,12 @@ class Microservice(ABC):
             return False
 
     def _on_isc_connect(self, *args) -> None:
-        """Performs a rollcall when re/connecting."""
+        """Performs a rollcall when re/connecting after subscribing."""
+        all_subscribed = False
+        while not all_subscribed:
+            if all(self._mqttc_local.is_subscribed(topic)
+                   for topic in self._mqttc_local.subscriptions):
+                all_subscribed = True
         self.rollcall()
 
     @abstractmethod

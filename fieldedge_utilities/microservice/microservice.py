@@ -3,6 +3,8 @@
 import logging
 import time
 from abc import ABC, abstractmethod
+from queue import Queue
+from threading import Thread
 from typing import Any, Callable
 from uuid import uuid4
 
@@ -79,6 +81,7 @@ class Microservice(ABC):
         'isc_queue', '_isc_timer', '_isc_tags', '_isc_ignore',
         '_hidden_properties', '_hidden_isc_properties', '_rollcall_properties',
         'features', 'ms_proxies', 'property_cache',
+        '_publisher_queue', '_publisher_thread',
     )
 
     LOG_LEVELS = ['DEBUG', 'INFO']
@@ -130,6 +133,11 @@ class Microservice(ABC):
             'rollcall_properties',
         ]
         self._rollcall_properties: 'list[str]' = []
+        self._publisher_queue = Queue()
+        self._publisher_thread = Thread(target=self._publisher,
+                                        name=f'{self.tag}_publisher',
+                                        daemon=True)
+        self._publisher_thread.start()
         self.isc_queue = IscTaskQueue()
         self._isc_timer = RepeatingTimer(seconds=isc_poll_interval,
                                          target=self.isc_queue.remove_expired,
@@ -652,6 +660,13 @@ class Microservice(ABC):
         _log.debug('Responding to property change request %s', request_id)
         self.notify(message=response, subtopic='info/properties/values')
 
+    def _publisher(self) -> None:
+        """Publishes MQTT messages from a non-blocking thread allowing chaining.
+        """
+        while True:
+            publish_args: tuple = self._publisher_queue.get()
+            self._mqttc_local.publish(*publish_args)
+
     def notify(self,
                topic: str = None,
                message: dict = None,
@@ -689,7 +704,7 @@ class Microservice(ABC):
                        topic, message)
             return
         _log.info('Publishing ISC %s: %s', topic, json_message)
-        self._mqttc_local.publish(topic, json_message, qos)
+        self._publisher_queue.put((topic, json_message, qos))
 
     def task_add(self, task: IscTask) -> None:
         """Adds a task to the task queue."""

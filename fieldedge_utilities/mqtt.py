@@ -453,6 +453,7 @@ class MqttClient:
                 message: 'str|dict|None',
                 qos: int = 1,
                 camel_keys: bool = False,
+                wait_for_publish: float = None,
                 ) -> bool:
         """Publishes a message to a MQTT topic.
 
@@ -482,15 +483,19 @@ class MqttClient:
         if not isinstance(qos, int) or qos not in range(0, 3):
             _log.warning('Invalid MQTT QoS %s - using QoS 1', qos)
             qos = 1
-        (result_code, mid) = self._mqtt.publish(topic=topic,
-                                                payload=message,
-                                                qos=qos)
-        if _vlog():
-            _log.debug('MQTT published (mid=%d) %s: %s', mid, topic, message)
-        if result_code != MqttResultCode.SUCCESS:
+        publish_info = self._mqtt.publish(topic=topic, payload=message, qos=qos)
+        if wait_for_publish:
+            try:
+                publish_info.wait_for_publish(wait_for_publish)
+            except (ValueError, RuntimeError) as exc:
+                _log.error("Wait error: %s", exc)
+        if publish_info.rc != MqttResultCode.SUCCESS:
             _log.error('Publishing error %d (%s)',
-                       result_code, _get_mqtt_result(result_code))
+                       publish_info.rc, _get_mqtt_result(publish_info.rc))
             return False
+        if _vlog():
+            _log.debug('MQTT published (mid=%d) %s: %s',
+                       publish_info.mid, topic, message)
         return True
 
 

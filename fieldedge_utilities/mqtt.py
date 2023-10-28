@@ -135,8 +135,8 @@ class MqttClient:
             `MqttError` if the client_id is not valid.
 
         """
-        self._host = kwargs.get('host', MQTT_HOST)
-        self._username = kwargs.get('username', MQTT_USER)
+        self._host: str = kwargs.get('host', MQTT_HOST)
+        self._username: str = kwargs.get('username', MQTT_USER)
         self._password = kwargs.get('password', MQTT_PASS)
         self._port = kwargs.get('port', 1883)
         self._keepalive = kwargs.get('keepalive', 60)
@@ -457,14 +457,14 @@ class MqttClient:
                 ) -> bool:
         """Publishes a message to a MQTT topic.
 
-        If the message is a dictionary, 
+        If the message is a dictionary, validates JSON compatibility.
         
         Args:
             topic: The MQTT topic
-            message: The message to publish
+            message: The message payload
             qos: The MQTT Quality of Service (0, 1 or 2)
-            camel_keys: Ensures all embedded dictionary keys are JSON style
-                (camelCase)
+            camel_keys: Ensures message dictionary keys are JSON camelCase style
+            wait_for_publish: If present waits up to this timeout to complete
 
         Returns:
             True if successful, else False.

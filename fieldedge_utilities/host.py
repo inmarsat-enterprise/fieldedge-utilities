@@ -81,8 +81,9 @@ def host_command(command: str, **kwargs) -> str:
             _log.error('Failed to access SSH')
     else:
         method = 'DIRECT'
-        args = command if '|' in command else command.split(' ')
-        shell = '|' in command
+        args = command if ' | ' in command else command.split(' ')
+        shell = ' | ' in command
+        _log.debug('args: %s, shell=%s', args, shell)
         res = subprocess.run(args, capture_output=True, shell=shell, check=True)
         result = res.stdout.decode() if res.stdout else res.stderr.decode()
     result = result.strip()

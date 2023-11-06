@@ -83,8 +83,11 @@ def host_command(command: str, **kwargs) -> str:
         method = 'DIRECT'
         args = command if ' | ' in command else command.split(' ')
         shell = ' | ' in command
-        res = subprocess.run(args, capture_output=True, shell=shell, check=True)
-        result = res.stdout.decode() if res.stdout else res.stderr.decode()
+        try:
+            res = subprocess.run(args, capture_output=True, shell=shell, check=True)
+            result = res.stdout.decode() if res.stdout else res.stderr.decode()
+        except subprocess.CalledProcessError as exc:
+            _log.error('%s [Errno %d]: %s', exc.cmd, exc.returncode, exc.output)
     result = result.strip()
     if verbose_logging('host'):
         _log.debug('%s: %s -> %s', method, command, result)

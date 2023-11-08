@@ -29,10 +29,6 @@ from paho.mqtt.client import MQTTMessage as PahoMessage
 from fieldedge_utilities.logger import verbose_logging
 from fieldedge_utilities.properties import json_compatible
 
-MQTT_HOST = os.getenv('MQTT_HOST', 'fieldedge-broker')
-MQTT_USER = os.getenv('MQTT_USER')
-MQTT_PASS = os.getenv('MQTT_PASS')
-
 __all__ = ['MqttResultCode', 'MqttError', 'MqttClient']
 
 _log = logging.getLogger(__name__)
@@ -125,16 +121,21 @@ class MqttClient:
             ca_certs (str): path to the CA certificate
             certfile (str): path to the PEM certificate for the client
             keyfile (str): path to the PEM certificate for the client key
-            qos (int): MQTT QoS defaults to 0 (send at most once)
+            qos (int): MQTT QoS 0=at most once (default), 1=at least once,
+                2=exactly once
             thread_name (str): Optional tag to identify thread in logging.
 
         Raises:
             `MqttError` if the client_id is not valid.
 
         """
-        self._host: str = kwargs.get('host', MQTT_HOST)
-        self._username: str = kwargs.get('username', MQTT_USER)
-        self._password = kwargs.get('password', MQTT_PASS)
+        if (str(os.getenv('DOCKER')).lower() in ['1', 'true']):
+            dflt_host = 'fieldedge-broker'
+        else:
+            dflt_host = 'localhost'
+        self._host: str = kwargs.get('host', os.getenv('MQTT_HOST', dflt_host))
+        self._username: str = kwargs.get('username', os.getenv('MQTT_USER'))
+        self._password = kwargs.get('password', os.getenv('MQTT_PASS'))
         self._port = kwargs.get('port', 1883)
         self._keepalive = kwargs.get('keepalive', 60)
         self._bind_address = kwargs.get('bind_address', '')
@@ -403,8 +404,8 @@ class MqttClient:
             if _vlog():
                 _log.debug('MQTT message payload non-JSON (%s)', exc)
         if _vlog():
-            _log.debug('MQTT received message "%s" on topic "%s" with QoS %d',
-                       payload, message.topic, message.qos)
+            _log.debug('MQTT received message on topic "%s" (QoS=%d): "%s"',
+                       message.topic, message.qos, payload)
             if userdata:
                 _log.debug('MQTT client userdata: %s', userdata)
         self.on_message(message.topic, payload)
@@ -491,8 +492,8 @@ class MqttClient:
                        publish_info.rc, _get_mqtt_result(publish_info.rc))
             return False
         if _vlog():
-            _log.debug('MQTT published (mid=%d) %s: %s',
-                       publish_info.mid, topic, message)
+            _log.debug('MQTT published (mid=%d, qos=%d) %s: %s',
+                       publish_info.mid, qos, topic, message)
         return True
 
 

@@ -23,20 +23,27 @@ import logging
 import os
 import http.client
 import subprocess
+from dataclasses import dataclass
 
 from fieldedge_utilities import hostpipe
 from fieldedge_utilities.logger import verbose_logging
 
 _log = logging.getLogger(__name__)
 
-DOCKER = os.getenv('DOCKER', None) == '1'
-HOSTPIPE_LOG = os.getenv('HOSTPIPE_LOG')
-HOSTREQUEST_HOST = os.getenv('HOSTREQUEST_HOST', 'localhost')
-HOSTREQUEST_PORT = os.getenv('HOSTREQUEST_PORT')
-SSH_HOST = os.getenv('SSH_HOST')
-SSH_USER = os.getenv('SSH_USER')
-SSH_PASS = os.getenv('SSH_PASS')
-TEST_MODE = os.getenv('TEST_MODE')
+
+@dataclass
+class SshInfo:
+    host: str
+    user: str
+    passwd: str
+
+
+def _get_ssh_info() -> 'SshInfo|None':
+    if os.getenv('SSH_HOST'):
+        return SshInfo(os.getenv('SSH_HOST'),
+                       os.getenv('SSH_USER'),
+                       os.getenv('SSH_PASS'))
+    return None
 
 
 def host_command(command: str, **kwargs) -> str:
@@ -51,8 +58,9 @@ def host_command(command: str, **kwargs) -> str:
     """
     result = ''
     method = None
-    if DOCKER or 'test_mode' in kwargs:
-        if HOSTPIPE_LOG or 'pipelog' in kwargs:
+    if (str(os.getenv('DOCKER')).lower() in ['1', 'true'] or
+        'test_mode' in kwargs):
+        if os.getenv('HOSTPIPE_LOG') or 'pipelog' in kwargs:
             method = 'HOSTPIPE'
             valid_kwargs = ['timeout', 'noresponse', 'pipelog', 'test_mode']
             hostpipe_kwargs = {}
@@ -62,18 +70,18 @@ def host_command(command: str, **kwargs) -> str:
                 if key == 'test_mode':
                     hostpipe_kwargs[key] = val is not None
             result = hostpipe.host_command(command, **hostpipe_kwargs)
-        elif HOSTREQUEST_PORT:
+        elif os.getenv('HOSTREQUEST_PORT'):
             method = 'HOSTREQUEST'
+            host = os.getenv('HOSTREQUEST_HOST', 'localhost')
+            port = os.getenv('HOSTREQUEST_PORT')
             try:
-                conn = http.client.HTTPConnection(host=HOSTREQUEST_HOST,
-                                                  port=HOSTREQUEST_PORT)
+                conn = http.client.HTTPConnection(host, port)
                 headers = { 'Content-Type': 'text/plain' }
                 conn.request('POST', '/', command, headers)
                 result = conn.getresponse().read().decode()
             except ConnectionError:
                 _log.error('Failed to reach HTTP server')
-    elif ((SSH_HOST and SSH_USER and SSH_PASS) or
-          kwargs.get('ssh_client') is not None):
+    elif (kwargs.get('ssh_client') is not None or _get_ssh_info() is not None):
         method = 'SSH'
         try:
             result = ssh_command(command, kwargs.get('ssh_client', None))
@@ -109,13 +117,19 @@ def ssh_command(command: str, ssh_client = None) -> str:
     
     Returns:
         A string with the response, typically multiline separated by `\n`.
+    
+    Raises:
+        `TypeError` if client or environment settings are invalid.
         
     """
+    if (not isinstance(ssh_client, paramiko.SSHClient) and not _get_ssh_info()):
+        raise TypeError('Invalid SSH client or configuration')
     if not isinstance(ssh_client, paramiko.SSHClient):
         close_client = True
         ssh_client = paramiko.SSHClient()
         ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh_client.connect(SSH_HOST, username=SSH_USER, password=SSH_PASS,
+        ssh = _get_ssh_info()
+        ssh_client.connect(ssh.host, username=ssh.user, password=ssh.passwd,
                            look_for_keys=False)
     else:
         close_client = False
@@ -145,8 +159,8 @@ def get_ssh_session(**kwargs):   # -> paramiko.SSHClient:
     """
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    client.connect(hostname=kwargs.get('hostname', SSH_HOST),
-                   username=kwargs.get('username', SSH_USER),
-                   password=kwargs.get('password', SSH_PASS),
+    client.connect(hostname=kwargs.get('hostname', os.getenv('SSH_HOST')),
+                   username=kwargs.get('username', os.getenv('SSH_USER')),
+                   password=kwargs.get('password', os.getenv('SSH_PASS')),
                    look_for_keys=False)
     return client

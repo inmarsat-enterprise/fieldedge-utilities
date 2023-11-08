@@ -8,6 +8,7 @@ from threading import Event
 from typing import Any, Callable
 
 from fieldedge_utilities.logger import verbose_logging
+from fieldedge_utilities.path import get_caller_name
 from fieldedge_utilities.timer import RepeatingTimer
 
 from .interservice import IscException, IscTask, IscTaskQueue
@@ -16,8 +17,6 @@ from .propertycache import PropertyCache
 __all__ = ['MicroserviceProxy', 'InitializationState']
 
 _log = logging.getLogger(__name__)
-
-PROXY_PROPERTY_TIMEOUT = int(os.getenv('PROXY_PROPERTY_TIMEOUT', '35'))
 
 
 class InitializationState(IntEnum):
@@ -73,6 +72,9 @@ class MicroserviceProxy(ABC):
             kwargs.get('init_callback', None))
         self._init_timeout: int = kwargs.get('init_timeout', 10)
         self._cache_lifetime: 'int|None' = kwargs.get('cache_lifetime', None)
+        self._prop_timeout = int(kwargs.get('proxy_property_timeout',
+                                            os.getenv('PROXY_PROPERTY_TIMEOUT',
+                                                      '35')))
         self._isc_poll_interval: int = kwargs.get('isc_poll_interval', 1)
         self.isc_queue = IscTaskQueue(blocking=True)
         self._isc_timer = RepeatingTimer(seconds=self._isc_poll_interval,
@@ -118,21 +120,24 @@ class MicroserviceProxy(ABC):
             times out after `PROXY_PROPERTY_TIMEOUT` seconds (default 35).
         
         """
-        if self._init < InitializationState.PENDING:
+        if _vlog(self.tag):
+            _log.debug('Properties requested by: %s',
+                       get_caller_name(depth=3, mth=True))
+        if self._init <= InitializationState.PENDING:
             raise OSError('Proxy not initialized')
         cached = self._property_cache.get_cached('all')
         if cached:
             return self._proxy_properties
         pending = self.isc_queue.peek(task_meta=('properties', 'all'))
         if pending:
-            _log.debug('Prior query pending')
+            _log.debug('Prior query pending (%s)', pending.uid)
         else:
             self._proxy_properties = None
             task_meta = { 'properties': 'all' }
             if self._proxy_event.is_set():
                 self._proxy_event.clear()
             self.query_properties(['all'], task_meta)
-        self._proxy_event.wait(PROXY_PROPERTY_TIMEOUT)
+        self._proxy_event.wait(self._prop_timeout)
         if not self._proxy_properties:
             raise OSError('proxy_properties unsuccessful')
         return self._proxy_properties
@@ -151,7 +156,12 @@ class MicroserviceProxy(ABC):
 
     def task_add(self, task: IscTask) -> None:
         """Adds a task to the task queue."""
+        if self.isc_queue.is_full:
+            _log.debug('Waiting on isc_queue...')
         self.isc_queue.task_blocking.wait()
+        if _vlog(self.tag):
+            _log.debug('ISC queueing task %s with meta %s',
+                       task.uid, task.task_meta)
         try:
             self.isc_queue.append(task)
         except IscException as err:
@@ -168,7 +178,7 @@ class MicroserviceProxy(ABC):
         """
         task_id = response.get('uid', None)
         if not task_id or not self.isc_queue.is_queued(task_id):
-            _log.debug('No task ID %s queued - not handling', task_id)
+            _log.debug('Ignoring message - No task queued with ID %s', task_id)
             return False
         task = self.isc_queue.get(task_id, unblock=unblock)
         if not isinstance(task.task_meta, dict):
@@ -246,7 +256,6 @@ class MicroserviceProxy(ABC):
             method = 'set'
         else:
             method = 'get'
-        _log.debug('%sting %s properties %s', method, self.tag, properties)
         if isinstance(task_meta, dict):
             lifetime = task_meta.get('timeout', 10)
         else:
@@ -256,6 +265,7 @@ class MicroserviceProxy(ABC):
                             callback=self.update_proxy_properties,
                             lifetime=lifetime)
         self.task_add(prop_task)
+        _log.debug('%sting %s properties %s', method, self.tag, properties)
         topic = f'{self._base_topic}/request/properties/{method}'
         message = {
             'uid': prop_task.uid,

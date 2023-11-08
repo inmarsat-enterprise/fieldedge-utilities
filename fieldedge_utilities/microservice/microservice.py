@@ -665,6 +665,8 @@ class Microservice(ABC):
         """
         while True:
             publish_args: tuple = self._publisher_queue.get()
+            if _vlog():
+                _log.debug('Processing: %s', *publish_args)
             self._mqttc_local.publish(*publish_args)
 
     def notify(self,
@@ -703,7 +705,7 @@ class Microservice(ABC):
             _log.error('MQTT client not connected - failed to publish %s: %s',
                        topic, message)
             return
-        _log.info('Publishing ISC %s: %s', topic, json_message)
+        _log.info('Queueing ISC %s: %s', topic, json_message)
         self._publisher_queue.put((topic, json_message, qos))
 
     def task_add(self, task: IscTask) -> None:

@@ -23,7 +23,6 @@ from socket import gaierror, timeout  # : Python<3.10 vs TimeoutError
 from time import sleep, time
 from typing import Any, Callable
 
-from dotenv import load_dotenv
 from paho.mqtt.client import Client as PahoClient
 from paho.mqtt.client import MQTTMessage as PahoMessage
 
@@ -37,8 +36,6 @@ MQTT_PASS = os.getenv('MQTT_PASS')
 __all__ = ['MqttResultCode', 'MqttError', 'MqttClient']
 
 _log = logging.getLogger(__name__)
-
-load_dotenv()
 
 
 class MqttResultCode(IntEnum):
@@ -190,7 +187,7 @@ class MqttClient:
             self._client_id = uid
         else:
             if uid != self._client_base_id:
-                if verbose_logging('mqtt'):
+                if _vlog():
                     _log.debug('Updating client_id %s with new timestamp', uid)
                 uid = self._client_base_id
             self._client_id = f'{uid}_{int(time())}'

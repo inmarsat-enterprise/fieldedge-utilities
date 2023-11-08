@@ -28,6 +28,8 @@ import sys
 from logging.handlers import RotatingFileHandler
 from time import gmtime
 
+from dotenv import load_dotenv
+
 from fieldedge_utilities.path import clean_path
 
 FORMAT_CSV = ('%(asctime)s.%(msecs)03dZ,[%(levelname)s],(%(threadName)s),'
@@ -42,6 +44,8 @@ FORMAT_JSON = ('{'
                 ',"message":"%(message)s"'
                 '}')
 DATEFMT = '%Y-%m-%dT%H:%M:%S'
+
+load_dotenv()
 LOG_VERBOSE = os.getenv('LOG_VERBOSE')
 DEFAULT_OBSCURE = ['password', 'token', 'key', 'secret']
 OBSCURE = json.loads(os.getenv('OBSCURE', json.dumps(DEFAULT_OBSCURE)))
@@ -383,11 +387,14 @@ def get_fieldedge_logger(filename: str = None,
     return logger
 
 
-def verbose_logging(filter: str = '', case_sensitive: bool = True) -> bool:
+def verbose_logging(filter: str = '',
+                    log_verbose: 'str|None' = LOG_VERBOSE,
+                    case_sensitive: bool = True) -> bool:
     """Indicates if verbose logging is configured, with an optional filter.
     
     Args:
         filter: An optional filter e.g. the package+module name
+        log_verbose: The verbose string overrides the LOG_VERBOSE from .env
         case_sensitive: Defaults to case sensitive filter.
     
     Returns:

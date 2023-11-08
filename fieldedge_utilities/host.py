@@ -24,8 +24,8 @@ import os
 import http.client
 import subprocess
 
-from . import hostpipe
-from .logger import verbose_logging
+from fieldedge_utilities import hostpipe
+from fieldedge_utilities.logger import verbose_logging
 
 _log = logging.getLogger(__name__)
 

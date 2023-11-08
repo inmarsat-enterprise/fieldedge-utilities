@@ -24,6 +24,8 @@ from .interservice import IscTask, IscTaskQueue
 from .msproxy import MicroserviceProxy
 from .propertycache import PropertyCache
 
+MQTT_DFLT_QOS = 2
+
 __all__ = ['Microservice']
 
 _log = logging.getLogger(__name__)
@@ -116,7 +118,7 @@ class Microservice(ABC):
                                        on_connect=self._on_isc_connect,
                                        on_message=self.on_isc_message,
                                        auto_connect=auto_connect,
-                                       qos=kwargs.get('qos', 0))
+                                       qos=int(kwargs.get('qos', MQTT_DFLT_QOS)))
         self._default_publish_topic = f'fieldedge/{self._tag}'
         self._hidden_properties: 'list[str]' = [
             'features',
@@ -386,20 +388,20 @@ class Microservice(ABC):
                 response[isc_prop] = self.isc_get_property(isc_prop)
         self.notify(message=response, subtopic=subtopic)
 
-    def isc_topic_subscribe(self, topic: str) -> bool:
+    def isc_topic_subscribe(self, topic: str, qos: int = MQTT_DFLT_QOS) -> bool:
         """Subscribes to the specified ISC topic."""
         if not isinstance(topic, str) or not topic.startswith('fieldedge/'):
             raise ValueError('First level topic must be fieldedge')
         if topic not in self._subscriptions:
             try:
-                self._mqttc_local.subscribe(topic)
+                self._mqttc_local.subscribe(topic, qos)
                 self._subscriptions.append(topic)
                 return True
             except Exception as exc:
                 _log.error('Failed to subscribe %s (%s)', topic, exc)
                 return False
         else:
-            _log.warning('Already subscribed to %s', topic)
+            _log.debug('Already subscribed to %s', topic)
             return True
 
     def isc_topic_unsubscribe(self, topic: str) -> bool:
@@ -529,7 +531,7 @@ class Microservice(ABC):
             uid (str): The message uid that caused the error.
         
         Keyword Args:
-            qos (int): Optional MQTT QoS, default is 1.
+            qos (int): Optional MQTT QoS, default is `MQTT_DFLT_QOS` (2).
         
         Raises:
             `ValueError` if no topic or uid provided.
@@ -542,7 +544,7 @@ class Microservice(ABC):
         response = { 'uid': uid }
         for rep in ['/request/', '/info/', '/event/']:
             topic = topic.replace(rep, '/error/', 1)
-        qos = kwargs.pop('qos', 1)
+        qos = int(kwargs.pop('qos', MQTT_DFLT_QOS))
         for key, val in kwargs.items():
             response[key] = val
         self.notify(topic, message=response, qos=qos)
@@ -673,7 +675,7 @@ class Microservice(ABC):
                topic: str = None,
                message: dict = None,
                subtopic: str = None,
-               qos: int = 1) -> None:
+               qos: int = MQTT_DFLT_QOS) -> None:
         """Publishes an inter-service (ISC) message to the local MQTT broker.
         
         Args:
@@ -681,6 +683,7 @@ class Microservice(ABC):
                 used if `topic` is not passed in.
             message: The message to publish as a JSON object.
             subtopic: A subtopic appended to the `_default_publish_topic`.
+            qos: 0=at most once; 1=at least once; 2=exactly once.
             
         """
         if message is None:

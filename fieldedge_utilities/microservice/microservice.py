@@ -665,7 +665,7 @@ class Microservice(ABC):
         """
         while True:
             publish_args: tuple = self._publisher_queue.get()
-            if _vlog():
+            if _vlog(self.tag):
                 _log.debug('Processing: %s', *publish_args)
             self._mqttc_local.publish(*publish_args)
 

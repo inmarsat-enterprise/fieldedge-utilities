@@ -135,6 +135,10 @@ class IscTaskQueue(list):
             return self._task_blocking
 
     @property
+    def is_full(self) -> bool:
+        return self._blocking and len(self) > 0
+    
+    @property
     def _vlog(self) -> bool:
         return verbose_logging('isctaskqueue')
 
@@ -177,7 +181,16 @@ class IscTaskQueue(list):
              task_id: str = None,
              task_type: str = None,
              task_meta: 'tuple[str, Any]' = None) -> 'IscTask|None':
-        """Returns the task based on search criteria or None."""
+        """Returns a queued task if it matches the search criteria.
+        
+        The task remains in the queue.
+        
+        Args:
+            task_id (str): optional first criteria is unique id
+            task_type (str): optional second criteria returns first match
+            task_meta (tuple): optional metadata tuple returns first match
+            
+        """
         if not task_id and not task_type and not task_meta:
             raise ValueError('Missing search criteria')
         if isinstance(task_meta, tuple) and len(task_meta) != 2:

@@ -567,13 +567,12 @@ class Microservice(ABC):
                 optional `categorized` flag.
         
         """
-        if _vlog(self.tag):
-            _log.debug('Request to notify properties: %s', request)
         if not isinstance(request, dict):
             raise ValueError('Request must be a dictionary')
         if ('properties' in request and
             not isinstance(request['properties'], list)):
             raise ValueError('Request properties must be a list')
+        _log.debug('Processing request to notify properties: %s', request)
         response = {}
         request_id = request.get('uid', None)
         if request_id:
@@ -616,8 +615,9 @@ class Microservice(ABC):
                         res_props[prop] = self.isc_get_property(prop)
             except AttributeError as exc:
                 response = { 'uid': request_id, 'error': {exc} }
-        _log.debug('Responding to request %s for properties: %s',
-                   request_id, request.get('properties', 'ALL'))
+        if _vlog(self.tag):
+            _log.debug('Responding to request %s for properties: %s',
+                       request_id, request.get('properties', 'ALL'))
         self.notify(message=response, subtopic=subtopic)
 
     def properties_change(self, request: dict) -> 'None|dict':
@@ -636,12 +636,11 @@ class Microservice(ABC):
                 select ISC property names and values to set.
         
         """
-        if _vlog(self.tag):
-            _log.debug('Request to change properties: %s', request)
         if (not isinstance(request, dict) or
             'properties' not in request or
             not isinstance(request['properties'], dict)):
             raise ValueError('Request must contain a properties dictionary')
+        _log.debug('Processing request to change properties: %s', request)
         response = { 'properties': {} }
         request_id = request.get('uid', None)
         if request_id:
@@ -659,7 +658,8 @@ class Microservice(ABC):
                 _log.warning('Failed to set %s=%s (%s)', key, val, exc)
         if not request_id:
             return response
-        _log.debug('Responding to property change request %s', request_id)
+        if _vlog(self.tag):
+            _log.debug('Responding to property change request %s', request_id)
         self.notify(message=response, subtopic='info/properties/values')
 
     def _publisher(self) -> None:
@@ -774,4 +774,5 @@ class Microservice(ABC):
 
 
 def _vlog(tag: str) -> bool:
+    """Check if vebose logging is enabled for this microservice."""
     return verbose_logging(f'{tag}-microservice')

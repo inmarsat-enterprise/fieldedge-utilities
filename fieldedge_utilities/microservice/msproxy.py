@@ -350,14 +350,15 @@ class MicroserviceProxy(ABC):
             `True` if the message was processed or `False` otherwise.
             
         """
-        if _vlog(self.tag):
-            _log.debug('Proxy received %s: %s', topic, message)
         if not topic.startswith(f'fieldedge/{self.tag}/'):
             return False
         if topic.endswith('info/properties/values'):
             return self.task_handle(message)
+        if _vlog(self.tag):
+            _log.debug('Proxy ignoring %s: %s', topic, message)
         return False
 
 
 def _vlog(tag: str) -> bool:
+    """Check if verbose logging is enabled for this msproxy."""
     return verbose_logging(f'{tag}-msproxy')

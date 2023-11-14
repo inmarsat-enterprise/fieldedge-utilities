@@ -450,7 +450,8 @@ class Microservice(ABC):
             True if handled by a defined method.
         
         """
-        if (topic.split('/')[1] == self.tag and '/request/' not in topic):
+        source = topic.split('/')[1]
+        if (source == self.tag and '/request/' not in topic):
             if _vlog(self.tag):
                 _log.debug('Ignoring own response/event (%s)', topic)
             return True
@@ -461,10 +462,10 @@ class Microservice(ABC):
             return True
         elif (topic.endswith(f'/{self.tag}/request/properties/list') or
               topic.endswith(f'/{self.tag}/request/properties/get')):
-            self.properties_notify(message)
+            self.properties_notify(message, source)
             return self._processing_complete(message, filter=['properties'])
         elif topic.endswith(f'/{self.tag}/request/properties/set'):
-            self.properties_change(message)
+            self.properties_change(message, source)
             return self._processing_complete(message, filter=['properties'])
         else:
             if self.features:
@@ -549,7 +550,7 @@ class Microservice(ABC):
             response[key] = val
         self.notify(topic, message=response, qos=qos)
 
-    def properties_notify(self, request: dict) -> None:
+    def properties_notify(self, request: dict, source: str = '') -> None:
         """Publishes the requested ISC property values to the local broker.
         
         If no `properties` key is in the request, it implies a simple list of
@@ -572,7 +573,8 @@ class Microservice(ABC):
         if ('properties' in request and
             not isinstance(request['properties'], list)):
             raise ValueError('Request properties must be a list')
-        _log.debug('Processing request to notify properties: %s', request)
+        _log.debug('Processing %s request to notify properties: %s',
+                   source, request)
         response = {}
         request_id = request.get('uid', None)
         if request_id:
@@ -616,11 +618,11 @@ class Microservice(ABC):
             except AttributeError as exc:
                 response = { 'uid': request_id, 'error': {exc} }
         if _vlog(self.tag):
-            _log.debug('Responding to request %s for properties: %s',
-                       request_id, request.get('properties', 'ALL'))
+            _log.debug('Responding to %s request %s for properties: %s',
+                       source, request_id, request.get('properties', 'ALL'))
         self.notify(message=response, subtopic=subtopic)
 
-    def properties_change(self, request: dict) -> 'None|dict':
+    def properties_change(self, request: dict, source: str = '') -> 'None|dict':
         """Processes the requested property changes.
         
         The `request` dictionary must include the `properties` key with a
@@ -640,7 +642,8 @@ class Microservice(ABC):
             'properties' not in request or
             not isinstance(request['properties'], dict)):
             raise ValueError('Request must contain a properties dictionary')
-        _log.debug('Processing request to change properties: %s', request)
+        _log.debug('Processing %s request to change properties: %s',
+                   source, request)
         response = { 'properties': {} }
         request_id = request.get('uid', None)
         if request_id:
@@ -659,7 +662,8 @@ class Microservice(ABC):
         if not request_id:
             return response
         if _vlog(self.tag):
-            _log.debug('Responding to property change request %s', request_id)
+            _log.debug('Responding to %s property change request %s',
+                       source, request_id)
         self.notify(message=response, subtopic='info/properties/values')
 
     def _publisher(self) -> None:

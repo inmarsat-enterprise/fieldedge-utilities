@@ -455,8 +455,7 @@ class Microservice(ABC):
             if _vlog(self.tag):
                 _log.debug('Ignoring own response/event (%s)', topic)
             return True
-        if _vlog(self.tag):
-            _log.debug('Received ISC %s: %s', topic, message)
+        _log.debug('Received ISC %s: %s', topic, message)
         if topic.endswith('/rollcall'):
             self.rollcall_respond(topic, message)
             return True
@@ -672,7 +671,7 @@ class Microservice(ABC):
         while True:
             publish_args: tuple = self._publisher_queue.get()
             if _vlog(self.tag):
-                _log.debug('Processing: %s', *publish_args)
+                _log.debug('Processing: %s', publish_args)
             self._mqttc_local.publish(*publish_args)
 
     def notify(self,

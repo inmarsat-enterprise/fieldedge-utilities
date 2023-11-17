@@ -469,14 +469,14 @@ class Microservice(ABC):
         else:
             if self.features:
                 if _vlog(self.tag):
-                    _log.debug('Checking features for ISC handling (%s)',
-                               self.features.keys())
+                    _log.debug('Checking features for %s ISC handling (%s)',
+                               source, self.features.keys())
                 if self._is_child_isc(self.features, topic, message):
                     return True
             if self.ms_proxies:
                 if _vlog(self.tag):
-                    _log.debug('Checking ms proxies for ISC handling (%s)',
-                               self.ms_proxies.keys())
+                    _log.debug('Checking ms proxies for %s ISC handling (%s)',
+                               source, self.ms_proxies.keys())
                 if self._is_child_isc(self.ms_proxies, topic, message):
                     return True
         return False

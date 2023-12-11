@@ -71,7 +71,6 @@ class RepeatingTimer(threading.Thread):
         if target is None:
             _log.warning('No target specified for RepeatingTimer %s', self.name)
         self.target = target
-        self._exception = None
         self.args = args or ()
         self.kwargs = kwargs or {}
         self.sleep_chunk = sleep_chunk
@@ -160,7 +159,8 @@ class RepeatingTimer(threading.Thread):
                         drift_adjusted = self.interval - self._resync()
                         self._count = drift_adjusted / self.sleep_chunk
                     except BaseException as exc:
-                        self._exception = exc
+                        _log.error('Exception in %s: %s', self.name, exc)
+                        raise
 
     def start_timer(self):
         """Initially start the repeating timer."""
@@ -227,8 +227,6 @@ class RepeatingTimer(threading.Thread):
 
     def join(self, timeout=None):
         super().join(timeout)
-        if self._exception:
-            raise self._exception
         return self.target
 
 

@@ -801,7 +801,17 @@ was not set (released).</li>
     </div>
     <a class="headerlink" href="#IscTaskQueue.peek"></a>
     
-            <div class="docstring"><p>Returns the task based on search criteria or None.</p>
+            <div class="docstring"><p>Returns a queued task if it matches the search criteria.</p>
+
+<p>The task remains in the queue.</p>
+
+<h6 id="arguments">Arguments:</h6>
+
+<ul>
+<li><strong>task_id (str):</strong>  optional first criteria is unique id</li>
+<li><strong>task_type (str):</strong>  optional second criteria returns first match</li>
+<li><strong>task_meta (tuple):</strong>  optional metadata tuple returns first match</li>
+</ul>
 </div>
 
 
@@ -1254,7 +1264,7 @@ the second level of the topic e.g. <code>fieldedge/&lt;requestor&gt;/...</code><
                                 <div class="attr function">
             
         <span class="def">def</span>
-        <span class="name">isc_topic_subscribe</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span>, </span><span class="param"><span class="n">topic</span><span class="p">:</span> <span class="nb">str</span></span><span class="return-annotation">) -> <span class="nb">bool</span>:</span></span>
+        <span class="name">isc_topic_subscribe</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span>, </span><span class="param"><span class="n">topic</span><span class="p">:</span> <span class="nb">str</span>, </span><span class="param"><span class="n">qos</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span></span><span class="return-annotation">) -> <span class="nb">bool</span>:</span></span>
 
         
     </div>
@@ -1341,7 +1351,7 @@ to its queries, tagged with a <code>uid</code> in the message body.</p>
 <h6 id="keyword-args">Keyword Args:</h6>
 
 <blockquote>
-  <p>qos (int): Optional MQTT QoS, default is 1.</p>
+  <p>qos (int): Optional MQTT QoS, default is <code>MQTT_DFLT_QOS</code> (2).</p>
 </blockquote>
 
 <h6 id="raises">Raises:</h6>
@@ -1357,7 +1367,7 @@ to its queries, tagged with a <code>uid</code> in the message body.</p>
                                 <div class="attr function">
             
         <span class="def">def</span>
-        <span class="name">properties_notify</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span>, </span><span class="param"><span class="n">request</span><span class="p">:</span> <span class="nb">dict</span></span><span class="return-annotation">) -> <span class="kc">None</span>:</span></span>
+        <span class="name">properties_notify</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span>, </span><span class="param"><span class="n">request</span><span class="p">:</span> <span class="nb">dict</span>, </span><span class="param"><span class="n">source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span></span><span class="return-annotation">) -> <span class="kc">None</span>:</span></span>
 
         
     </div>
@@ -1389,7 +1399,7 @@ optional <code>categorized</code> flag.</li>
                                 <div class="attr function">
             
         <span class="def">def</span>
-        <span class="name">properties_change</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span>, </span><span class="param"><span class="n">request</span><span class="p">:</span> <span class="nb">dict</span></span><span class="return-annotation">) -> <span class="kc">None</span> <span class="o">|</span> <span class="nb">dict</span>:</span></span>
+        <span class="name">properties_change</span><span class="signature pdoc-code condensed">(<span class="param"><span class="bp">self</span>, </span><span class="param"><span class="n">request</span><span class="p">:</span> <span class="nb">dict</span>, </span><span class="param"><span class="n">source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span></span><span class="return-annotation">) -> <span class="kc">None</span> <span class="o">|</span> <span class="nb">dict</span>:</span></span>
 
         
     </div>
@@ -1419,7 +1429,7 @@ select ISC property names and values to set.</li>
                                 <div class="attr function">
             
         <span class="def">def</span>
-        <span class="name">notify</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="bp">self</span>,</span><span class="param">	<span class="n">topic</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span>,</span><span class="param">	<span class="n">message</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span>,</span><span class="param">	<span class="n">subtopic</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span>,</span><span class="param">	<span class="n">qos</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span></span><span class="return-annotation">) -> <span class="kc">None</span>:</span></span>
+        <span class="name">notify</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="bp">self</span>,</span><span class="param">	<span class="n">topic</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span>,</span><span class="param">	<span class="n">message</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span>,</span><span class="param">	<span class="n">subtopic</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span>,</span><span class="param">	<span class="n">qos</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span></span><span class="return-annotation">) -> <span class="kc">None</span>:</span></span>
 
         
     </div>
@@ -1434,6 +1444,7 @@ select ISC property names and values to set.</li>
 used if <code>topic</code> is not passed in.</li>
 <li><strong>message:</strong>  The message to publish as a JSON object.</li>
 <li><strong>subtopic:</strong>  A subtopic appended to the <code>_default_publish_topic</code>.</li>
+<li><strong>qos:</strong>  0=at most once; 1=at least once; 2=exactly once.</li>
 </ul>
 </div>
 
@@ -1607,7 +1618,8 @@ before the next task can be queued.</p>
       initialize() completes.
   init_timeout (int): Time in seconds allowed for initialization.
   cache_lifetime (int): The proxy property cache time.
-  isc_poll_interval (int): The time between checks for task expiry.</p>
+  isc_poll_interval (int): The time between checks for task expiry.
+  parent_tag (str): Optional identifier of the proxy parent.</p>
 </blockquote>
 </div>
 

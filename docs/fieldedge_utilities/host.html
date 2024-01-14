@@ -31,6 +31,15 @@
             <h2>API Documentation</h2>
                 <ul class="memberlist">
             <li>
+                    <a class="class" href="#SshInfo">SshInfo</a>
+                            <ul class="memberlist">
+                        <li>
+                                <a class="function" href="#SshInfo.__init__">SshInfo</a>
+                        </li>
+                </ul>
+
+            </li>
+            <li>
                     <a class="function" href="#host_command">host_command</a>
             </li>
             <li>
@@ -76,6 +85,32 @@ execute natively on the host shell.</p>
                 
                 
             </section>
+                <section id="SshInfo">
+                    <div class="attr class">
+                    <div class="decorator">@dataclass</div>
+
+    <span class="def">class</span>
+    <span class="name">SshInfo</span>:
+
+        
+    </div>
+    <a class="headerlink" href="#SshInfo"></a>
+    
+    
+
+                            <div id="SshInfo.__init__" class="classattr">
+                                <div class="attr function">
+            
+        <span class="name">SshInfo</span><span class="signature pdoc-code condensed">(<span class="param"><span class="n">host</span><span class="p">:</span> <span class="nb">str</span>, </span><span class="param"><span class="n">user</span><span class="p">:</span> <span class="nb">str</span>, </span><span class="param"><span class="n">passwd</span><span class="p">:</span> <span class="nb">str</span></span>)</span>
+
+        
+    </div>
+    <a class="headerlink" href="#SshInfo.__init__"></a>
+    
+    
+
+                            </div>
+                </section>
                 <section id="host_command">
                     <div class="attr function">
             
@@ -107,13 +142,27 @@ execute natively on the host shell.</p>
                     <div class="attr function">
             
         <span class="def">def</span>
-        <span class="name">ssh_command</span><span class="signature pdoc-code condensed">(<span class="param"><span class="n">command</span><span class="p">:</span> <span class="nb">str</span>, </span><span class="param"><span class="n">ssh_client</span><span class="p">:</span> <span class="n">paramiko</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">SSHClient</span> <span class="o">=</span> <span class="kc">None</span></span><span class="return-annotation">) -> <span class="nb">str</span>:</span></span>
+        <span class="name">ssh_command</span><span class="signature pdoc-code condensed">(<span class="param"><span class="n">command</span><span class="p">:</span> <span class="nb">str</span>, </span><span class="param"><span class="n">ssh_client</span><span class="o">=</span><span class="kc">None</span></span><span class="return-annotation">) -> <span class="nb">str</span>:</span></span>
 
         
     </div>
     <a class="headerlink" href="#ssh_command"></a>
     
             <div class="docstring"><p>Sends a host command via SSH.</p>
+
+<pre><code>Args:
+    command (str): The shell command to send.
+    ssh_client (paramiko.SSHClient): Optional SSH client session.
+
+Returns:
+    A string with the response, typically multiline separated by `
+</code></pre>
+
+<p>`.</p>
+
+<pre><code>Raises:
+    `TypeError` if client or environment settings are invalid.
+</code></pre>
 </div>
 
 
@@ -122,7 +171,7 @@ execute natively on the host shell.</p>
                     <div class="attr function">
             
         <span class="def">def</span>
-        <span class="name">get_ssh_session</span><span class="signature pdoc-code condensed">(<span class="param"><span class="o">**</span><span class="n">kwargs</span></span><span class="return-annotation">) -> <span class="n">paramiko</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">SSHClient</span>:</span></span>
+        <span class="name">get_ssh_session</span><span class="signature pdoc-code condensed">(<span class="param"><span class="o">**</span><span class="n">kwargs</span></span><span class="return-annotation">):</span></span>
 
         
     </div>
@@ -136,6 +185,12 @@ execute natively on the host shell.</p>
   <p>hostname (str): The hostname of the SSH target.
   username (str): SSH login username.
   password (str): SSH login password.</p>
+</blockquote>
+
+<h6 id="returns">Returns:</h6>
+
+<blockquote>
+  <p>A <code>paramiko.SSHClient</code> if paramiko is installed.</p>
 </blockquote>
 </div>
 

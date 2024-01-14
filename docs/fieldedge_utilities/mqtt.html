@@ -559,7 +559,9 @@ or reconnect after disconnection.</li>
     ca_certs (str): path to the CA certificate
     certfile (str): path to the PEM certificate for the client
     keyfile (str): path to the PEM certificate for the client key
-    qos (int): MQTT QoS defaults to 0 (send at most once)</p>
+    qos (int): MQTT QoS 0=at most once (default), 1=at least once,
+        2=exactly once
+    thread_name (str): Optional tag to identify thread in logging.</p>
 
 <h6 id="raises">Raises:</h6>
 
@@ -572,7 +574,7 @@ or reconnect after disconnection.</li>
                             </div>
                             <div id="MqttClient.subscriptions" class="classattr">
                                 <div class="attr variable">
-            <span class="name">subscriptions</span><span class="annotation">: dict</span>
+            <span class="name">subscriptions</span><span class="annotation">: dict[str, dict]</span>
 
         
     </div>
@@ -682,7 +684,7 @@ Message id <code>mid</code> is 0 when not actively subscribed.</p>
                                 <div class="attr function">
             
         <span class="def">def</span>
-        <span class="name">publish</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="bp">self</span>,</span><span class="param">	<span class="n">topic</span><span class="p">:</span> <span class="nb">str</span>,</span><span class="param">	<span class="n">message</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span>,</span><span class="param">	<span class="n">qos</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span>,</span><span class="param">	<span class="n">camel_keys</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span></span><span class="return-annotation">) -> <span class="nb">bool</span>:</span></span>
+        <span class="name">publish</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="bp">self</span>,</span><span class="param">	<span class="n">topic</span><span class="p">:</span> <span class="nb">str</span>,</span><span class="param">	<span class="n">message</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span>,</span><span class="param">	<span class="n">qos</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span>,</span><span class="param">	<span class="n">camel_keys</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>,</span><span class="param">	<span class="n">wait_for_publish</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="kc">None</span></span><span class="return-annotation">) -> <span class="nb">bool</span>:</span></span>
 
         
     </div>
@@ -690,16 +692,16 @@ Message id <code>mid</code> is 0 when not actively subscribed.</p>
     
             <div class="docstring"><p>Publishes a message to a MQTT topic.</p>
 
-<p>If the message is a dictionary, </p>
+<p>If the message is a dictionary, validates JSON compatibility.</p>
 
 <h6 id="arguments">Arguments:</h6>
 
 <ul>
 <li><strong>topic:</strong>  The MQTT topic</li>
-<li><strong>message:</strong>  The message to publish</li>
+<li><strong>message:</strong>  The message payload</li>
 <li><strong>qos:</strong>  The MQTT Quality of Service (0, 1 or 2)</li>
-<li><strong>camel_keys:</strong>  Ensures all embedded dictionary keys are JSON style
-(camelCase)</li>
+<li><strong>camel_keys:</strong>  Ensures message dictionary keys are JSON camelCase style</li>
+<li><strong>wait_for_publish:</strong>  If present waits up to this timeout to complete</li>
 </ul>
 
 <h6 id="returns">Returns:</h6>

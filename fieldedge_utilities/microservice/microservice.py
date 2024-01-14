@@ -450,16 +450,18 @@ class Microservice(ABC):
             True if handled by a defined method.
         
         """
-        source = topic.split('/')[1]
-        if (source == self.tag and '/request/' not in topic):
+        target = topic.split('/')[1]
+        if (target == self.tag and '/request/' not in topic):
             if _vlog(self.tag):
                 _log.debug('Ignoring own response/event (%s)', topic)
             return True
         _log.debug('Received ISC %s: %s', topic, message)
         if topic.endswith('/rollcall'):
+            # source = target
             self.rollcall_respond(topic, message)
             return True
-        elif (topic.endswith(f'/{self.tag}/request/properties/list') or
+        source: str = message.get('requestor', '')
+        if (topic.endswith(f'/{self.tag}/request/properties/list') or
               topic.endswith(f'/{self.tag}/request/properties/get')):
             self.properties_notify(message, source)
             return self._processing_complete(message, filter=['properties'])

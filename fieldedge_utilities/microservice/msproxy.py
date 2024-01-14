@@ -48,12 +48,14 @@ class MicroserviceProxy(ABC):
             init_timeout (int): Time in seconds allowed for initialization.
             cache_lifetime (int): The proxy property cache time.
             isc_poll_interval (int): The time between checks for task expiry.
+            parent_tag (str): Optional identifier of the proxy parent.
         
         """
         self._tag: str = (kwargs.get('tag', None) or
                           self.__class__.__name__.lower())
         if not self._tag:
             raise ValueError('Invalid tag provided')
+        self._parent_tag: str = kwargs.get('parent_tag', None)
         callbacks = ['publish', 'subscribe', 'unsubscribe', 'init_callback']
         int_config = ['init_timeout', 'cache_lifetime', 'isc_poll_interval']
         for key, val in kwargs.items():
@@ -271,6 +273,8 @@ class MicroserviceProxy(ABC):
             'uid': prop_task.uid,
             'properties': properties,
         }
+        if self._parent_tag:
+            message['requestor'] = self._parent_tag
         if isinstance(query_meta, dict):
             for key, val in query_meta.items():
                 message[key] = val

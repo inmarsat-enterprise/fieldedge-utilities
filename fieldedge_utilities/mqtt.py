@@ -136,8 +136,8 @@ class MqttClient:
         self._host: str = kwargs.get('host', os.getenv('MQTT_HOST', dflt_host))
         self._username: str = kwargs.get('username', os.getenv('MQTT_USER'))
         self._password = kwargs.get('password', os.getenv('MQTT_PASS'))
-        self._port = kwargs.get('port', 1883)
-        self._keepalive = kwargs.get('keepalive', 60)
+        self._port = int(kwargs.get('port', os.getenv('MQTT_PORT', '1883')))
+        self._keepalive = int(kwargs.get('keepalive', 60))
         self._bind_address = kwargs.get('bind_address', '')
         self._ca_certs = kwargs.get('ca_certs', None)
         self._certfile = kwargs.get('certfile', None)
@@ -283,7 +283,7 @@ class MqttClient:
             self._mqtt.on_disconnect = self._mqtt_on_disconnect
             self._mqtt.on_subscribe = self._mqtt_on_subscribe
             self._mqtt.on_message = self._mqtt_on_message
-            if self._username and self._password:
+            if self._username or self._password:
                 self._mqtt.username_pw_set(username=self._username,
                                            password=self._password)
             if self._port == 8883:

@@ -197,10 +197,11 @@ class MicroserviceProxy(ABC):
 
     def task_complete(self, task_meta: dict = None):
         """Call to complete a task and remove from the blocking queue."""
-        task_id = None
-        if isinstance(task_meta, dict):
-            task_id = task_meta.get('task_id', None)
-            task_type = task_meta.get('task_type', 'task')
+        if not isinstance(task_meta, dict):
+            _log.debug('No task metadata provided for completion - ignoring')
+            return
+        task_id = task_meta.get('task_id', None)
+        task_type = task_meta.get('task_type', None)
         _log.debug('Completing %s (%s)', task_type, task_id)
         self.isc_queue.task_blocking.set()
 
@@ -315,10 +316,11 @@ class MicroserviceProxy(ABC):
             self._property_cache.cache(cache_all, 'all', cache_lifetime)
             if not self._proxy_event.is_set():
                 self._proxy_event.set()
-        self.task_complete(task_meta)
-        if new_init and callable(self._init_callback):
-            self._init_callback(success=True,
-                                tag=task_meta.get('initialize', None))
+        if isinstance(task_meta, dict):
+            self.task_complete(task_meta)
+            if new_init and callable(self._init_callback):
+                self._init_callback(success=True,
+                                    tag=task_meta.get('initialize', None))
 
     def publish(self, topic: str, message: dict, qos: int = 0):
         """Publishes to MQTT via the parent."""

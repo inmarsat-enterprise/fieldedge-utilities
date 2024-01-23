@@ -9,7 +9,7 @@ repository = "https://github.com/inmarsat-enterprise/fieldedge-utilities"
 keywords = ["Inmarsat", "FieldEdge"]
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = "^3.9"
 paho-mqtt = "^1.6.1"
 python-dotenv = "^0.19.1"
 pyserial = "^3.5"

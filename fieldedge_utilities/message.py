@@ -29,7 +29,7 @@ class MessageMeta:
     
     @property
     def size(self) -> int:
-        if len(self.data_str) == 0:
+        if not isinstance(self.data_b64, str) or len(self.data_b64) == 0:
             return 0
         return len(base64.b64decode(self.data_b64))
 

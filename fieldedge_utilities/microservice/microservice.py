@@ -617,7 +617,7 @@ class Microservice(ABC):
                     for prop in req_props:
                         res_props[prop] = self.isc_get_property(prop)
             except AttributeError as exc:
-                response = { 'uid': request_id, 'error': {exc} }
+                response = { 'uid': request_id, 'error': f'{exc}' }
         if _vlog(self.tag):
             _log.debug('Responding to %s request %s for properties: %s',
                        source, request_id, request.get('properties', 'ALL'))

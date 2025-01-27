@@ -306,12 +306,20 @@ class MicroserviceProxy(ABC):
                 cache_all = True
         if self._proxy_properties is None:
             self._proxy_properties = {}
-        for prop, val in properties.items():
-            if (prop not in self._proxy_properties or
-                self._proxy_properties[prop] != val):
-                _log.debug('Updating %s = %s', prop, val)
-                self._proxy_properties[prop] = val
-                self._property_cache.cache(val, prop, cache_lifetime)
+        if not any(key in properties for key in ['config', 'info']):
+            for prop, val in properties.items():
+                if (prop not in self._proxy_properties or
+                    self._proxy_properties[prop] != val):
+                    _log.debug('Updating %s = %s', prop, val)
+                    self._proxy_properties[prop] = val
+                    self._property_cache.cache(val, prop, cache_lifetime)
+        else:
+            for cat, props in properties.items():
+                if cat not in self._proxy_properties:
+                    self._proxy_properties[cat] = {}
+                for prop, val in props.items():
+                    self._proxy_properties[cat][prop] = val
+                    self._property_cache.cache(val, prop, cache_lifetime)
         if cache_all:
             self._property_cache.cache(cache_all, 'all', cache_lifetime)
             if not self._proxy_event.is_set():

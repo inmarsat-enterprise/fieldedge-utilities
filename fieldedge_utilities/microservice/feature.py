@@ -3,7 +3,11 @@
 from abc import ABC, abstractmethod
 from typing import Any, Callable
 
-from fieldedge_utilities.properties import camel_case, get_class_properties
+from fieldedge_utilities.properties import (
+    camel_case,
+    get_class_properties,
+    property_is_read_only,
+)
 
 from .interservice import IscTaskQueue
 
@@ -28,6 +32,8 @@ class Feature(ABC):
                  **kwargs) -> None:
         """Initializes the feature.
         
+        Additional keyword arguments passed in each become a property/value.
+        
         Args:
             task_queue (`IscTaskQueue`): The parent microservice ISC task queue.
             task_notify (`Callable[[str, dict]]`): The parent `notify`
@@ -36,9 +42,6 @@ class Feature(ABC):
                 completion function to receive task `uid` and `task_meta`.
             task_fail (`Callable`): An optional parent function to call if the
                 task fails.
-
-        Keyword Args:
-             
         """
         self._task_queue: IscTaskQueue = task_queue
         self._task_notify: Callable[[str, dict], None] = task_notify
@@ -56,15 +59,35 @@ class Feature(ABC):
             return self.__class__.__name__.lower()
 
     @abstractmethod
-    def properties_list(self) -> 'list[str]':
-        """Returns a lists of exposed property names."""
-        return get_class_properties(self)
+    def properties_list(self, **kwargs) -> 'list[str]':
+        """Returns a lists of exposed property names.
+        
+        Args:
+            **config (bool): Returns only configuration properties if True.
+            **info (bool): Returns only information properties if True.
+        """
+        all_props = get_class_properties(self)
+        if kwargs.get('config') is True:
+            return [p for p in all_props if not property_is_read_only(self, p)]
+        if kwargs.get('info') is True:
+            return [p for p in all_props if property_is_read_only(self, p)]
+        return all_props
 
     @abstractmethod
-    def status(self) -> dict:
-        """Returns a dictionary of key status summary information."""
+    def status(self, **kwargs) -> dict:
+        """Returns a dictionary of key status summary information.
+        
+        Args:
+            **categorized (bool): Returns categorized 
+        """
+        if kwargs.get('categorized') is True:
+            info = { camel_case(k): getattr(self, k)
+                    for k in self.properties_list(info=True) }
+            config = { camel_case(k): getattr(self, k)
+                      for k in self.properties_list(config=True) }
+            return { 'config': config, 'info': info }
         return {camel_case(key): getattr(self, key)
-                for key in self.properties_list}
+                for key in self.properties_list()}
 
     @abstractmethod
     def on_isc_message(self, topic: str, message: dict) -> bool:

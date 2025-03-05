@@ -3,6 +3,7 @@
 import logging
 import time
 from abc import ABC, abstractmethod
+from enum import Enum
 from queue import Queue
 from threading import Thread
 from typing import Any, Callable
@@ -11,6 +12,7 @@ from uuid import uuid4
 from fieldedge_utilities.logger import verbose_logging
 from fieldedge_utilities.mqtt import MqttClient
 from fieldedge_utilities.properties import (READ_ONLY, READ_WRITE, camel_case,
+                                            snake_case,
                                             get_class_properties,
                                             get_class_tag, hasattr_static,
                                             json_compatible,
@@ -72,6 +74,11 @@ class QueuedCallback:
             self.callback(*self.args, **self.kwargs)
 
 
+class MicroserviceLogLevel(Enum):
+    DEBUG = 'DEBUG'
+    INFO = 'INFO'
+
+
 class Microservice(ABC):
     """Abstract base class for a FieldEdge microservice.
     
@@ -86,8 +93,6 @@ class Microservice(ABC):
         'features', 'ms_proxies', 'property_cache',
         '_publisher_queue', '_publisher_thread',
     )
-
-    LOG_LEVELS = ['DEBUG', 'INFO']
 
     def __init__(self, **kwargs) -> None:
         """Initialize the class instance.
@@ -163,8 +168,9 @@ class Microservice(ABC):
     @log_level.setter
     def log_level(self, value: str):
         "The logging level of the root logger."
-        if not isinstance(value, str) or value.upper() not in self.LOG_LEVELS:
-            raise ValueError(f'Level must be in {self.LOG_LEVELS}')
+        log_levels = list(MicroserviceLogLevel.__members__)
+        if not isinstance(value, str) or value.upper() not in log_levels:
+            raise ValueError(f'Level must be in {log_levels}')
         logging.getLogger().setLevel(value.upper())
 
     @property
@@ -302,6 +308,20 @@ class Microservice(ABC):
 
     def isc_set_property(self, isc_property: str, value: Any) -> None:
         """Sets a property value based on its ISC name."""
+        prop_config = self.isc_configurable().get(isc_property)
+        if not prop_config:
+            raise ValueError('Property %s not found in ISC configurable')
+        type_obj = ConfigurableProperty.supported_types().get(prop_config.type)
+        if not isinstance(value, type_obj):
+            raise ValueError('Invalid data type')
+        if prop_config.min is not None and value < prop_config.min:
+            raise ValueError('Invalid value too low')
+        if prop_config.max is not None and value > prop_config.max:
+            raise ValueError('Invalid value too high')
+        if isinstance(prop_config.enum, Enum):
+            if value not in prop_config.enum.__members__:
+                raise ValueError('Invalid value not in enum set')
+            value = prop_config.enum[value]
         prop = untag_class_property(isc_property, self._isc_tags)
         if hasattr_static(self, prop):
             if property_is_read_only(self, prop):
@@ -309,15 +329,16 @@ class Microservice(ABC):
             setattr(self, prop, value)
             return
         else:
-            for tag, feature in self.features.items():
-                if not prop.startswith(f'{tag}_'):
-                    continue
-                fprop = prop.replace(f'{tag}_', '')
-                if hasattr_static(feature, fprop):
-                    if property_is_read_only(feature, fprop):
-                        raise AttributeError(f'{prop} is read-only')
-                    setattr(feature, fprop, value)
-                    return
+            for child in [self.features, self.ms_proxies]:
+                for tag, entity in child.items():
+                    if not prop.startswith(f'{tag}_'):
+                        continue
+                    eprop = prop.replace(f'{tag}_', '')
+                    if hasattr_static(entity, eprop):
+                        if property_is_read_only(entity, eprop):
+                            raise AttributeError(f'{prop} is read-only')
+                        setattr(entity, eprop, value)
+                        return
         raise AttributeError(f'ISC property {isc_property} not found')
 
     def isc_property_hide(self, isc_property: str) -> None:
@@ -334,17 +355,36 @@ class Microservice(ABC):
             self._hidden_isc_properties.remove(isc_property)
             self._refresh_isc_properties()
 
-    def configurable(self, **kwargs) -> 'dict[str, ConfigurableProperty]':
+    def isc_configurable(self, **kwargs) -> 'dict[str, ConfigurableProperty]':
         """Get a map of configurable properties.
         
-        Subclass should pass in kwargs as `property_name=ConfigurableProperty()`
+        This is a function rather than a property to avoid double exposure.
+        Subclass function should pass in kwargs as
+        `<property_name>=<ConfigurableProperty()>`
+        
+        Returns
+            `dictionary` of `ConfigurableProperty` defining how to set over ISC.
         """
-        base = { 'log_level': ConfigurableProperty('str', enum=self.LOG_LEVELS) }
+        base = {
+            'log_level': ConfigurableProperty('str', enum=MicroserviceLogLevel),
+        }
         if kwargs:
-            if all(isinstance(v, ConfigurableProperty) for v in kwargs.values()):
-                return base | kwargs
-            raise ValueError('Invalid ConfigurableProperty')
-        return base
+            if not all(isinstance(v, ConfigurableProperty) 
+                       for v in kwargs.values()):
+                raise ValueError('Invalid ConfigurableProperty')
+            base = base | kwargs
+        for tag, feature in self.features.items():
+            if isinstance(feature.isc_configurable(), dict):
+                for fprop, fprop_config in feature.isc_configurable().items():
+                    base[f'{tag}_{fprop}'] = fprop_config
+        for tag, proxy in self.ms_proxies.items():
+            if isinstance(proxy.isc_configurable(), dict):
+                for pprop, pprop_config in proxy.isc_configurable().items():
+                    base[f'{tag}_{pprop}'] = pprop_config
+        for prop in self.isc_properties_by_type['config']:
+            if snake_case(prop) not in base:
+                _log.warning('Missing config detail for %s', prop)
+        return { camel_case(k): v for k, v in base.items() }
 
     @property
     def rollcall_properties(self) -> 'list[str]':
@@ -629,8 +669,10 @@ class Microservice(ABC):
                 else:
                     for prop in req_props:
                         res_props[prop] = self.isc_get_property(prop)
-                configurable = self.configurable()
-                if configurable:
+                configurable = self.isc_configurable()
+                if (configurable and
+                    all(isinstance(v, ConfigurableProperty) 
+                        for v in configurable.values())):
                     response['configurable'] = {
                         k: v.json_compatible() for k, v in configurable.items()
                     }

@@ -10,7 +10,7 @@ from typing import Any, Callable
 from fieldedge_utilities.logger import verbose_logging
 from fieldedge_utilities.path import get_caller_name
 from fieldedge_utilities.timer import RepeatingTimer
-from fieldedge_utilities.properties import ConfigurableProperty
+from fieldedge_utilities.properties import ConfigurableProperty, snake_case
 
 from .interservice import IscException, IscTask, IscTaskQueue
 from .propertycache import PropertyCache
@@ -86,7 +86,7 @@ class MicroserviceProxy(ABC):
                                          auto_start=True)
         self._proxy_properties: dict = None
         self._property_cache: PropertyCache = PropertyCache()
-        self._configurable: 'dict[str, ConfigurableProperty]|None' = None
+        self._isc_configurable: 'dict[str, ConfigurableProperty]' = {}
         self._proxy_event: Event = Event()
         self._init: InitializationState = InitializationState.NONE
 
@@ -158,9 +158,9 @@ class MicroserviceProxy(ABC):
         task_meta = { 'set': property_name }
         self.query_properties({ property_name: value }, task_meta, **kwargs)
 
-    def configurable(self) -> 'dict[str, ConfigurableProperty]|None':
+    def isc_configurable(self) -> 'dict[str, ConfigurableProperty]':
         """Get the map of configurable properties."""
-        return self._configurable
+        return self._isc_configurable
     
     def task_add(self, task: IscTask) -> None:
         """Adds a task to the task queue."""
@@ -223,6 +223,7 @@ class MicroserviceProxy(ABC):
             'initialize': self.tag,
             'timeout': self._init_timeout,
             'timeout_callback': self._init_fail,
+            'allow_config': kwargs.pop('allow_config', False),
         }
         self._init = InitializationState.PENDING
         self.query_properties(['all'], task_meta, **kwargs)
@@ -232,7 +233,7 @@ class MicroserviceProxy(ABC):
         """
         self._init = InitializationState.NONE
         self._property_cache.clear()
-        self._configurable = None
+        self._isc_configurable = {}
         self.isc_queue.clear()
 
     def _init_fail(self, task_meta: dict = None):
@@ -317,25 +318,28 @@ class MicroserviceProxy(ABC):
         if self._proxy_properties is None:
             self._proxy_properties = {}
         if not any(key in properties for key in ['config', 'info']):
-            for prop, val in properties.items():
-                if (prop not in self._proxy_properties or
-                    self._proxy_properties[prop] != val):
-                    _log.debug('Updating %s = %s', prop, val)
-                    self._proxy_properties[prop] = val
-                    self._property_cache.cache(val, prop, cache_lifetime)
+            for prop_name, val in properties.items():
+                if (prop_name not in self._proxy_properties or
+                    self._proxy_properties[prop_name] != val):
+                    _log.debug('Updating %s = %s', prop_name, val)
+                    self._proxy_properties[prop_name] = val
+                    self._property_cache.cache(val, prop_name, cache_lifetime)
         else:
             for cat, props in properties.items():
                 if cat not in self._proxy_properties:
                     self._proxy_properties[cat] = {}
-                for prop, val in props.items():
-                    self._proxy_properties[cat][prop] = val
-                    self._property_cache.cache(val, prop, cache_lifetime)
-        configurable = message.get('configurable')
-        if configurable and isinstance(configurable, dict):
-            for prop, config_map in configurable.items():
-                if self._configurable is None:
-                    self._configurable = {}
-                self._configurable[prop] = ConfigurableProperty(**config_map)
+                for prop_name, val in props.items():
+                    self._proxy_properties[cat][prop_name] = val
+                    self._property_cache.cache(val, prop_name, cache_lifetime)
+        allow_config = task_meta.get('allow_config', False)
+        if allow_config:
+            configurable = message.get('configurable')
+            if isinstance(configurable, dict):
+                self._isc_configurable = {}
+                for prop_name, prop_config in configurable.items():
+                    k = snake_case(prop_name)
+                    v = ConfigurableProperty(**prop_config)
+                    self._isc_configurable[k] = v
         if cache_all:
             self._property_cache.cache(cache_all, 'all', cache_lifetime)
             if not self._proxy_event.is_set():

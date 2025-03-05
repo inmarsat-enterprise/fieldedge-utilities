@@ -74,9 +74,9 @@ class Feature(ABC):
             return [p for p in all_props if property_is_read_only(self, p)]
         return all_props
     
-    def configurable(self) -> 'dict[str, ConfigurableProperty]|None':
+    def isc_configurable(self) -> 'dict[str, ConfigurableProperty]':
         """Get the map of configurable properties."""
-        return None
+        return {}
 
     @abstractmethod
     def status(self, **kwargs) -> dict:

@@ -71,8 +71,8 @@ class TestService(Microservice):
     #     await asyncio.sleep(1)
     #     return self._info_prop
 
-    def configurable(self):
-        return super().configurable(**{
+    def isc_configurable(self):
+        return super().isc_configurable(**{
             'config_prop': ConfigurableProperty(
                 type = 'int',
                 min = 0,
@@ -80,7 +80,7 @@ class TestService(Microservice):
             ),
             'config_enum': ConfigurableProperty(
                 type = 'str',
-                enum = list(TestEnum.__members__.keys()),
+                enum = TestEnum,
             )
         })
     
@@ -116,9 +116,13 @@ class TestFeature(Feature):
         return self._config_enum
     
     @test_config.setter
-    def test_config(self, value: str):
-        if (not isinstance(value, str) or value not in TestEnum.__members__):
-            raise ValueError('Invalid enum value')
+    def test_config(self, value: 'TestEnum|str'):
+        if isinstance(value, str):
+            if value not in TestEnum.__members__:
+                raise ValueError('Invalid enum value')
+            value = TestEnum[value]
+        if not isinstance(value, TestEnum):
+            raise ValueError('Invalid TestEnum')
         self._config_enum = TestEnum[value]
 
     def status(self) -> dict:
@@ -127,16 +131,16 @@ class TestFeature(Feature):
     def properties_list(self) -> 'list[str]':
         return ['test_prop', 'test_config']
     
-    def configurable(self):
+    def isc_configurable(self):
         return {
             'test_config': ConfigurableProperty(
                 type = 'str',
-                enum = list(TestEnum.__members__.keys()),
+                enum = TestEnum,
             ),
         }
 
     def on_isc_message(self, topic: str, message: dict) -> bool:
-        logger.info(f'Feature received ISC {topic}: {message}')
+        # logger.info(f'Feature received ISC {topic}: {message}')
         feature_relevant = message.get('feature', None)
         if feature_relevant:
             logger.info('Feature handled')
@@ -433,8 +437,10 @@ def test_complex_ms(test_complex: TestService, test_service: TestService, mocker
     feature = test_complex.features.get('feature')
     logger.info('Feature tag: %s', feature.tag)
     assert hasattr(feature, '_custom_protected')
-    assert isinstance(feature.configurable(), dict)
-    for k, v in feature.configurable().items():
+    assert isinstance(feature.isc_configurable(), dict)
+    for k, v in feature.isc_configurable().items():
+        assert isinstance(v, ConfigurableProperty)
+    for k, v in test_complex.isc_configurable().items():
         assert isinstance(v, ConfigurableProperty)
     complex_props = test_complex.properties
     assert 'feature_test_prop' in complex_props
@@ -465,15 +471,21 @@ def test_complex_ms(test_complex: TestService, test_service: TestService, mocker
     assert 'infoProp' in proxy_props and proxy_props['infoProp'] == 'test'
     assert 'logLevel' in proxy_props and proxy_props['logLevel'] == 'DEBUG'
     assert proxy.property_get('configProp') == 2
+    assert test_service.isc_get_property('configProp') == 2
+    remote_delay = 1
     proxy.property_set('configProp', 3)
     attempts = 0
     while not proxy.property_get('configProp') == 3 and attempts < 3:
         attempts += 1
-        time.sleep(0.5)
+        time.sleep(remote_delay)
     assert proxy.property_get('configProp') == 3
-    assert isinstance(proxy.configurable(), dict)
-    for k, v in proxy.configurable().items():
-        assert isinstance(v, ConfigurableProperty)
+    assert test_service.isc_get_property('configProp') == 3
+    proxy.property_set('configEnum', 'TWO')
+    attempts = 0
+    while not proxy.property_get('configEnum') == 'TWO' and attempts < 3:
+        attempts += 1
+        time.sleep(remote_delay)
+    assert test_service.isc_get_property('configEnum') == TestEnum.TWO
 
 
 def mtest_proxy_init_fail(test_complex: TestService):

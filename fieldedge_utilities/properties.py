@@ -32,10 +32,10 @@ class ConfigurableProperty:
     type: str
     min: Optional[Union[int, float]] = None
     max: Optional[Union[int, float]] = None
-    enum: Optional[list[str]] = None
+    enum: Optional[Enum] = None
     
     def __post_init__(self):
-        if self.type not in ['str', 'int', 'float', 'dict', 'list']:
+        if self.type not in self.supported_types().keys():
             raise ValueError('Invalid type string')
         if self.min is not None:
             if not isinstance(self.min, (int, float)):
@@ -44,14 +44,26 @@ class ConfigurableProperty:
             if not isinstance(self.max, (int, float)):
                 raise ValueError('Invalid max value')
         if self.enum is not None:
-            if (not isinstance(self.enum, list) or
-                not all(isinstance(e, str) and len(e) > 0 for e in self.enum)):
-                raise ValueError('Invalid enum list')
+            if not issubclass(self.enum, Enum):
+                raise ValueError('Invalid Enum type')
         
+    @classmethod
+    def supported_types(cls) -> dict:
+        return {
+            'int': int,
+            'float': float,
+            'str': str,
+            'enum': str,
+            'list': list,
+            'dict': dict,
+        }
+    
     def json_compatible(self) -> dict:
         """Converts to a JSON-compatible representation."""
-        d = asdict(self)
-        return { k: v for k, v in d.items() if v is not None }
+        result = asdict(self)
+        if result['enum'] is not None and issubclass(result['enum'], Enum):
+            result['enum'] = result['enum'].__members__.keys()
+        return { k: v for k, v in result.items() if v is not None }
 
 
 def camel_to_snake(camel_str: str, skip_caps: bool = False) -> str:

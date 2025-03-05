@@ -7,6 +7,7 @@ from fieldedge_utilities.properties import (
     camel_case,
     get_class_properties,
     property_is_read_only,
+    ConfigurableProperty,
 )
 
 from .interservice import IscTaskQueue
@@ -72,6 +73,10 @@ class Feature(ABC):
         if kwargs.get('info') is True:
             return [p for p in all_props if property_is_read_only(self, p)]
         return all_props
+    
+    def configurable(self) -> 'dict[str, ConfigurableProperty]|None':
+        """Get the map of configurable properties."""
+        return None
 
     @abstractmethod
     def status(self, **kwargs) -> dict:

@@ -16,7 +16,8 @@ from fieldedge_utilities.properties import (READ_ONLY, READ_WRITE, camel_case,
                                             json_compatible,
                                             property_is_read_only,
                                             tag_class_property,
-                                            untag_class_property)
+                                            untag_class_property,
+                                            ConfigurableProperty)
 from fieldedge_utilities.timer import RepeatingTimer
 
 from .feature import Feature
@@ -333,6 +334,18 @@ class Microservice(ABC):
             self._hidden_isc_properties.remove(isc_property)
             self._refresh_isc_properties()
 
+    def configurable(self, **kwargs) -> 'dict[str, ConfigurableProperty]':
+        """Get a map of configurable properties.
+        
+        Subclass should pass in kwargs as `property_name=ConfigurableProperty()`
+        """
+        base = { 'log_level': ConfigurableProperty('str', enum=self.LOG_LEVELS) }
+        if kwargs:
+            if all(isinstance(v, ConfigurableProperty) for v in kwargs.values()):
+                return base | kwargs
+            raise ValueError('Invalid ConfigurableProperty')
+        return base
+
     @property
     def rollcall_properties(self) -> 'list[str]':
         """Property key/values that will be sent in the rollcall response."""
@@ -616,12 +629,17 @@ class Microservice(ABC):
                 else:
                     for prop in req_props:
                         res_props[prop] = self.isc_get_property(prop)
+                configurable = self.configurable()
+                if configurable:
+                    response['configurable'] = {
+                        k: v.json_compatible() for k, v in configurable.items()
+                    }
             except AttributeError as exc:
                 response = { 'uid': request_id, 'error': f'{exc}' }
         if _vlog(self.tag):
             _log.debug('Responding to %s request %s for properties: %s',
                        source, request_id, request.get('properties', 'ALL'))
-        self.notify(message=response, subtopic=subtopic)
+        self.notify(message=json_compatible(response), subtopic=subtopic)
 
     def properties_change(self, request: dict, source: str = '') -> 'None|dict':
         """Processes the requested property changes.

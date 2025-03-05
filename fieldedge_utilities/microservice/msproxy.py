@@ -10,6 +10,7 @@ from typing import Any, Callable
 from fieldedge_utilities.logger import verbose_logging
 from fieldedge_utilities.path import get_caller_name
 from fieldedge_utilities.timer import RepeatingTimer
+from fieldedge_utilities.properties import ConfigurableProperty
 
 from .interservice import IscException, IscTask, IscTaskQueue
 from .propertycache import PropertyCache
@@ -85,6 +86,7 @@ class MicroserviceProxy(ABC):
                                          auto_start=True)
         self._proxy_properties: dict = None
         self._property_cache: PropertyCache = PropertyCache()
+        self._configurable: 'dict[str, ConfigurableProperty]|None' = None
         self._proxy_event: Event = Event()
         self._init: InitializationState = InitializationState.NONE
 
@@ -154,8 +156,12 @@ class MicroserviceProxy(ABC):
     def property_set(self, property_name: str, value: Any, **kwargs):
         """Sets the proxy property value."""
         task_meta = { 'set': property_name }
-        self.query_properties({ property_name: value }, task_meta, kwargs)
+        self.query_properties({ property_name: value }, task_meta, **kwargs)
 
+    def configurable(self) -> 'dict[str, ConfigurableProperty]|None':
+        """Get the map of configurable properties."""
+        return self._configurable
+    
     def task_add(self, task: IscTask) -> None:
         """Adds a task to the task queue."""
         if self.isc_queue.is_full:
@@ -219,13 +225,14 @@ class MicroserviceProxy(ABC):
             'timeout_callback': self._init_fail,
         }
         self._init = InitializationState.PENDING
-        self.query_properties(['all'], task_meta, kwargs)
+        self.query_properties(['all'], task_meta, **kwargs)
 
     def deinitialize(self) -> None:
         """De-initialize the proxy and clear the property cache and task queue.
         """
         self._init = InitializationState.NONE
         self._property_cache.clear()
+        self._configurable = None
         self.isc_queue.clear()
 
     def _init_fail(self, task_meta: dict = None):
@@ -240,7 +247,8 @@ class MicroserviceProxy(ABC):
     def query_properties(self,
                          properties: 'dict|list',
                          task_meta: dict = None,
-                         query_meta: dict = None):
+                         query_meta: dict = None,
+                         **kwargs):
         """Gets or sets the microservice properties via MQTT.
         
         Args:
@@ -274,6 +282,8 @@ class MicroserviceProxy(ABC):
             'uid': prop_task.uid,
             'properties': properties,
         }
+        if kwargs.get('categorized') is True:
+            message['categorized'] = True
         if self._parent_tag:
             message['requestor'] = self._parent_tag
         if isinstance(query_meta, dict):
@@ -320,6 +330,12 @@ class MicroserviceProxy(ABC):
                 for prop, val in props.items():
                     self._proxy_properties[cat][prop] = val
                     self._property_cache.cache(val, prop, cache_lifetime)
+        configurable = message.get('configurable')
+        if configurable and isinstance(configurable, dict):
+            for prop, config_map in configurable.items():
+                if self._configurable is None:
+                    self._configurable = {}
+                self._configurable[prop] = ConfigurableProperty(**config_map)
         if cache_all:
             self._property_cache.cache(cache_all, 'all', cache_lifetime)
             if not self._proxy_event.is_set():

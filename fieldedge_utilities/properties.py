@@ -5,6 +5,9 @@ import itertools
 import json
 import logging
 import re
+from dataclasses import dataclass, asdict
+from enum import Enum
+from typing import Optional, Union
 
 from fieldedge_utilities.logger import verbose_logging
 
@@ -14,12 +17,41 @@ __all__ = ['camel_case', 'snake_case', 'get_class_tag',
            'json_compatible', 'hasattr_static',
            'property_is_read_only', 'property_is_async', 'tag_class_properties',
            'tag_class_property', 'untag_class_property', 'tag_merge',
-           'equivalent_attributes', 'READ_ONLY', 'READ_WRITE']
+           'equivalent_attributes', 'READ_ONLY', 'READ_WRITE',
+           'ConfigurableProperty']
 
 READ_ONLY = 'info'
 READ_WRITE = 'config'
 
 _log = logging.getLogger(__name__)
+
+
+@dataclass
+class ConfigurableProperty:
+    """Data structure for a remotely configurable property."""
+    type: str
+    min: Optional[Union[int, float]] = None
+    max: Optional[Union[int, float]] = None
+    enum: Optional[list[str]] = None
+    
+    def __post_init__(self):
+        if self.type not in ['str', 'int', 'float', 'dict', 'list']:
+            raise ValueError('Invalid type string')
+        if self.min is not None:
+            if not isinstance(self.min, (int, float)):
+                raise ValueError('Invalid min value')
+        if self.max is not None:
+            if not isinstance(self.max, (int, float)):
+                raise ValueError('Invalid max value')
+        if self.enum is not None:
+            if (not isinstance(self.enum, list) or
+                not all(isinstance(e, str) and len(e) > 0 for e in self.enum)):
+                raise ValueError('Invalid enum list')
+        
+    def json_compatible(self) -> dict:
+        """Converts to a JSON-compatible representation."""
+        d = asdict(self)
+        return { k: v for k, v in d.items() if v is not None }
 
 
 def camel_to_snake(camel_str: str, skip_caps: bool = False) -> str:
@@ -213,6 +245,8 @@ def json_compatible(obj: object,
             res = [json_compatible(i) for i in obj]
     try:
         json.dumps(res)
+        if isinstance(res, Enum):
+            return res.name
         return res
     except TypeError:
         try:

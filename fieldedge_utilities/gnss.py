@@ -120,7 +120,7 @@ def parse_nmea_to_location(nmea_sentence: str,
         if i == 0:
             nmea_type = field_data[-3:]
             if nmea_type not in ['RMC', 'GGA', 'GSA']:
-                _log.warning('No processing required for %s sentence', nmea_type)
+                _log.warning('No processing defined for %s sentence', nmea_type)
                 break
             if _vlog():
                 _log.debug('Processing NMEA type: %s', nmea_type)

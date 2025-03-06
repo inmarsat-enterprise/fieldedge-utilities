@@ -9,3 +9,4 @@ dist/archive
 pcaps
 certs
 private*
+gnss_output.txt

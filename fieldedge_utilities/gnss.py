@@ -4,7 +4,7 @@ import logging
 # import re
 from copy import deepcopy
 from dataclasses import dataclass, asdict
-from enum import IntEnum
+from enum import Enum, IntEnum
 from typing import Optional
 
 from fieldedge_utilities.logger import verbose_logging
@@ -19,9 +19,9 @@ _log = logging.getLogger(__name__)
 
 class GnssFixType(IntEnum):
     """Enumerated fix type from NMEA-0183 standard."""
-    NONE = 1
-    D2 = 2
-    D3 = 3
+    FIX_NONE = 1
+    FIX_2D = 2
+    FIX_3D = 3
 
 
 class GnssFixQuality(IntEnum):
@@ -54,19 +54,24 @@ class GnssLocation:
     fix_quality: Optional[GnssFixQuality] = None
 
     @property
-    def iso_time(self) -> str:
+    def iso_time(self) -> 'str|None':
+        if self.timestamp is None:
+            return None
         return ts_to_iso(self.timestamp)
     
     def json_compatible(self, **kwargs) -> str:
         lat_lon_precision = kwargs.get('lat_lon_precision', 5)
         other_precision = kwargs.get('other_precision', 1)
-        result = asdict(self)
-        result['iso_time'] = self.iso_time
+        result = { k: v for k, v in asdict(self).items() if v is not None }
+        if self.timestamp is not None:
+            result['iso_time'] = self.iso_time
         for k, v in result.items():
             if k in ['latitude', 'longitude']:
                 result[k] = round(v, lat_lon_precision)
             elif isinstance(k, float):
                 result[k] = round(v, other_precision)
+            elif isinstance(v, Enum):
+                result[k] = v.name
         return { camel_case(k): v for k, v in result.items() if v is not None }
 
 
@@ -97,6 +102,7 @@ def parse_nmea_to_location(nmea_sentence: str,
     """
     if _vlog():
         _log.debug('Parsing NMEA: %s', nmea_sentence)
+        _log.debug('Previous location: %s', location)
     if not validate_nmea(nmea_sentence):
         raise ValueError('Invalid NMEA-0183 sentence')
     if not isinstance(location, GnssLocation):
@@ -109,11 +115,13 @@ def parse_nmea_to_location(nmea_sentence: str,
     nmea_type = ''
     cache = {}
     for i, field_data in enumerate(data.split(',')):
+        if not field_data:
+            continue   # skip empty fields
         if i == 0:
             nmea_type = field_data[-3:]
-            if nmea_type == 'GSV':
-                _log.warning('No processing required for GSV sentence')
-                return
+            if nmea_type not in ['RMC', 'GGA', 'GSA']:
+                _log.warning('No processing required for %s sentence', nmea_type)
+                break
             if _vlog():
                 _log.debug('Processing NMEA type: %s', nmea_type)
         elif i == 1:
@@ -216,7 +224,7 @@ def parse_nmea_to_location(nmea_sentence: str,
                 if _vlog():
                     _log.debug('VDOP: %d', location.vdop)
     if void:
-         if old_location:
+         if isinstance(old_location, GnssLocation):
              return old_location
          return None
     if isinstance(old_location, GnssLocation):

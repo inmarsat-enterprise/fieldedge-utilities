@@ -7,7 +7,8 @@ from enum import IntEnum
 from typing import Optional
 
 from fieldedge_utilities.logger import verbose_logging
-from fieldedge_utilities.timestamp import iso_to_ts
+from fieldedge_utilities.properties import camel_case
+from fieldedge_utilities.timestamp import iso_to_ts, ts_to_iso
 
 __all__ = ['GnssFixType', 'GnssFixQuality', 'GnssLocation',
            'validate_nmea', 'parse_nmea_to_location']
@@ -41,16 +42,32 @@ class GnssLocation:
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     altitude: Optional[float] = None
-    speed_kn: Optional[float] = None
+    speed: Optional[float] = None
     heading: Optional[float] = None
     hdop: Optional[float] = None
     pdop: Optional[float] = None
     vdop: Optional[float] = None
-    satellites: int = 0
-    timestamp: int = 0
-    fix_type: GnssFixType = GnssFixType.NONE
-    fix_quality: GnssFixQuality = GnssFixQuality.INVALID
+    satellites: Optional[int] = None
+    timestamp: Optional[int] = None
+    fix_type: Optional[GnssFixType] = None
+    fix_quality: Optional[GnssFixQuality] = None
+
+    @property
+    def iso_time(self) -> str:
+        return ts_to_iso(self.timestamp)
     
+    def json_compatible(self, **kwargs) -> str:
+        lat_lon_precision = kwargs.get('lat_lon_precision', 5)
+        other_precision = kwargs.get('other_precision', 1)
+        result = asdict(self)
+        result['iso_time'] = self.iso_time
+        for k, v in result.items():
+            if k in ['latitude', 'longitude']:
+                result[k] = round(v, lat_lon_precision)
+            elif isinstance(k, float):
+                result[k] = round(v, other_precision)
+        return { camel_case(k): v for k, v in result.items() if v is not None }
+
 
 def validate_nmea(nmea_sentence: str) -> bool:
     """Validates a given NMEA-0183 sentence with CRC.
@@ -70,7 +87,8 @@ def validate_nmea(nmea_sentence: str) -> bool:
 
 
 def parse_nmea_to_location(nmea_sentence: str,
-                           location: GnssLocation = None) -> 'dict|GnssLocation|None':
+                           location: GnssLocation = None,
+                           **kwargs) -> 'dict|GnssLocation|None':
     """Parses a NMEA-0183 sentence to a location or update.
     
     Passing a Location object in will update the location with NMEA data.
@@ -141,9 +159,9 @@ def parse_nmea_to_location(nmea_sentence: str,
                     _log.debug('Fix quality: %s', location.fix_quality.name)
         elif i == 7:
             if nmea_type == 'RMC':
-                location.speed_kn = float(field_data)
+                location.speed = float(field_data) * 1.852
                 if _vlog():
-                    _log.debug('Speed: %.1f', location.speed_kn)
+                    _log.debug('Speed: %.1f', location.speed)
             elif nmea_type == 'GGA':
                 location.satellites = int(field_data)
                 if _vlog():
@@ -202,7 +220,7 @@ def parse_nmea_to_location(nmea_sentence: str,
          return None
     if isinstance(old_location, GnssLocation):
         return location
-    return { k: v for k, v in asdict(location) if v is not None }
+    return location.json_compatible(**kwargs)
 
 
 def _vlog() -> bool:

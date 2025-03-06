@@ -1,6 +1,7 @@
 """NMEA helper utilities for location data from commercial GNSS devices."""
 
 import logging
+# import re
 from copy import deepcopy
 from dataclasses import dataclass, asdict
 from enum import IntEnum
@@ -226,3 +227,94 @@ def parse_nmea_to_location(nmea_sentence: str,
 def _vlog() -> bool:
     """Check if vebose logging is enabled for this microservice."""
     return verbose_logging('nmea')
+
+
+# def parse_nmea_sentence(nmea):
+#     """
+#     Parse an NMEA sentence and extract location, heading, speed, and UTC time.
+
+#     Parameters:
+#     - nmea: A string containing an NMEA sentence.
+
+#     Returns:
+#     - A dictionary with keys 'latitude', 'longitude', 'heading', 'speed', 'fix_quality', and 'utc_time'.
+#     """
+#     # Define regex patterns for NMEA sentences of interest
+#     gga_pattern = re.compile(r"\$G[NP]GGA,(\d{6}\.\d+),(\d{2})(\d{2}\.\d+),([NS]),(\d{3})(\d{2}\.\d+),([EW]),(\d),")
+#     rmc_pattern = re.compile(r"\$G[NP]RMC,(\d{6}\.\d+),[AV],(\d{2})(\d{2}\.\d+),([NS]),(\d{3})(\d{2}\.\d+),([EW]),(\d+\.\d+),(\d+\.\d+),")
+#     gsa_pattern = re.compile(r"\$G[NP]GSA,[AM],(\d),.*")
+
+#     # Initialize result dictionary
+#     result = {
+#         "latitude": None,
+#         "longitude": None,
+#         "heading": None,
+#         "speed": None,
+#         "fix_quality": None,
+#         "utc_time": None,
+#     }
+
+#     # Parse GGA data (latitude, longitude, fix quality, UTC time)
+#     gga_match = gga_pattern.search(nmea)
+#     if gga_match:
+#         utc_time = gga_match.group(1)
+#         lat_deg = int(gga_match.group(2))
+#         lat_min = float(gga_match.group(3))
+#         lat_dir = gga_match.group(4)
+#         lon_deg = int(gga_match.group(5))
+#         lon_min = float(gga_match.group(6))
+#         lon_dir = gga_match.group(7)
+#         fix_quality = int(gga_match.group(8))
+
+#         # Convert latitude and longitude to decimal degrees
+#         latitude = lat_deg + lat_min / 60.0
+#         if lat_dir == 'S':
+#             latitude = -latitude
+
+#         longitude = lon_deg + lon_min / 60.0
+#         if lon_dir == 'W':
+#             longitude = -longitude
+
+#         result["latitude"] = latitude
+#         result["longitude"] = longitude
+#         result["fix_quality"] = fix_quality
+#         result["utc_time"] = utc_time
+
+#     # Parse RMC data (latitude, longitude, speed, heading, UTC time)
+#     rmc_match = rmc_pattern.search(nmea)
+#     if rmc_match:
+#         utc_time = rmc_match.group(1)
+#         lat_deg = int(rmc_match.group(2))
+#         lat_min = float(rmc_match.group(3))
+#         lat_dir = rmc_match.group(4)
+#         lon_deg = int(rmc_match.group(5))
+#         lon_min = float(rmc_match.group(6))
+#         lon_dir = rmc_match.group(7)
+#         speed_knots = float(rmc_match.group(8))
+#         heading = float(rmc_match.group(9))
+
+#         # Convert latitude and longitude to decimal degrees
+#         latitude = lat_deg + lat_min / 60.0
+#         if lat_dir == 'S':
+#             latitude = -latitude
+
+#         longitude = lon_deg + lon_min / 60.0
+#         if lon_dir == 'W':
+#             longitude = -longitude
+
+#         # Convert speed from knots to km/h
+#         speed_kmh = speed_knots * 1.852
+
+#         result["latitude"] = latitude
+#         result["longitude"] = longitude
+#         result["speed"] = speed_kmh
+#         result["heading"] = heading
+#         result["utc_time"] = utc_time
+
+#     # Parse GSA data (fix type)
+#     gsa_match = gsa_pattern.search(nmea)
+#     if gsa_match:
+#         fix_quality = int(gsa_match.group(1))
+#         result["fix_quality"] = fix_quality
+
+#     return result

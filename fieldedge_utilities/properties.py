@@ -32,7 +32,7 @@ class ConfigurableProperty:
     type: str
     min: Optional[Union[int, float]] = None
     max: Optional[Union[int, float]] = None
-    enum: Optional[Enum] = None
+    enum: Optional[list[str]] = None
     
     def __post_init__(self):
         if self.type not in self.supported_types().keys():
@@ -44,8 +44,12 @@ class ConfigurableProperty:
             if not isinstance(self.max, (int, float)):
                 raise ValueError('Invalid max value')
         if self.enum is not None:
-            if not issubclass(self.enum, Enum):
-                raise ValueError('Invalid Enum type')
+            # if issubclass(self.enum, Enum):
+            if hasattr(self.enum, '__members__'):
+                self.enum = list(self.enum.__members__.keys())
+            if (not isinstance(self.enum, list) or
+                not all(isinstance(e, str) and len(e) > 0 for e in self.enum)):
+                raise ValueError('Invalid enum values')
         
     @classmethod
     def supported_types(cls) -> dict:
@@ -61,8 +65,8 @@ class ConfigurableProperty:
     def json_compatible(self) -> dict:
         """Converts to a JSON-compatible representation."""
         result = asdict(self)
-        if result['enum'] is not None and issubclass(result['enum'], Enum):
-            result['enum'] = result['enum'].__members__.keys()
+        if result['enum'] is not None and hasattr(result['enum'], '__members__'):
+            result['enum'] = list(result['enum'].__members__.keys())
         return { k: v for k, v in result.items() if v is not None }
 
 

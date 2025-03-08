@@ -67,7 +67,7 @@ class Feature(ABC):
             **config (bool): Returns only configuration properties if True.
             **info (bool): Returns only information properties if True.
         """
-        all_props = get_class_properties(self)
+        all_props = get_class_properties(self, ignore=['tag'])
         if kwargs.get('config') is True:
             return [p for p in all_props if not property_is_read_only(self, p)]
         if kwargs.get('info') is True:

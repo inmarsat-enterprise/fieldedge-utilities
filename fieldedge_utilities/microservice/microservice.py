@@ -366,7 +366,7 @@ class Microservice(ABC):
             `dictionary` of `ConfigurableProperty` defining how to set over ISC.
         """
         base = {
-            'log_level': ConfigurableProperty('str', enum=MicroserviceLogLevel),
+            'log_level': ConfigurableProperty('enum', enum=MicroserviceLogLevel),
         }
         if kwargs:
             if not all(isinstance(v, ConfigurableProperty) 

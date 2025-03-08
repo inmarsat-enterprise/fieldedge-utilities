@@ -223,7 +223,6 @@ class MicroserviceProxy(ABC):
             'initialize': self.tag,
             'timeout': self._init_timeout,
             'timeout_callback': self._init_fail,
-            'allow_config': kwargs.pop('allow_config', False),
         }
         self._init = InitializationState.PENDING
         self.query_properties(['all'], task_meta, **kwargs)
@@ -331,15 +330,13 @@ class MicroserviceProxy(ABC):
                 for prop_name, val in props.items():
                     self._proxy_properties[cat][prop_name] = val
                     self._property_cache.cache(val, prop_name, cache_lifetime)
-        allow_config = task_meta.get('allow_config', False)
-        if allow_config:
-            configurable = message.get('configurable')
-            if isinstance(configurable, dict):
-                self._isc_configurable = {}
-                for prop_name, prop_config in configurable.items():
-                    k = snake_case(prop_name)
-                    v = ConfigurableProperty(**prop_config)
-                    self._isc_configurable[k] = v
+        configurable = message.get('configurable')
+        if isinstance(configurable, dict):
+            self._isc_configurable = {}
+            for prop_name, prop_config in configurable.items():
+                k = snake_case(prop_name)
+                v = ConfigurableProperty(**prop_config)
+                self._isc_configurable[k] = v
         if cache_all:
             self._property_cache.cache(cache_all, 'all', cache_lifetime)
             if not self._proxy_event.is_set():

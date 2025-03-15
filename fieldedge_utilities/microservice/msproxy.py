@@ -155,9 +155,19 @@ class MicroserviceProxy(ABC):
 
     def property_set(self, property_name: str, value: Any, **kwargs):
         """Sets the proxy property value."""
+        if not isinstance(property_name, str) or not property_name:
+            raise ValueError('Invalid property name')
         task_meta = { 'set': property_name }
         self.query_properties({ property_name: value }, task_meta, **kwargs)
 
+    def properties_set(self, props_dict: dict, **kwargs):
+        """Sets multiple proxy property values."""
+        if (not isinstance(props_dict, dict) or
+            not all(isinstance(p, str) for p in props_dict)):
+            raise ValueError('Invalid properties dictionary')
+        task_meta = { 'set': list(props_dict.keys()) }
+        self.query_properties(props_dict, task_meta, **kwargs)
+    
     def isc_configurable(self) -> 'dict[str, ConfigurableProperty]':
         """Get the map of configurable properties."""
         return self._isc_configurable
@@ -334,9 +344,8 @@ class MicroserviceProxy(ABC):
         if isinstance(configurable, dict):
             self._isc_configurable = {}
             for prop_name, prop_config in configurable.items():
-                k = snake_case(prop_name)
                 v = ConfigurableProperty(**prop_config)
-                self._isc_configurable[k] = v
+                self._isc_configurable[prop_name] = v
         if cache_all:
             self._property_cache.cache(cache_all, 'all', cache_lifetime)
             if not self._proxy_event.is_set():

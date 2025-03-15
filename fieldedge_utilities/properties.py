@@ -200,17 +200,24 @@ def get_class_properties(cls: type, ignore: 'list[str]' = None) -> 'list[str]':
         ValueError if `cls` does not have a `dir()` method or is not a `type`.
         
     """
+    # helper function
+    def is_callable(attr_name):
+        attr = inspect.getattr_static(cls, attr_name)
+        if isinstance(attr, (classmethod, staticmethod)):
+            return callable(attr.__func__)
+        return callable(attr)
+    # main function
     if not dir(cls):
         raise ValueError('Invalid cls_instance - must have dir() method')
     if isinstance(cls, type) and '__slots__' not in dir(cls):
         _log.warning('No __slots__: attributes in __init__ will be missed')
     if not isinstance(ignore, list):
         ignore = []
-    attrs = [attr for attr in dir(cls)
-             if not attr.startswith(('_',)) and
-             attr not in ignore and
-             not callable(inspect.getattr_static(cls, attr)) and
-             not attr.isupper()]
+    attrs = [attr_name for attr_name in dir(cls)
+             if not attr_name.startswith(('_',)) and
+             attr_name not in ignore and
+             not is_callable(attr_name) and
+             not attr_name.isupper()]
     return attrs
 
 

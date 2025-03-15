@@ -10,7 +10,7 @@ from typing import Any, Callable
 from fieldedge_utilities.logger import verbose_logging
 from fieldedge_utilities.path import get_caller_name
 from fieldedge_utilities.timer import RepeatingTimer
-from fieldedge_utilities.properties import ConfigurableProperty, snake_case
+from fieldedge_utilities.properties import ConfigurableProperty
 
 from .interservice import IscException, IscTask, IscTaskQueue
 from .propertycache import PropertyCache

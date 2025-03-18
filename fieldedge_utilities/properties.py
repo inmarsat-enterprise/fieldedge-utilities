@@ -5,7 +5,7 @@ import itertools
 import json
 import logging
 import re
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, is_dataclass
 from enum import Enum
 from typing import Optional, Union
 
@@ -155,7 +155,7 @@ def camel_case(original: str,
         raise ValueError('Invalid string input')
     if original.isupper() and skip_caps:
         return original
-    words = original.split('_')
+    words = snake_case(original).split('_')
     if len(words) == 1:
         regex = '.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)'
         matches = re.finditer(regex, original)
@@ -267,6 +267,8 @@ def json_compatible(obj: object,
         elif isinstance(obj, list):
             res = [json_compatible(i) for i in obj]
     try:
+        if is_dataclass(res):
+            res = asdict(res)
         json.dumps(res)
         if isinstance(res, Enum):
             return res.name

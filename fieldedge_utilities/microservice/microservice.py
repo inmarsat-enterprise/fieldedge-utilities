@@ -12,7 +12,6 @@ from uuid import uuid4
 from fieldedge_utilities.logger import verbose_logging
 from fieldedge_utilities.mqtt import MqttClient
 from fieldedge_utilities.properties import (READ_ONLY, READ_WRITE, camel_case,
-                                            snake_case,
                                             get_class_properties,
                                             get_class_tag, hasattr_static,
                                             json_compatible,

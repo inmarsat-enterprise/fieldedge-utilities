@@ -296,7 +296,10 @@ class Microservice(ABC):
         """Gets a property value based on its ISC name."""
         prop = untag_class_property(isc_property, self._isc_tags)
         if hasattr_static(self, prop):
-            return getattr(self, prop)
+            attr = getattr(self, prop)
+            if isinstance(attr, MicroserviceProxy):
+                return attr.properties
+            return attr
         else:
             for tag, feature in self.features.items():
                 if not prop.startswith(f'{tag}_'):
@@ -382,7 +385,8 @@ class Microservice(ABC):
                 for pprop, pprop_config in proxy.isc_configurable().items():
                     base[f'{tag}_{pprop}'] = pprop_config
         for prop in self.isc_properties_by_type['config']:
-            if snake_case(prop) not in base:
+            # if snake_case(prop) not in base:
+            if prop not in base:
                 _log.warning('Missing config detail for %s', prop)
         return { camel_case(k): v for k, v in base.items() }
 

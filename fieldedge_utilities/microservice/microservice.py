@@ -312,7 +312,7 @@ class Microservice(ABC):
         """Sets a property value based on its ISC name."""
         prop_config = self.isc_configurable().get(isc_property)
         if not prop_config:
-            raise ValueError('Property %s not found in ISC configurable')
+            raise ValueError(f'Property {isc_property} not ISC configurable')
         type_obj = ConfigurableProperty.supported_types().get(prop_config.type)
         if not isinstance(value, type_obj):
             raise ValueError('Invalid data type')
@@ -383,11 +383,11 @@ class Microservice(ABC):
             if isinstance(proxy.isc_configurable(), dict):
                 for pprop, pprop_config in proxy.isc_configurable().items():
                     base[f'{tag}_{pprop}'] = pprop_config
+        base = { camel_case(k): v for k, v in base.items() }
         for prop in self.isc_properties_by_type['config']:
-            # if snake_case(prop) not in base:
             if prop not in base:
                 _log.warning('Missing config detail for %s', prop)
-        return { camel_case(k): v for k, v in base.items() }
+        return base
 
     @property
     def rollcall_properties(self) -> 'list[str]':

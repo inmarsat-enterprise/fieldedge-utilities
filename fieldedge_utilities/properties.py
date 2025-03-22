@@ -33,6 +33,7 @@ class ConfigurableProperty:
     min: Optional[Union[int, float]] = None
     max: Optional[Union[int, float]] = None
     enum: Optional[list[str]] = None
+    desc: Optional[str] = None
     
     def __post_init__(self):
         if self.type not in self.supported_types().keys():
@@ -55,6 +56,7 @@ class ConfigurableProperty:
     def supported_types(cls) -> dict:
         return {
             'int': int,
+            'bool': bool,
             'float': float,
             'str': str,
             'enum': str,
@@ -280,13 +282,14 @@ def json_compatible(obj: object,
             elif isinstance(res, list):
                 res = [json_compatible(v, camel_keys, skip_caps)
                        for v in res]
+            elif isinstance(res, dict):
+                res = {k:json_compatible(v, camel_keys, skip_caps)
+                       for k, v in res.items()}
+            # elif is_dataclass(res):
             elif hasattr(res, '__dict__'):
                 res = json_compatible(get_instance_properties_values(res),
                                       camel_keys,
                                       skip_caps)
-            elif isinstance(res, dict):
-                res = {k:json_compatible(v, camel_keys, skip_caps)
-                       for k, v in res.items()}
             elif hasattr(res, '__slots__'):
                 res = {s: json_compatible(getattr(res, s, None))
                        for s in res.__slots__}

@@ -47,14 +47,10 @@ class MessageStore:
         """Adds a message to the buffer."""
         if not isinstance(message, MessageMeta):
             raise ValueError('Invalid message metadata')
-        if message.mo:
-            queue = self.rx_queue
-        else:
-            queue = self.tx_queue
-        for queued in queue:
-            if message.id == queued.id:
-                raise ValueError(f'Duplicate id {message.id} found')
-        if queue == self.rx_queue:
+        queue = self.tx_queue if message.mo else self.rx_queue
+        if any(queued.id == message.id for queued in queue):
+            raise ValueError(f'Duplicate id {message.id} found')
+        if queue == self.tx_queue:
             self.last_mo_id = message.id
         else:
             self.last_mt_id = message.id
@@ -66,7 +62,7 @@ class MessageStore:
         
         id -1 indicates the first enqueued message.
         """
-        queue = self.rx_queue if mo else self.tx_queue
+        queue = self.tx_queue if mo else self.rx_queue
         if id == -1 and len(queue) > 0:
             if not retain:
                 return queue.pop(0)

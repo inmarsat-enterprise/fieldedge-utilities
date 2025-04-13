@@ -297,15 +297,20 @@ class Microservice(ABC):
         if hasattr_static(self, prop):
             attr = getattr(self, prop)
             if isinstance(attr, MicroserviceProxy):
-                return attr.properties
+                return attr.properties   # for backward compatibility
             return attr
         else:
-            for tag, feature in self.features.items():
-                if not prop.startswith(f'{tag}_'):
-                    continue
-                fprop = prop.replace(f'{tag}_', '')
+            tag = prop.split('_')[0]
+            feature = self.features.get(tag)
+            if feature:
+                fprop = prop.replace(f'{tag}_', '', 1)
                 if hasattr_static(feature, fprop):
                     return getattr(feature, fprop)
+            ms_proxy = self.ms_proxies.get(tag)
+            if ms_proxy:
+                pprop = camel_case(prop.replace(f'{tag}_', '', 1))
+                if pprop in ms_proxy.properties:
+                    return ms_proxy.properties.get(pprop)
         raise AttributeError(f'ISC property {isc_property} not found')
 
     def isc_set_property(self, isc_property: str, value: Any) -> None:

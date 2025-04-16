@@ -1,8 +1,13 @@
 """Methods for reading and writing user configuration file settings.
 
 """
+import json
+import logging
 import os
 from base64 import urlsafe_b64decode, urlsafe_b64encode
+from json import JSONDecodeError
+
+_log = logging.getLogger(__name__)
 
 
 APPDIR = os.getenv('APPDIR', '/home/fieldedge/fieldedge')
@@ -10,19 +15,30 @@ USERDIR = os.getenv('USERDIR', f'{APPDIR}/user')
 USER_CONFIG_FILE = os.getenv('USER_CONFIG_FILE', f'{USERDIR}/config.env')
 
 
-def read_user_config(filename: str = USER_CONFIG_FILE) -> dict:
+def _is_valid_prefix(prefix) -> bool:
+    return prefix is None or isinstance(prefix, str) and len(prefix) > 0
+
+
+def read_user_config(filename: str = USER_CONFIG_FILE,
+                     prefix: str = None) -> dict:
     """Reads user configuration from a `.env` style file.
     
-    Format of the file is `CONST_CASE=value` with one entry per line.
+    Format of the file is `key=value` with one entry per line.
+    Attempts to convert boolean and numeric values.
     
     Args:
-        filename: The full path/filename
+        filename (str): The full path/filename. Defaults to
+            `{APPDIR}/user/config.env`, where `APPDIR` is an environment
+            variable with default `/home/fieldedge/fieldedge`.
+        prefix (str): Optional prefix for keys.
     
     Returns:
         A dictionary of configuration settings.
         
     """
-    user_config = {}
+    if not _is_valid_prefix(prefix):
+        raise ValueError('Invalid prefix')
+    file_config: 'dict[str, str]' = {}
     if not isinstance(filename, str):
         filename = USER_CONFIG_FILE
     if os.path.isfile(filename):
@@ -31,52 +47,89 @@ def read_user_config(filename: str = USER_CONFIG_FILE) -> dict:
                 if line.startswith('#') or not line.strip():
                     continue
                 key, value = line.split('=', 1)
-                user_config[key] = value.strip()
-                if 'PASSWORD' in key:
-                    user_config[key] = unobscure(value)
+                file_config[key] = value.strip()
+                if 'PASSWORD' in key.upper():
+                    file_config[key] = unobscure(value)
+    user_config: 'dict[str, str]' = {}
+    for k, v in file_config.items():
+        if isinstance(prefix, str):
+            if not k.startswith(prefix):
+                continue
+            k = k.replace(f'{prefix}_', '', 1)
+        if k in user_config:
+            _log.warning('Overwriting duplicate key %s', k)
+        if isinstance(v, str):
+            if v.startswith('"') and v.endswith('"'):
+                v = v[1:-1]
+            if ((v.startswith('{') and v.endswith('}')) or
+                (v.startswith('[') and v.endswith(']'))):
+                try:
+                    v = json.loads(v)
+                except JSONDecodeError:
+                    pass
+            elif v.lower() in ['true', 'false']:
+                v = v.lower() == 'true'
+            elif '.' in v:
+                try:
+                    v = float(v)
+                except ValueError:
+                    pass
+            else:
+                try:
+                    v = int(v)
+                except ValueError:
+                    pass
+        user_config[k] = v
     return user_config
 
 
-def write_user_config(config: dict, filename: str = USER_CONFIG_FILE) -> None:
-    """Writes the user config values to the file path specified.
+def write_user_config(config: dict,
+                      filename: str = USER_CONFIG_FILE,
+                      prefix: str = None) -> None:
+    """Writes the user config values to the `.env` style file path specified.
     
-    Keys are converted to `CONST_CASE`.
+    Format of the file is `key=value` with one entry per line.
     
     Args:
-        config: The configuration settings dictionary.
-        filename: The full file path/name to store into. Defaults to
+        config (dict): The configuration settings dictionary.
+        filename (str): The full file path/name to store into. Defaults to
             `{APPDIR}/user/config.env`, where `APPDIR` is an environment
             variable with default `/home/fieldedge/fieldedge`.
+        prefix (str): Optional prefix for keys.
         
     """
-    lines_to_write: 'list[str]' = []
-    keys_written: 'list[str]' = []
+    if not _is_valid_prefix(prefix):
+        raise ValueError('Invalid prefix')
     if not isinstance(filename, str) or not os.path.dirname(filename):
         filename = USER_CONFIG_FILE
+    old_config = {}
+    lines_to_write: 'list[str]' = []
     if os.path.isfile(filename):
+        old_config = read_user_config(filename, prefix)
         with open(filename) as file:
-            for line in file.readlines():
-                if line.startswith('#') or not line.strip():
-                    continue
-                file_key, file_value = line.strip().split('=', 1)
-                if file_key in config:
-                    keys_written.append(file_key)
-                    if 'PASSWORD' in file_key:
-                        file_value = unobscure(file_value)
-                    if file_value != config[file_key]:
-                        new_value = config[file_key]
-                        if 'PASSWORD' in file_key:
-                            new_value = obscure(new_value)
-                        lines_to_write.append(f'{file_key}={new_value}')
-                        continue
-                lines_to_write.append(line.strip())
-    for key, val in config.items():
-        if key in keys_written:
-            continue
-        if 'PASSWORD' in key:
-            lines_to_write.append(f'{key}={obscure(val)}')
+            lines_to_write = [line.strip() for line in file.readlines()]
+    line_indices_to_remove = []
+    for k, v in config.items():
+        if k in old_config and v == old_config[k]:
+            continue   # no change - skip
+        if prefix:
+            k = f'{prefix}_{k}'
+        if 'PASSWORD' in k.upper():
+            line_to_write = f'{k}={obscure(v)}'
         else:
-            lines_to_write.append(f'{key}={val}')
+            line_to_write = f'{k}={v}'
+        seen = False
+        for i, line in enumerate(lines_to_write):
+            if line.startswith(f'{k}='):
+                if not seen:
+                    lines_to_write[i] = line_to_write
+                    seen = True
+                else:
+                    line_indices_to_remove.append(i)
+        if not seen:
+            lines_to_write.append(line_to_write)
+    for i in sorted(line_indices_to_remove, reverse=True):
+        del lines_to_write[i]
     with open(filename, 'w') as file:
         file.writelines('\n'.join(lines_to_write))
 

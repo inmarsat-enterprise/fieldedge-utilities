@@ -10,10 +10,13 @@ from dataclasses import dataclass
 
 import ifaddr
 
-VALID_PREFIXES = json.loads(os.getenv('INTERFACE_VALID_PREFIXES',
-                                      '["eth","wlan"]'))
+try:
+    VALID_PREFIXES = json.loads(os.getenv('INTERFACE_VALID_PREFIXES',
+                                          '["eth","wlan"]'))
+except (json.JSONDecodeError, ValueError):
+    VALID_PREFIXES = ['eth', 'wlan']
 
-__all__ = ['VALID_PREFIXES', 'get_interfaces', 'is_address_in_subnet',
+__all__ = ['get_interfaces', 'is_address_in_subnet',
            'is_valid_ip', 'IfaddrAdapter']
 
 

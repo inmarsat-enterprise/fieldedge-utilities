@@ -1,7 +1,11 @@
 """Helpers for managing serial ports on the system.
 
 """
-from serial.tools import list_ports
+import glob
+import platform
+
+import serial.tools.list_ports
+from serial import Serial, SerialException
 from serial.tools.list_ports_common import ListPortInfo
 
 
@@ -56,17 +60,14 @@ def is_valid(target: str) -> bool:
     """Validates a given serial port as available on the host.
 
     Args:
-        target: Target port name e.g. ``/dev/ttyUSB0``
+        target: Target port name e.g. `/dev/ttyUSB0`
     
     Returns:
         True if found on the host.
-
     """
-    devices = get_devices()
-    for device in devices:
-        if device.name == target:
-            return True
-    return False
+    if not isinstance(target, str) or len(target) == 0:
+        raise ValueError('Invalid serial port target')
+    return target in list_available_serial_ports()
 
 
 def get_devices(target: str = None) -> list:
@@ -79,9 +80,25 @@ def get_devices(target: str = None) -> list:
         A list of `SerialDevice` objects describing each port.
 
     """
-    devices = [SerialDevice(p) for p in list_ports.comports()]
+    devices = [SerialDevice(p) for p in serial.tools.list_ports.comports()]
     if target is not None:
         for device in devices:
             if device.name != target:
                 devices.remove(device)
     return devices
+
+
+def list_available_serial_ports() -> 'list[str]':
+    """Get a list of the available serial ports."""
+    if platform.system() in ('Linux', 'Darwin'):
+        candidates = glob.glob('/dev/tty[A-Z]*' if platform.system() == 'Linux'
+                               else '/dev/tty.[A-Za-z]*')
+        available = []
+        for port in candidates:
+            try:
+                with Serial(port):
+                    available.append(port)
+            except (OSError, SerialException):
+                pass
+        return available
+    return [p.device for p in serial.tools.list_ports.comports()]

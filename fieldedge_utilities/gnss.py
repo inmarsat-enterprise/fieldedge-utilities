@@ -1,7 +1,7 @@
 """NMEA helper utilities for location data from commercial GNSS devices."""
 
 import logging
-import re
+# import re   # future support for regex optimization
 from copy import deepcopy
 from dataclasses import dataclass, asdict
 from enum import Enum, IntEnum
@@ -87,8 +87,8 @@ def validate_nmea(nmea_sentence: str) -> bool:
     data, cs_hex = nmea_sentence.split('*')
     candidate = int(cs_hex, 16)
     crc = 0   # initial
-    for i in range(1, len(data)):   # ignore initial $
-        crc ^= ord(data[i])
+    for char in data[1:]:   # ignore initial $
+        crc ^= ord(char)
     return candidate == crc
 
 
@@ -115,8 +115,6 @@ def parse_nmea_to_location(nmea_sentence: str,
     nmea_type = ''
     cache = {}
     for i, field_data in enumerate(data.split(',')):
-        if not field_data:
-            continue   # skip empty fields
         if i == 0:
             nmea_type = field_data[-3:]
             if nmea_type not in ['RMC', 'GGA', 'GSA']:
@@ -146,8 +144,8 @@ def parse_nmea_to_location(nmea_sentence: str,
                     _log.debug('Fix type: %D', location.fix_type.name)
         elif i == 3:
             if nmea_type == 'RMC':
-                location.latitude = (float(field_data[0:2]) +
-                                     float(field_data[2]) / 60.0)
+                location.latitude = round(float(field_data[0:2]) +
+                                          float(field_data[2:]) / 60.0, 6)
         elif i == 4:
             if nmea_type == 'RMC':
                 if field_data == 'S':
@@ -156,8 +154,8 @@ def parse_nmea_to_location(nmea_sentence: str,
                     _log.debug('Latitude: %.5f', location.latitude)
         elif i == 5:
             if nmea_type == 'RMC':
-                location.longitude = (float(field_data[0:3]) +
-                                      float(field_data[3]) / 60.0)
+                location.longitude = round(float(field_data[0:3]) +
+                                           float(field_data[3:]) / 60.0, 6)
         elif i == 6:
             if nmea_type == 'RMC':
                 if field_data == 'W':
@@ -170,7 +168,7 @@ def parse_nmea_to_location(nmea_sentence: str,
                     _log.debug('Fix quality: %s', location.fix_quality.name)
         elif i == 7:
             if nmea_type == 'RMC':
-                location.speed = float(field_data) * 1.852
+                location.speed = round(float(field_data) * 1.852, 2)
                 if _vlog():
                     _log.debug('Speed: %.1f', location.speed)
             elif nmea_type == 'GGA':

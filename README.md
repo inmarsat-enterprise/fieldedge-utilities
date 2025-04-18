@@ -1,6 +1,6 @@
-# Inmarsat FieldEdge Utilities
+# Viasat FieldEdge Utilities
 
-Inmarsat FieldEdge project supports *Internet of Things* (**IoT**) using
+The FieldEdge project supports *Internet of Things* (**IoT**) using
 satellite communications technology. Generally this library is meant to be used
 on single board computers capable of running Debian Linux.
 

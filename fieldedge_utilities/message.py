@@ -25,13 +25,29 @@ class MessageMeta:
     """Message metadata."""
     id: 'int|str'
     mo: bool   # mo = Mobile-Originated (else Mobile-Terminated)
-    data_b64: str = ''   # Base64-encoded string
+    data_b64: str = ''   # Base64-encoded string of payload data
+    _size: int = field(init=False, repr=False, default=None)
+    
+    def __post_init__(self):
+        if self._size is None:
+            if not isinstance(self.data_b64, str) or len(self.data_b64) == 0:
+                self._size = 0
+            else:
+                self._size = len(base64.b64decode(self.data_b64))
     
     @property
     def size(self) -> int:
-        if not isinstance(self.data_b64, str) or len(self.data_b64) == 0:
-            return 0
-        return len(base64.b64decode(self.data_b64))
+        return self._size
+    
+    @size.setter
+    def size(self, value: int):
+        # allows size to be modified e.g. IP headers
+        if not isinstance(value, int):
+            raise ValueError('Size must be an integer')
+        if (isinstance(self.data_b64) and 
+            value < len(base64.b64decode(self.data_b64))):
+            raise ValueError('Size less than payload length')
+        self._size = value
 
 
 @dataclass

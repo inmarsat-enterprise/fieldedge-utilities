@@ -2,11 +2,14 @@
 
 """
 import glob
+# import logging
 import platform
 
 import serial.tools.list_ports
 from serial import Serial, SerialException
 from serial.tools.list_ports_common import ListPortInfo
+
+# _log = logging.getLogger(__name__)
 
 
 class SerialDevice:
@@ -88,13 +91,16 @@ def get_devices(target: str = None) -> list:
     return devices
 
 
-def list_available_serial_ports() -> 'list[str]':
+def list_available_serial_ports(skip: 'list[str]|None' = None) -> 'list[str]':
     """Get a list of the available serial ports."""
     if platform.system() in ('Linux', 'Darwin'):
         candidates = glob.glob('/dev/tty[A-Z]*' if platform.system() == 'Linux'
                                else '/dev/tty.[A-Za-z]*')
         available = []
         for port in candidates:
+            if isinstance(skip, list) and port in skip:
+                # _log.debug('Ignoring %s', port)
+                continue
             try:
                 with Serial(port):
                     available.append(port)

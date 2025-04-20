@@ -41,6 +41,10 @@ class Egnss(Feature):
         _log.info('GNSS reader started with refresh %d seconds', self.refresh)
     
     @property
+    def port(self) -> 'str|None':
+        return self._ser.port
+    
+    @property
     def refresh(self) -> int:
         return self._refresh
     

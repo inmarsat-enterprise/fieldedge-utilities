@@ -92,19 +92,31 @@ def get_devices(target: str = None) -> list:
 
 
 def list_available_serial_ports(skip: 'list[str]|None' = None) -> 'list[str]':
-    """Get a list of the available serial ports."""
+    """Get a list of the available serial ports.
+    
+    Args:
+        skip (list): Optional list of port names to skip when testing validity.
+            Primarily to skip port(s) already in use by the application.
+        
+    Returns:
+        `list` of valid serial port names.
+    """
     if platform.system() in ('Linux', 'Darwin'):
+        if (skip is not None and 
+            not (isinstance(skip, list) and all(isinstance(x, str) 
+                                                for x in skip))):
+            raise ValueError('Invalid skip list')
+        if skip is None:
+            skip = []
         candidates = glob.glob('/dev/tty[A-Z]*' if platform.system() == 'Linux'
                                else '/dev/tty.[A-Za-z]*')
         available = []
         for port in candidates:
-            if isinstance(skip, list) and port in skip:
-                # _log.debug('Ignoring %s', port)
-                continue
-            try:
-                with Serial(port):
-                    available.append(port)
-            except (OSError, SerialException):
-                pass
+            if port not in skip:
+                try:
+                    with Serial(port):
+                        available.append(port)
+                except (OSError, SerialException):
+                    pass
         return available
     return [p.device for p in serial.tools.list_ports.comports()]

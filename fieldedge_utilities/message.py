@@ -44,7 +44,7 @@ class MessageMeta:
         # allows size to be modified e.g. IP headers
         if not isinstance(value, int):
             raise ValueError('Size must be an integer')
-        if (isinstance(self.data_b64) and 
+        if (isinstance(self.data_b64, str) and 
             value < len(base64.b64decode(self.data_b64))):
             raise ValueError('Size less than payload length')
         self._size = value
@@ -66,7 +66,7 @@ class MessageStore:
         queue = self.tx_queue if message.mo else self.rx_queue
         if any(queued.id == message.id for queued in queue):
             raise ValueError(f'Duplicate id {message.id} found')
-        if queue == self.tx_queue:
+        if queue is self.tx_queue:
             self.last_mo_id = message.id
         else:
             self.last_mt_id = message.id

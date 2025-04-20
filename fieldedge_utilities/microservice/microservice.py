@@ -651,6 +651,7 @@ class Microservice(ABC):
             else:
                 response['properties'] = self.isc_properties
         else:
+            dbg_prop = None
             try:
                 subtopic = 'info/properties/values'
                 req_props: list = request.get('properties', [])
@@ -662,6 +663,7 @@ class Microservice(ABC):
                 if categorized:
                     props_source = self.isc_properties_by_type
                     for prop in req_props:
+                        dbg_prop = prop
                         if (READ_WRITE in props_source and
                             prop in props_source[READ_WRITE]):
                             # config property
@@ -676,6 +678,7 @@ class Microservice(ABC):
                                 self.isc_get_property(prop))
                 else:
                     for prop in req_props:
+                        dbg_prop = prop
                         res_props[prop] = self.isc_get_property(prop)
                 configurable = self.isc_configurable()
                 if (configurable and
@@ -684,8 +687,8 @@ class Microservice(ABC):
                     response['configurable'] = {
                         k: v.json_compatible() for k, v in configurable.items()
                     }
-            except AttributeError as exc:
-                response = { 'uid': request_id, 'error': f'{exc}' }
+            except (AttributeError) as exc:
+                response = { 'uid': request_id, 'error': f'{dbg_prop}: {exc}' }
         if _vlog(self.tag):
             _log.debug('Responding to %s request %s for properties: %s',
                        source, request_id, request.get('properties', 'ALL'))

@@ -12,7 +12,7 @@ _log = logging.getLogger(__name__)
 
 APPDIR = os.getenv('APPDIR', '/home/fieldedge/fieldedge')
 USERDIR = os.getenv('USERDIR', f'{APPDIR}/user')
-USER_CONFIG_FILE = os.getenv('USER_CONFIG_FILE', f'{USERDIR}/config.env')
+USER_CONFIG_FILE = os.getenv('USER_CONFIG_FILE', f'{USERDIR}/user.conf')
 
 
 def _is_valid_prefix(prefix) -> bool:
@@ -114,19 +114,19 @@ def write_user_config(config: dict,
             continue   # no change - skip
         if prefix:
             k = f'{prefix}_{k}'
-        if 'PASSWORD' in k.upper():
+        if 'PASSWORD' in k and v is not None:
             line_to_write = f'{k}={obscure(v)}'
         else:
             line_to_write = f'{k}={v}'
         seen = False
         for i, line in enumerate(lines_to_write):
             if line.startswith(f'{k}='):
-                if not seen:
+                if seen or v is None:
+                    line_indices_to_remove.append(i)
+                else:   
                     lines_to_write[i] = line_to_write
                     seen = True
-                else:
-                    line_indices_to_remove.append(i)
-        if not seen:
+        if not seen and v is not None:
             lines_to_write.append(line_to_write)
     for i in sorted(line_indices_to_remove, reverse=True):
         del lines_to_write[i]

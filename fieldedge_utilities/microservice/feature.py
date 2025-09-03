@@ -45,6 +45,7 @@ class Feature(ABC):
             task_fail (`Callable`): An optional parent function to call if the
                 task fails.
         """
+        super().__init__(**kwargs)
         self._task_queue = task_queue
         self._task_notify = task_notify
         self._task_complete = task_complete
@@ -52,20 +53,29 @@ class Feature(ABC):
         self._props: dict[str, Any] = dict(kwargs)
 
     def __getattr__(self, name):
-        try:
-            return self._props[name]
-        except KeyError:
-            raise AttributeError(f'{name} not found')
+        # only called if normal lookup fails
+        props = self.__dict__.get('_props', None)
+        if props and name in props:
+            return props[name]
+        raise AttributeError(f'{name} not found')
 
     def __setattr__(self, name, value):
+        # Directly set known slots
         if name in self.__slots__:
-            super().__setattr__(name, value)
-        else:
+            object.__setattr__(self, name, value)
+        # For dynamic properties, ensure _props exists first
+        elif '_props' in self.__dict__:
             self._props[name] = value
+        # For early/inheritance initialization before _props is set
+        else:
+            object.__setattr__(self, name, value)
     
     @property
     def tag(self) -> str:
-        return getattr(self, '_tag', self.__class__.__name__.lower())
+        try:
+            return super().__getattribute__('_tag')
+        except AttributeError:
+            return self.__class__.__name__.lower()
 
     @abstractmethod
     def properties_list(self, **kwargs) -> 'list[str]':

@@ -11,53 +11,21 @@ from typing import Any, Optional, Union
 
 from fieldedge_utilities.logger import verbose_logging
 
-# __all__ = ['camel_case', 'snake_case', 'get_class_tag',
-#            'camel_to_snake', 'snake_to_camel',
-#            'get_class_properties', 'get_instance_properties_values',
-#            'json_compatible', 'hasattr_static',
-#            'property_is_read_only', 'property_is_async', 'tag_class_properties',
-#            'tag_class_property', 'untag_class_property', 'tag_merge',
-#            'equivalent_attributes', 'READ_ONLY', 'READ_WRITE']
+__all__ = [
+    'camel_case', 'snake_case', 'pascal_case',
+    'get_class_tag', 'get_class_properties',
+    'get_instance_properties_values',
+    'equivalent_attributes', 'json_compatible', 'hasattr_static',
+    'property_is_read_only', 'property_is_async',
+    'tag_class_properties', 'tag_class_property', 'untag_class_property',
+    'tag_merge',
+    'READ_ONLY', 'READ_WRITE',
+]
 
 READ_ONLY = 'info'
 READ_WRITE = 'config'
 
 _log = logging.getLogger(__name__)
-
-
-def camel_to_snake(camel_str: str, skip_caps: bool = False) -> str:
-    """Converts a camelCase string to snake_case.
-    
-    **DEPRECATED** use `snake_case` instead.
-
-    Args:
-        camel_str: The string to convert.
-        skip_caps: A flag if `True` will return CAPITAL_CASE unchanged.
-        
-    Returns:
-        The input string in snake_case format.
-        
-    Raises:
-        `ValueError` if camel_str is not a valid string.
-        
-    """
-    return snake_case(camel_str, skip_caps, skip_pascal=True)
-
-
-def snake_to_camel(snake_str: str, skip_caps: bool = False) -> str:
-    """Converts a snake_case string to camelCase.
-    
-    **DEPRECATED** use `camel_case` instead.
-    
-    Args:
-        snake_str: The string to convert.
-        skip_caps: If `True` will return CAPITAL_CASE unchanged
-    
-    Returns:
-        The input string in camelCase structure.
-        
-    """
-    return camel_case(snake_str, skip_caps, skip_pascal=True)
 
 
 def snake_case(original: str,
@@ -194,6 +162,58 @@ def get_instance_properties_values(instance: object) -> dict[str, Any]:
     return { k: getattr(instance, k) for k in props_list }
 
 
+def equivalent_attributes(ref: object,
+                          other: object,
+                          exclude: Optional[list[str]] = None,
+                          dbg: str = '',
+                          ) -> bool:
+    """Recursively check that two objects have equivalent non-callable attributes.
+    
+    Args:
+        ref: The reference object being compared to.
+        other: The object comparing against the reference.
+        exclude: Optional list of attribute names to exclude from comparison.
+    
+    Returns:
+        True if all (non-excluded) attribute name/values match.
+
+    """
+    if not isinstance(other, type(ref)):
+        return False
+    if exclude is None:
+        exclude = []
+    if dbg:
+        dbg += '.'
+    if hasattr(ref, '__slots__'):
+        attrs = list(getattr(ref, '__slots__', []))
+    else:
+        attrs = list(getattr(ref, '__dict__', {}).keys())
+    # Add in properties defined on the class
+    for name, val in inspect.getmembers(type(ref)):
+        if isinstance(val, property):
+            attrs.append(name)
+    for attr in sorted(set(attrs)):
+        if attr.startswith('__') or attr in exclude:
+            continue
+        if not hasattr(other, attr):
+            _log.debug('Other missing %s%s', dbg, attr)
+            return False
+        ref_val = getattr(ref, attr)
+        other_val = getattr(other, attr)
+        # Skip methods and functions
+        if inspect.ismethod(ref_val) or inspect.isfunction(ref_val):
+            continue
+        # Recurse if they’re objects with attributes
+        if (hasattr(ref_val, '__dict__') or hasattr(ref_val, '__slots__')) \
+           and not isinstance(ref_val, (str, bytes, int, float, bool, tuple, frozenset)):
+            if not equivalent_attributes(ref_val, other_val, exclude=exclude, dbg=dbg+attr):
+                return False
+        elif ref_val != other_val:
+            _log.debug('%s%s mismatch: %r != %r', dbg, attr, ref_val, other_val)
+            return False
+    return True
+
+
 def json_compatible(obj: object,
                     camel_keys: bool = True,
                     skip_caps: bool = True) -> Any:
@@ -262,53 +282,6 @@ def json_compatible(obj: object,
     except Exception as exc:
         _log.error(exc)
         return '<non-serializable>'
-    # res = obj
-    # if camel_keys:
-    #     if isinstance(obj, dict):
-    #         res = {}
-    #         for key, val in obj.items():
-    #             if ((isinstance(key, str) and key.isupper() and skip_caps) or
-    #                 not isinstance(key, str)):
-    #                 # no change
-    #                 new_key = key
-    #             else:
-    #                 new_key = camel_case(str(key))
-    #             if new_key != key and verbose_logging('tags'):
-    #                 _log.debug('Changed %s to %s', key, new_key)
-    #             res[new_key] = json_compatible(val, camel_keys, skip_caps)
-    #     elif isinstance(obj, list):
-    #         res = [json_compatible(i) for i in obj]
-    # try:
-    #     if is_dataclass(res):
-    #         res = asdict(res)   # type: ignore
-    #     json.dumps(res)
-    #     if isinstance(res, Enum):
-    #         return res.name
-    #     return res
-    # except TypeError:
-    #     try:
-    #         if callable(res):
-    #             res = f'<function:{res.__name__}>'
-    #         elif isinstance(res, list):
-    #             res = [json_compatible(v, camel_keys, skip_caps)
-    #                    for v in res]
-    #         elif isinstance(res, dict):
-    #             res = {k:json_compatible(v, camel_keys, skip_caps)
-    #                    for k, v in res.items()}
-    #         # elif is_dataclass(res):
-    #         elif hasattr(res, '__dict__'):
-    #             res = json_compatible(get_instance_properties_values(res),
-    #                                   camel_keys,
-    #                                   skip_caps)
-    #         elif hasattr(res, '__slots__'):
-    #             res = {s: json_compatible(getattr(res, s, None))
-    #                    for s in getattr(res, '__slots__')}
-    #         else:
-    #             res = '<non-serializable>'
-    #         return res
-    #     except Exception as exc:
-    #         _log.error(exc)
-    #         raise exc
 
 
 def hasattr_static(obj: object, attr: str) -> bool:
@@ -505,72 +478,3 @@ def _nested_tag_merge(add: dict, merged: dict) -> dict:
                 for nested_key, nested_val in val.items():
                     merged[key][nested_key] = nested_val
     return merged
-
-
-def equivalent_attributes(ref: object,
-                          other: object,
-                          exclude: Optional[list[str]] = None,
-                          dbg: str = '',
-                          ) -> bool:
-    """Recursively check that two objects have equivalent non-callable attributes.
-    
-    Args:
-        ref: The reference object being compared to.
-        other: The object comparing against the reference.
-        exclude: Optional list of attribute names to exclude from comparison.
-    
-    Returns:
-        True if all (non-excluded) attribute name/values match.
-
-    """
-    if not isinstance(other, type(ref)):
-        return False
-    if exclude is None:
-        exclude = []
-    if dbg:
-        dbg += '.'
-    if hasattr(ref, '__slots__'):
-        attrs = list(getattr(ref, '__slots__', []))
-    else:
-        attrs = list(getattr(ref, '__dict__', {}).keys())
-    # Add in properties defined on the class
-    for name, val in inspect.getmembers(type(ref)):
-        if isinstance(val, property):
-            attrs.append(name)
-    for attr in sorted(set(attrs)):
-        if attr.startswith('__') or attr in exclude:
-            continue
-        if not hasattr(other, attr):
-            _log.debug('Other missing %s%s', dbg, attr)
-            return False
-        ref_val = getattr(ref, attr)
-        other_val = getattr(other, attr)
-        # Skip methods and functions
-        if inspect.ismethod(ref_val) or inspect.isfunction(ref_val):
-            continue
-        # Recurse if they’re objects with attributes
-        if (hasattr(ref_val, '__dict__') or hasattr(ref_val, '__slots__')) \
-           and not isinstance(ref_val, (str, bytes, int, float, bool, tuple, frozenset)):
-            if not equivalent_attributes(ref_val, other_val, exclude=exclude, dbg=dbg+attr):
-                return False
-        elif ref_val != other_val:
-            _log.debug('%s%s mismatch: %r != %r', dbg, attr, ref_val, other_val)
-            return False
-    return True
-    # for attr in dir(ref):
-    #     if attr.startswith('__') or attr in exclude:
-    #         continue
-    #     if not hasattr(other, attr):
-    #         _log.debug('Other missing %s%s', dbg, attr)
-    #         return False
-    #     ref_val = getattr(ref, attr)
-    #     if callable(ref_val):
-    #         continue
-    #     other_val = getattr(other, attr)
-    #     if any(hasattr(ref_val, a) for a in ['__dict__', '__slots__']):
-    #         if not equivalent_attributes(ref_val, other_val, dbg=attr):
-    #             return False
-    #     elif ref_val != other_val:
-    #         _log.debug('%s%s mismatch', dbg, attr)
-    #         return False
-    # return True

@@ -31,6 +31,7 @@ def test_basic_pubsub(capsys):
         'broker.hivemq.com',
     ]
     connect_timeout = 6.0
+    mqttc = None
     for test_server in TEST_SERVERS:
         try:
             mqttc = MqttClient(client_id='test_client',
@@ -42,17 +43,18 @@ def test_basic_pubsub(capsys):
             break
         except MqttError as err:
             assert 'timed out' in err.args[0]
-    assert mqttc._mqtt._connect_timeout == connect_timeout
-    captured = capsys.readouterr()
+    assert isinstance(mqttc, MqttClient)
+    assert mqttc.connect_timeout == connect_timeout
+    capsys.readouterr()
     assert isinstance(mqttc, MqttClient)
     while not mqttc.is_connected:
         time.sleep(0.5)
-    captured = capsys.readouterr()
+    capsys.readouterr()
     mqttc.publish(TEST_TOPIC, TEST_PAYLOAD)
-    captured = capsys.readouterr()
+    capsys.readouterr()
     while not message_received:
         time.sleep(0.5)
-    captured = capsys.readouterr()
+    capsys.readouterr()
     assert message_received == f'{TEST_TOPIC}: {TEST_PAYLOAD}'
 
 
@@ -98,6 +100,7 @@ def mtest_azure_sas(capsys):
     AZURE_ROOT_CA = os.getenv('AZURE_ROOT_CA')
     AZURE_DEVICE_ID = os.getenv('AZURE_DEVICE_ID')
     AZURE_SAS_TOKEN = os.getenv('AZURE_SAS_TOKEN')
+    assert AZURE_IOT_HUB and AZURE_ROOT_CA and AZURE_DEVICE_ID and AZURE_SAS_TOKEN
     azure_username = (f'{AZURE_IOT_HUB}/{AZURE_DEVICE_ID}'
                       '/?api-version=2021-04-12')
     azure_base_topic = f'devices/{AZURE_DEVICE_ID}/messages/events'
@@ -152,10 +155,10 @@ def mtest_aws(capsys):
     # captured = capsys.readouterr()
     # assert mqttc.is_connected
     mqttc.publish(TEST_TOPIC, TEST_PAYLOAD)
-    captured = capsys.readouterr()
+    capsys.readouterr()
     attempts = 0
     while not message_received and attempts <= 10:
         attempts += 1
         time.sleep(0.5)
-    captured = capsys.readouterr()
+    capsys.readouterr()
     assert message_received == f'{TEST_TOPIC}: {TEST_PAYLOAD}'

@@ -1,6 +1,6 @@
 """Tools for file path and caller traces."""
-import inspect
 import os
+import sys
 from pathlib import Path
 
 
@@ -52,20 +52,21 @@ def get_caller_name(depth: int = 2,
         Name (string) including module[.class][.method]
 
     """
-    stack = inspect.stack()
-    start = 0 + depth
-    if len(stack) < start + 1:
+    try:
+        frame = sys._getframe(depth)
+    except (ValueError, AttributeError):
         return ''
-    parent_frame = stack[start][0]
-    name = []
-    module = inspect.getmodule(parent_frame)
-    if module and mod:
-        name.append(module.__name__)
-    if cls and 'self' in parent_frame.f_locals:
-        name.append(parent_frame.f_locals['self'].__class__.__name__)
+    name_parts = []
+    if mod:
+        module_name = frame.f_globals.get('__name__')
+        if module_name:
+            name_parts.append(module_name)
+    if cls:
+        self_obj = frame.f_locals.get('self')
+        if self_obj is not None:
+            name_parts.append(type(self_obj).__name__)
     if mth:
-        codename = parent_frame.f_code.co_name
-        if codename != '<module>':
-            name.append(codename)
-    del parent_frame, stack
-    return '.'.join(name)
+        code_name = frame.f_code.co_name
+        if code_name != '<module>':
+            name_parts.append(code_name)
+    return '.'.join(name_parts)

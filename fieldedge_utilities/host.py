@@ -14,16 +14,18 @@ If none of the above environment variables are configured the command will
 execute natively on the host shell.
 
 """
-try:
-    import paramiko
-except ImportError:
-    pass
-
 import logging
 import os
 import http.client
 import subprocess
 from dataclasses import dataclass
+
+try:
+    import paramiko
+    _HAS_PARAMIKO = True
+except ImportError:
+    paramiko = None
+    _HAS_PARAMIKO = False
 
 from fieldedge_utilities import hostpipe
 from fieldedge_utilities.logger import verbose_logging
@@ -38,12 +40,18 @@ class SshInfo:
     passwd: str
 
 
-def _get_ssh_info() -> 'SshInfo|None':
-    if os.getenv('SSH_HOST'):
-        return SshInfo(os.getenv('SSH_HOST'),
-                       os.getenv('SSH_USER'),
-                       os.getenv('SSH_PASS'))
-    return None
+def _require_paramiko():
+    if not _HAS_PARAMIKO:
+        raise ModuleNotFoundError('Paramiko is required for SSH operations')
+
+
+def _get_ssh_info() -> SshInfo|None:
+    try:
+        return SshInfo(os.getenv('SSH_HOST'),   # type: ignore
+                       os.getenv('SSH_USER'),   # type: ignore
+                       os.getenv('SSH_PASS'))   # type: ignore
+    except Exception:
+        return None
 
 
 def host_command(command: str, **kwargs) -> str:
@@ -73,7 +81,7 @@ def host_command(command: str, **kwargs) -> str:
         elif os.getenv('HOSTREQUEST_PORT'):
             method = 'HOSTREQUEST'
             host = os.getenv('HOSTREQUEST_HOST', 'localhost')
-            port = os.getenv('HOSTREQUEST_PORT')
+            port = int(os.getenv('HOSTREQUEST_PORT', '0')) or None
             try:
                 conn = http.client.HTTPConnection(host, port)
                 headers = { 'Content-Type': 'text/plain' }
@@ -122,6 +130,8 @@ def ssh_command(command: str, ssh_client = None) -> str:
         `TypeError` if client or environment settings are invalid.
         
     """
+    _require_paramiko()
+    assert paramiko is not None
     if (not isinstance(ssh_client, paramiko.SSHClient) and not _get_ssh_info()):
         raise TypeError('Invalid SSH client or configuration')
     if not isinstance(ssh_client, paramiko.SSHClient):
@@ -129,6 +139,8 @@ def ssh_command(command: str, ssh_client = None) -> str:
         ssh_client = paramiko.SSHClient()
         ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh = _get_ssh_info()
+        if not ssh:
+            raise ConnectionError('Unable to establish SSH connection')
         ssh_client.connect(ssh.host, username=ssh.user, password=ssh.passwd,
                            look_for_keys=False)
     else:
@@ -142,7 +154,7 @@ def ssh_command(command: str, ssh_client = None) -> str:
     stderr.close()
     if close_client:
         ssh_client.close()
-    return '\n'.join([l.strip() for l in res])
+    return '\n'.join([line.strip() for line in res])
 
 
 def get_ssh_session(**kwargs):   # -> paramiko.SSHClient:
@@ -157,6 +169,8 @@ def get_ssh_session(**kwargs):   # -> paramiko.SSHClient:
         A `paramiko.SSHClient` if paramiko is installed.
     
     """
+    _require_paramiko()
+    assert paramiko is not None
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     client.connect(hostname=kwargs.get('hostname', os.getenv('SSH_HOST')),

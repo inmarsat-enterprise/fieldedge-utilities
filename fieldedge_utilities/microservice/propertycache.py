@@ -11,7 +11,7 @@ structures for interservice communications.
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Optional, Union
 
 from fieldedge_utilities.logger import verbose_logging
 
@@ -28,8 +28,8 @@ class CachedProperty:
     
     """
     value: Any
-    name: 'str|None' = None
-    lifetime: 'float|None' = 1.0
+    name: Optional[str] = None
+    lifetime: Union[float, int, None] = 1.0
     cache_time: float = field(default_factory=time.time)
 
     @property
@@ -52,9 +52,12 @@ class PropertyCache:
     
     """
     def __init__(self) -> None:
-        self._cache: 'dict[str, CachedProperty]' = {}
+        self._cache: dict[str, CachedProperty] = {}
 
-    def cache(self, value: Any, tag: str, lifetime: 'float|None' = 1.0) -> None:
+    def cache(self,
+              value: Any,
+              tag: str,
+              lifetime: Union[float, int, None] = 1.0) -> None:
         """Timestamps and adds a property value to the cache.
         
         If the property is already cached, it will be overwritten.

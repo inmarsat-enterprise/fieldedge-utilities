@@ -28,7 +28,7 @@ class Egnss(Feature):
     def __init__(self, port: str, **kwargs):
         super().__init__(**kwargs)
         ser_kwargs = { k: v for k, v in kwargs if k in SERIAL_KWARGS }
-        self._ser = serial.Serial(port, **ser_kwargs)
+        self._ser = serial.Serial(port, **ser_kwargs)   # type: ignore
         self._location = GnssLocation()
         self._initial_fix: bool = False
         self._refresh: int = 0
@@ -92,12 +92,12 @@ class Egnss(Feature):
                         continue
                     if line.startswith(('$GN', '$GP')):
                         self._location = parse_nmea_to_location(line,
-                                                                self._location)
-                        if (self._location.latitude is not None and 
+                                                                self._location) # type: ignore
+                        if (self._location.latitude is not None and             # type: ignore
                             not self._initial_fix):
                             self._initial_fix = True
                             _log.info('Initial GNSS fix acquired')
-                if self._location.latitude is None:
+                if self._location.latitude is None:                             # type: ignore
                     _log.debug('No location determined')
         except (serial.SerialException, ValueError) as exc:
             _log.error(exc)
@@ -123,9 +123,9 @@ class Egnss(Feature):
                    time.time() - start_time < timeout):
                 self._read_gnss(timeout)
         _log.info('Queried location: %s', json_compatible(self._location))
-        return self._location
+        return self._location   # type: ignore
     
-    def get_utc(self, iso_time: bool = False) -> 'int|str':
+    def get_utc(self, iso_time: bool = False) -> int|str|None:
         """Get the current UTC timestamp in seconds since 1970-01-01T00:00:00.
         
         Args:
@@ -135,7 +135,9 @@ class Egnss(Feature):
             Integer timestamp in seconds, or ISO8601 string
         """
         self._read_gnss(timeout=1)
-        _log.info('Queried unix timestamp: %s', self._location.timestamp)
+        _log.info('Queried unix timestamp: %s', self._location.timestamp)   # type: ignore
+        if not isinstance(self._location, GnssLocation):
+            return None
         if iso_time:
             return self._location.iso_time
         return self._location.timestamp

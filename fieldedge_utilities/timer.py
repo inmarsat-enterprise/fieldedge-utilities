@@ -2,232 +2,267 @@
 
 """
 import logging
+import math
 import threading
-from time import time
-from typing import Callable
+import time
+from typing import Callable, Optional
 
 from .logger import verbose_logging
+
 
 _log = logging.getLogger(__name__)
 
 
 class RepeatingTimer(threading.Thread):
-    """A repeating thread to call a function, can be stopped/restarted/changed.
+    """A background repeating interval that calls a function on schedule.
     
-    Embedded tasks can use threading for continuous repeated operations.  A
-    *RepeatingTimer* can be started, stopped, restarted and reconfigured.
-
-    A Thread that counts down seconds using sleep increments, then calls back 
-    to a function with any provided arguments.
+    Can be stopped/restarted/changed.
+    
     Optional auto_start feature starts the thread and the timer, in this case 
     the user doesn't need to explicitly start() then start_timer().
 
     Attributes:
-        name (str): An optional descriptive name for the Thread.
-        interval (int): Repeating timer interval in seconds (0=disabled).
-        sleep_chunk (float): The fraction of seconds between processing ticks.
-        max_drift (int): Delay allowed to impact the next countdown after
-            running the target function.
+        seconds (float|int): Repeating timer interval in seconds (0=disabled).
+        target (Callable): The function to call each interval.
+        args (tuple): If present, stores the arguments to call with.
+        kwargs (dict): If present, stores the kwargs to decompose/call with.
+        name (str): A descriptive name for the Thread. Defaults
+            to the function name as: `<Function>TimerThread`
+        sleep_chunk (float): The fraction of seconds between verbose tick logs.
+        max_drift (float): If present and the called function execution
+            exceeds this time, resync the interval from the function completion
+            time.
         defer (bool): Waits until the first interval before triggering the
             target function (default = True)
 
     """
-    def __init__(self,
-                 seconds: int,
-                 target: Callable,
-                 args: tuple = None,
-                 kwargs: dict = None,
-                 name: str = None,
-                 sleep_chunk: float = 0.25,
-                 max_drift: int = None,
-                 auto_start: bool = False,
-                 defer: bool = True,
-                 daemon: bool = True,
-                 ):
-        """Sets up a RepeatingTimer thread.
 
-        Args:
-            seconds: Interval for timer repeat.
-            target: The function to execute each timer expiry.
-            args: Positional arguments required by the target.
-            kwargs: Optional keyword arguments to pass into the target.
-            name: Optional thread name.
-            sleep_chunk: Tick seconds between expiry checks.
-            max_drift: Number of seconds delay from function call, to tolerate.
-            auto_start: Starts the thread and timer when created.
-            defer: Set if first target waits for timer expiry.
-            daemon: Set if thread is a daemon (default)
-
-        Raises:
-            ValueError if seconds is not an integer.
-        """
-        if not (isinstance(seconds, int) and seconds >= 0):
-            err_str = 'RepeatingTimer seconds must be integer >= 0'
-            raise ValueError(err_str)
-        super().__init__(daemon=daemon)
-        self.name = name or f'{target.__name__}_timer_thread'
-        self._interval: int = 0
-        self.interval = seconds
-        if target is None:
-            _log.warning('No target specified for RepeatingTimer %s', self.name)
+    def __init__(
+        self,
+        seconds: float,
+        target: Callable,
+        args: Optional[tuple] = None,
+        kwargs: Optional[dict] = None,
+        name: Optional[str] = None,
+        sleep_chunk: float = 0.25,
+        max_drift: Optional[float] = None,
+        auto_start: bool = False,
+        defer: bool = True,
+        daemon: bool = True,
+    ):
+        if not isinstance(seconds, (float, int)) or seconds < 0:
+            raise ValueError('seconds must be >= 0')
+        if not callable(target):
+            raise ValueError('target must be a callable method')
+        if not (isinstance(sleep_chunk, (int, float)) and sleep_chunk > 0):
+            raise ValueError('sleep_chunk must be > 0')
+        self.target_name = getattr(target, '__name__', str(target))
+        if not isinstance(name, str) or len(name) == 0:
+            name = (f'{self.target_name[0].upper() + self.target_name[1:]}'
+                    'TimerThread')
+        super().__init__(name=name, daemon=daemon)
+        
+        self._interval = seconds
         self.target = target
         self.args = args or ()
         self.kwargs = kwargs or {}
-        self.sleep_chunk = sleep_chunk
         self.defer = defer
-        self._terminate_event = threading.Event()
+        self.max_drift = max_drift  # seconds allowed before resync
+        self.sleep_chunk = float(sleep_chunk)
+
         self._start_event = threading.Event()
         self._reset_event = threading.Event()
-        self._count = self.interval / self.sleep_chunk
-        self._timesync: int = None
-        self._max_drift = None
-        self.max_drift = max_drift
+        self._terminate_event = threading.Event()
+        self._lock = threading.Lock()
+
+        # Absolute scheduling anchors
+        self._next_deadline: Optional[float] = None
+        self._last_fire: Optional[float] = None
+
         if auto_start:
             self.start()
             self.start_timer()
 
+    # ----- Properties -----
+
     @property
-    def interval(self) -> int:
-        return self._interval
+    def interval(self) -> float:
+        with self._lock:
+            return self._interval
 
     @interval.setter
     def interval(self, val: int):
-        if val is None or not isinstance(val, int) or val < 0:
-            raise ValueError('Interval must be a positive integer or zero')
-        self._interval = val
-
-    @property
-    def sleep_chunk(self) -> float:
-        return self._sleep_chunk
-
-    @sleep_chunk.setter
-    def sleep_chunk(self, value: float):
-        if 1 % value != 0:
-            raise ValueError('sleep_chunk must evenly divide 1 second')
-        self._sleep_chunk = value
+        if not isinstance(val, int) or val < 0:
+            raise ValueError('interval must be integer >= 0')
+        with self._lock:
+            self._interval = val
 
     @property
     def is_running(self) -> bool:
         return self._start_event.is_set()
 
-    @property
-    def max_drift(self) -> 'int|None':
-        return self._max_drift
+    # ----- Core scheduling helpers -----
 
-    @max_drift.setter
-    def max_drift(self, val: 'int|None'):
-        if (val is not None and
-            (not isinstance(val, int) or val < 0 or val >= self.interval)):
-            raise ValueError('max_drift must be None, 0'
-                             ' or integer < interval')
-        self._max_drift = val
+    def _schedule_from_now(self):
+        """Reset the cadence to `now + interval`."""
+        if not self.is_running:
+            return
+        now = time.monotonic()
+        self._next_deadline = now + self.interval
+        _log.debug('Resync next trigger at %.3f (%0.3f)',
+                   self._next_deadline, now)
 
-    def _resync(self) -> int:
-        """Used to adjust the next countdown to account for drift."""
-        if self.max_drift is not None:
-            drift = (int(time()) - self._timesync) % self.interval
-            if drift > self.max_drift:
-                _log.debug('Compensating for drift of %d seconds', drift)
-                return drift
-        return 0
+    def _advance_on_schedule(self, scheduled: float, finished: float):
+        """Advance deadline after target execution.
+        
+        - If lateness exceeds max_drift abandon cadence and resync from now.
+        - Else if still within interval bump to the next interval.
+        - Else skip missed slots but keep original cadence.
+        """
+        if not self.is_running:
+            return
+        lateness = finished - scheduled
+        if self.max_drift is not None and lateness > self.max_drift:
+            # Too late: abandon original cadence, resync from now
+            self._schedule_from_now()
+        elif finished < scheduled + self.interval:
+            # Still on track
+            self._next_deadline = scheduled + self.interval
+        else:
+            # Missed one or more slots jump forward but preserve cadence
+            intervals_missed = math.ceil((finished - scheduled) / self.interval)
+            self._next_deadline = scheduled + intervals_missed * self.interval
+            _log.debug('Missed %d intervals', intervals_missed)
+
+    def _call_target(self):
+        try:
+            if _vlog():
+                _log.debug('Calling %s (%0.3f) with args=%s kwargs=%s',
+                           self.target_name,
+                           time.monotonic(),
+                           self.args,
+                           self.kwargs)
+            self.target(*self.args, **self.kwargs)
+        except Exception as exc:
+            _log.exception('%s exception: %s', self.target_name, exc)
+            raise
+
+    # ----- Thread loop -----
 
     def run(self):
-        """*Note: runs automatically, not meant to be called explicitly.*
-        
-        Counts down the interval, checking every ``sleep_chunk`` for expiry.
-        """
         while not self._terminate_event.is_set():
-            while (self._count > 0
-                   and self._start_event.is_set()
-                   and self.interval > 0):
-                if _vlog():
-                    if (self._count * self.sleep_chunk
-                        - int(self._count * self.sleep_chunk)
-                        <= 0.0):
-                        #: log debug message at reasonable interval
-                        _log.debug('%s countdown: %d (%d s) @ step %0.2f',
-                                   self.name, self._count, self.interval,
-                                   self.sleep_chunk)
-                if self._reset_event.wait(self.sleep_chunk):
-                    # reset -> restart the countdown
-                    self._reset_event.clear()
-                    self._count = self.interval / self.sleep_chunk
-                self._count -= 1
-                if self._count <= 0:
-                    try:   # countdown expired, trigger function and restart
-                        self.target(*self.args, **self.kwargs)
-                        drift_adjusted = self.interval - self._resync()
-                        self._count = drift_adjusted / self.sleep_chunk
-                    except BaseException as exc:
-                        _log.error('Exception in %s: %s', self.name, exc)
-                        raise
+            self._start_event.wait()
+            if self._terminate_event.is_set():
+                break
+
+            if self.interval <= 0:
+                # Disabled: wait for changes/restart
+                self._reset_event.wait(timeout=0.2)
+                self._reset_event.clear()
+                continue
+
+            # Initialize next deadline if missing
+            if self._next_deadline is None:
+                now = time.monotonic()
+                if not self.defer:
+                    started = time.monotonic()
+                    self._last_fire = started
+                    self._call_target()
+                    finished = time.monotonic()
+                    self._next_deadline = self._last_fire + self.interval
+                else:
+                    self._next_deadline = now + self.interval
+                _log.info('%d s interval started (%0.3f)', self.interval, now)
+
+            # Main loop while running
+            while self.is_running and not self._terminate_event.is_set():
+                now = time.monotonic()
+                remaining = (self._next_deadline or now) - now
+
+                # Wait in small chunks so we can log/observe resets
+                while (remaining > 0 and
+                       self.is_running and
+                       not self._terminate_event.is_set()):
+                    if _vlog():
+                        _log.debug('%s countdown: %.2fs',
+                                   self.name, remaining)
+                    # Wake early if reset arrives
+                    if self._reset_event.wait(timeout=min(self.sleep_chunk,
+                                                          remaining)):
+                        self._reset_event.clear()
+                        self._schedule_from_now()
+                        break
+                    now = time.monotonic()
+                    remaining = (self._next_deadline or now) - now
+                else:
+                    # Either time elapsed or we stopped/terminated
+                    if not self.is_running or self._terminate_event.is_set():
+                        break
+                    # Timer fired
+                    scheduled = self._next_deadline or time.monotonic()
+                    started = time.monotonic()
+                    self._last_fire = started
+                    self._call_target()
+                    finished = time.monotonic()
+                    self._advance_on_schedule(scheduled, finished)
+                    if _vlog():
+                        _log.debug('Triggered %s at %0.3f (duration %0.2f)'
+                                   ' next trigger %0.3f',
+                                   self.target_name,
+                                   started,
+                                   finished - started,
+                                   self._next_deadline)
+
+    # ----- External controls -----
 
     def start_timer(self):
-        """Initially start the repeating timer."""
-        self._timesync = int(time())
         self._start_event.set()
-        if self.interval > 0:
-            _log.info('%s timer started (%d s)', self.name, self.interval)
-            if not self.defer:
-                _log.debug('Triggering initial call to %s',
-                           self.target.__name__)
-                self.target(*self.args, **self.kwargs)
-        else:
-            _log.warning('%s timer cannot trigger (interval=0)', self.name)
+        if _vlog():
+            _log.debug('Interval start requested (%0.3f)', time.monotonic())
 
-    def stop_timer(self):
-        """Stop the repeating timer."""
+    def stop_timer(self, notify: bool = True):
         self._start_event.clear()
-        _log.info('%s timer stopped (%d s)', self.name, self.interval)
-        self._count = self.interval / self.sleep_chunk
+        if notify:
+            _log.info('Interval stopped (%0.3f)', time.monotonic())
 
-    def restart_timer(self, trigger_immediate: bool = None):
-        """Restart the repeating timer (after an interval change)."""
-        if trigger_immediate is None:
-            trigger_immediate = not self.defer
-        if self._start_event.is_set():
-            self._reset_event.set()
-        else:
-            self._start_event.set()
-        if self.interval > 0:
-            _log.info('%s timer restarted (%d s)', self.name, self.interval)
-            if trigger_immediate:
-                self.target(*self.args, **self.kwargs)
-        else:
-            _log.warning('%s timer cannot trigger (interval=0)', self.name)
-
-    def change_interval(self, seconds: int, trigger_immediate: bool = None):
-        """Change the timer interval and restart it.
+    def restart_timer(self,
+                      trigger_immediate: Optional[bool] = None,
+                      notify: bool = True):
+        """Restart the timer.
         
-        Args:
-            seconds (int): The new interval in seconds.
+        If `trigger_immediate` is True, fire now else wait one full interval.
         
-        Raises:
-            ValueError if seconds is not an integer.
-
+        Default is the opposite of `defer` configuration.
         """
-        if trigger_immediate is None:
+        if trigger_immediate is None or not isinstance(trigger_immediate, bool):
             trigger_immediate = not self.defer
-        if (isinstance(seconds, int) and seconds >= 0):
-            _log.info('%s timer interval changed (old: %d s new: %d s)',
-                      self.name, self.interval, seconds)
-            self.interval = seconds
-            self._count = self.interval / self.sleep_chunk
-            self.restart_timer(trigger_immediate)
-        else:
-            err_str = 'RepeatingTimer seconds must be integer >= 0'
-            _log.error(err_str)
-            raise ValueError(err_str)
+        self._start_event.set()
+        self._reset_event.set()
+        if trigger_immediate and self.interval > 0:
+            self._call_target()
+            self._last_fire = time.monotonic()
+            self._next_deadline = self._last_fire + self.interval
+        if notify:
+            _log.info('%d s interval restarted (trigger_immediate=%s) (%0.3f)',
+                      self.interval, trigger_immediate, time.monotonic())
+
+    def change_interval(self, seconds: int, trigger_immediate: Optional[bool] = None):
+        if not isinstance(seconds, int) or seconds < 0:
+            raise ValueError('seconds must be integer >= 0')
+        with self._lock:
+            old = self._interval
+            self._interval = seconds
+        _log.info('Interval changed (old: %0.1f s; new: %0.1f s)'
+                  ' (trigger_immediate=%s)', old, seconds, trigger_immediate)
+        if trigger_immediate is None or not isinstance(trigger_immediate, bool):
+            trigger_immediate = not self.defer
+        self.restart_timer(trigger_immediate, notify=False)
 
     def terminate(self):
-        """Terminate the timer. (Cannot be restarted)"""
-        self.stop_timer()
+        self.stop_timer(notify=False)
         self._terminate_event.set()
-        _log.info('%s timer terminated', self.name)
-
-    def join(self, timeout=None):
-        super().join(timeout)
-        return self.target
+        self._reset_event.set()
+        _log.info('Interval terminated (%0.3f)', time.monotonic())
 
 
 def _vlog() -> bool:

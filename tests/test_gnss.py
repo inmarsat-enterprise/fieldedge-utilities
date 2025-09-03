@@ -40,9 +40,10 @@ def test_parse_nmea_to_location():
             if not line:
                 continue
             sentences_read += 1
-            loc_before = loc.json_compatible()
+            loc_before = loc
             loc = parse_nmea_to_location(line, loc)
-            loc_after = loc.json_compatible()
+            assert isinstance(loc, GnssLocation)
+            loc_after = loc
             if loc_after != loc_before:
                 nmea_type = line[:6]
                 logger.info('Location updated by %s: %s', nmea_type,loc_after)

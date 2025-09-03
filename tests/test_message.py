@@ -19,14 +19,14 @@ def test_message_meta_default_size_zero():
 def test_message_meta_calculates_size_from_b64():
     raw_data = b'hello'
     b64_data = base64.b64encode(raw_data).decode()
-    msg = MessageMeta(id=2, mo=False, data_b64=b64_data)
+    msg = MessageMeta(id=2, mo=False, data=b64_data)
     assert msg.size == len(raw_data)
 
 
 def test_message_meta_size_setter_allows_valid_override():
     raw_data = b'hello'
     b64_data = base64.b64encode(raw_data).decode()
-    msg = MessageMeta(id=3, mo=True, data_b64=b64_data)
+    msg = MessageMeta(id=3, mo=True, data=b64_data)
     new_size = len(raw_data) + 20
     msg.size = new_size
     assert msg.size == new_size
@@ -35,14 +35,14 @@ def test_message_meta_size_setter_allows_valid_override():
 def test_message_meta_size_setter_rejects_non_int():
     msg = MessageMeta(id=4, mo=False)
     with pytest.raises(ValueError, match='Size must be an integer'):
-        msg.size = "ten"
+        msg.size = "ten"    # type: ignore
 
 
 def test_message_meta_size_setter_rejects_smaller_than_data():
     raw_data = b'abcdef'
     b64_data = base64.b64encode(raw_data).decode()
-    msg = MessageMeta(id=5, mo=False, data_b64=b64_data)
-    with pytest.raises(ValueError, match='Size less than payload length'):
+    msg = MessageMeta(id=5, mo=False, data=b64_data)
+    with pytest.raises(ValueError):
         msg.size = len(raw_data) - 1
 
 

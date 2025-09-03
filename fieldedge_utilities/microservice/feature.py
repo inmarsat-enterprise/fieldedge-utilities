@@ -1,7 +1,7 @@
 """A Feature class for use as a child of a `Microservice`.
 """
 from abc import ABC, abstractmethod
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 from fieldedge_utilities.properties import (
     camel_case,
@@ -23,13 +23,14 @@ class Feature(ABC):
     
     """
 
-    __slots__ = ['_task_queue', '_task_notify', '_task_complete', '_task_fail']
+    __slots__ = ['_task_queue', '_task_notify', '_task_complete', '_task_fail',
+                 '_props']
 
     def __init__(self,
-                 task_queue: IscTaskQueue = None,
-                 task_notify: Callable[[str, dict], None] = None,
-                 task_complete: Callable[[str, dict], None] = None,
-                 task_fail: Callable[[Any], None] = None,
+                 task_queue: Optional[IscTaskQueue] = None,
+                 task_notify: Optional[Callable[..., None]] = None,
+                 task_complete: Optional[Callable[..., None]] = None,
+                 task_fail: Optional[Callable[..., None]] = None,
                  **kwargs) -> None:
         """Initializes the feature.
         
@@ -44,20 +45,27 @@ class Feature(ABC):
             task_fail (`Callable`): An optional parent function to call if the
                 task fails.
         """
-        self._task_queue: IscTaskQueue = task_queue
-        self._task_notify: Callable[[str, dict], None] = task_notify
-        self._task_complete: Callable[[str, dict], None] = task_complete
-        self._task_fail: Callable[[Any], None] = task_fail
-        for key, val in kwargs.items():
-            self.__slots__.append(key)
-            setattr(self, key, val)
+        self._task_queue = task_queue
+        self._task_notify = task_notify
+        self._task_complete = task_complete
+        self._task_fail = task_fail
+        self._props: dict[str, Any] = dict(kwargs)
 
+    def __getattr__(self, name):
+        try:
+            return self._props[name]
+        except KeyError:
+            raise AttributeError(f'{name} not found')
+
+    def __setattr__(self, name, value):
+        if name in self.__slots__:
+            super().__setattr__(name, value)
+        else:
+            self._props[name] = value
+    
     @property
     def tag(self) -> str:
-        try:
-            return getattr(self, '_tag')
-        except AttributeError:
-            return self.__class__.__name__.lower()
+        return getattr(self, '_tag', self.__class__.__name__.lower())
 
     @abstractmethod
     def properties_list(self, **kwargs) -> 'list[str]':
@@ -67,7 +75,8 @@ class Feature(ABC):
             **config (bool): Returns only configuration properties if True.
             **info (bool): Returns only information properties if True.
         """
-        all_props = get_class_properties(self, ignore=['tag'])
+        all_props = get_class_properties(self.__class__, ignore=['tag'])
+        all_props += [p for p in self._props if not p.startswith('_')]
         if kwargs.get('config') is True:
             return [p for p in all_props if not property_is_read_only(self, p)]
         if kwargs.get('info') is True:
@@ -86,13 +95,13 @@ class Feature(ABC):
             **categorized (bool): Returns categorized 
         """
         if kwargs.get('categorized') is True:
-            info = { camel_case(k): getattr(self, k)
-                    for k in self.properties_list(info=True) }
-            config = { camel_case(k): getattr(self, k)
-                      for k in self.properties_list(config=True) }
-            return { 'config': config, 'info': info }
-        return {camel_case(key): getattr(self, key)
-                for key in self.properties_list()}
+            return {
+                'config': {camel_case(k): getattr(self, k)
+                           for k in self.properties_list(config=True)},
+                'info': {camel_case(k): getattr(self, k)
+                         for k in self.properties_list(info=True)},
+            }
+        return {camel_case(k): getattr(self, k) for k in self.properties_list()}
 
     @abstractmethod
     def on_isc_message(self, topic: str, message: dict) -> bool:

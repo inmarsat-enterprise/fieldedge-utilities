@@ -27,6 +27,7 @@ import os
 import sys
 from logging.handlers import RotatingFileHandler
 from time import gmtime
+from typing import Optional
 
 from fieldedge_utilities.path import clean_path
 
@@ -54,15 +55,15 @@ class LogFilterLessThan(logging.Filter):
     """
     def __init__(self,
                  exclusive_maximum: int = logging.WARNING,
-                 name: str = None):
+                 name: Optional[str] = None):
         if name is None:
             name = f'LessThan{logging.getLevelName(exclusive_maximum)}'
         super().__init__(name)
         self.max_level = exclusive_maximum
 
-    def filter(self, record):
+    def filter(self, record) -> bool:
         #non-zero return means we log this message
-        return 1 if record.levelno < self.max_level else 0
+        return record.levelno < self.max_level
 
 
 class LogFormatterOneLineException(logging.Formatter):
@@ -71,13 +72,13 @@ class LogFormatterOneLineException(logging.Formatter):
     Also replaces the record message with the error type.
 
     """
-    def formatException(self, exc_info):
+    def formatException(self, exc_info) -> str:   # type: ignore
         original = super().formatException(exc_info)
         return ' -> '.join([x.strip() for x in original.splitlines()])
 
     def format(self, record):
         result = super().format(record)
-        if record.exc_text:
+        if getattr(record, 'exc_text', None):
             err_type = type(record.msg).__name__
             result = result.replace(f'{record.msg}\n', f'{err_type}: ')
         return result
@@ -149,6 +150,7 @@ def get_logfile_name(logger: logging.Logger) -> str:
     for h in logger.handlers:
         if isinstance(h, RotatingFileHandler):
             return h.baseFilename
+    return ''
 
 
 def add_handler(logger: logging.Logger, handler: logging.Handler) -> None:
@@ -207,7 +209,7 @@ def apply_loglevel(logger: logging.Logger, level: int) -> None:
     if not isinstance(logger, logging.Logger):
         raise TypeError('Invalid Logger')
     for h in logger.handlers:
-        if 'stderr' not in h.name:
+        if h.name is not None and 'stderr' not in h.name:
             h.setLevel(level)
 
 
@@ -268,8 +270,8 @@ def get_handler_stderr(**kwargs) -> logging.StreamHandler:
     return handler_stderr
 
 
-def get_wrapping_logger(name: str = None,
-                        filename: str = None,
+def get_wrapping_logger(name: Optional[str] = None,
+                        filename: Optional[str] = None,
                         file_size: int = 5,
                         log_level: int = logging.INFO,
                         format: str = 'csv',
@@ -324,7 +326,7 @@ def get_wrapping_logger(name: str = None,
     return logger
 
 
-def get_fieldedge_logger(filename: str = None,
+def get_fieldedge_logger(filename: Optional[str] = None,
                          file_size: int = 5,
                          log_level: 'int|str' = logging.INFO,
                          format: str = 'csv',

@@ -49,11 +49,13 @@ def test_isc_task_queue_basic(isc_task: IscTask):
         task_queue.append(isc_task)
     assert task_queue.is_queued(isc_task.uid)
     assert task_queue.is_queued(task_type=isc_task.task_type)
-    assert task_queue.is_queued(task_meta=('test', 'test'))
+    assert task_queue.is_queued(task_meta=('test', 'test'))     # type: ignore legacy compatibility
+    assert task_queue.is_queued(task_meta={'test': 'test'})
     got = task_queue.get(isc_task.uid)
-    assert got == isc_task
+    assert isinstance(got, IscTask) and got == isc_task and got.task_meta
     assert not task_queue.is_queued(isc_task.uid)
     assert callable(got.task_meta.pop('timeout_callback'))
+    assert callable(got.callback)
     got.callback(got.task_meta)
 
 

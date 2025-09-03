@@ -3,6 +3,8 @@
 import logging
 import time
 from enum import IntEnum
+from typing import Optional
+from unittest.mock import Mock
 
 import pytest
 
@@ -35,7 +37,7 @@ class TestService(Microservice):
 
     TAG = 'test'   # a class constant
 
-    def __init__(self, tag: str = None) -> None:
+    def __init__(self, tag: Optional[str] = None) -> None:
         super().__init__(tag=tag or self.TAG)
         self._info_prop: str = 'test'
         self._config_prop: int = 2
@@ -71,7 +73,7 @@ class TestService(Microservice):
     #     await asyncio.sleep(1)
     #     return self._info_prop
 
-    def isc_configurable(self):
+    def isc_configurable(self, **kwargs):
         return super().isc_configurable(**{
             'config_prop': ConfigurableProperty(
                 type = 'int',
@@ -79,7 +81,7 @@ class TestService(Microservice):
                 max = 15,
             ),
             'config_enum': ConfigurableProperty(
-                type = 'str',
+                type = 'enum',
                 enum = TestEnum,
             )
         })
@@ -90,7 +92,7 @@ class TestService(Microservice):
     def rollcall_respond(self, topic: str, message: dict):
         return super().rollcall_respond(topic, message)
 
-    def on_isc_message(self, topic: str, message: dict) -> None:
+    def on_isc_message(self, topic: str, message: dict) -> bool:
         # logger.info('%s received ISC message %s: %s',
         #             self.tag, topic, message)
         return super().on_isc_message(topic, message)
@@ -112,7 +114,7 @@ class TestFeature(Feature):
         return True
     
     @property
-    def test_config(self) -> str:
+    def test_config(self) -> TestEnum:
         return self._config_enum
     
     @test_config.setter
@@ -123,12 +125,12 @@ class TestFeature(Feature):
             value = TestEnum[value]
         if not isinstance(value, TestEnum):
             raise ValueError('Invalid TestEnum')
-        self._config_enum = TestEnum[value]
+        self._config_enum = value
 
-    def status(self) -> dict:
+    def status(self, **kwargs) -> dict:
         return { 'test_prop': self.test_prop, 'test_config': self.test_config }
 
-    def properties_list(self) -> 'list[str]':
+    def properties_list(self, **kwargs) -> 'list[str]':
         return ['test_prop', 'test_config']
     
     def isc_configurable(self):
@@ -176,7 +178,7 @@ def test_complex() -> TestService:
         _custom_protected='test',
     )
     complex_ms.ms_proxies['proxy'] = TestProxy(
-        tag='test',
+        # tag='test',
         publish=complex_ms.notify,
         subscribe=complex_ms.isc_topic_subscribe,
         init_callback=complex_ms_init_callback,
@@ -185,17 +187,25 @@ def test_complex() -> TestService:
     return complex_ms
 
 
+@pytest.fixture
+def mock_mqtt():
+    publish = Mock()
+    subscribe = Mock()
+    unsubscribe = Mock()
+    return publish, subscribe, unsubscribe
+
+
 def test_get_subclass_name(test_service: TestService):
     assert get_class_tag(TestService) == 'testservice'
-    assert get_class_tag(test_service) == 'testservice'
+    assert get_class_tag(test_service) == 'testservice'     # type: ignore
     props_cls = get_class_properties(TestService)
-    props_inst = get_class_properties(test_service)
+    props_inst = get_class_properties(test_service)     # type: ignore
     assert props_cls == props_inst
 
 
 def test_microservice_subclass_creation(test_service: TestService):
     assert test_service.tag == TestService.TAG
-    expected_config_props = ['log_level', 'config_prop']
+    expected_config_props = ['log_level', 'config_prop', 'config_enum']
     expected_info_props = ['tag', 'properties', 'properties_by_type',
                            'isc_properties', 'isc_properties_by_type',
                            'rollcall_properties', 'info_prop',]
@@ -211,7 +221,7 @@ def test_microservice_subclass_creation(test_service: TestService):
                for prop in expected_info_props)
     assert not any(prop not in expected_info_props
                    for prop in test_service.properties_by_type['info'])
-    expected_isc_config_props = ['logLevel', 'configProp']
+    expected_isc_config_props = ['logLevel', 'configProp', 'configEnum']
     expected_isc_info_props = ['infoProp']
     expected_isc_props = expected_isc_config_props + expected_isc_info_props
     assert all(prop in test_service.isc_properties
@@ -289,7 +299,7 @@ def test_ms_on_isc_message_self_rollcall(test_service: TestService, mocker):
         logger.info(f'Mocking ISC {topic}: {message}')
         if 'subtopic' in kwargs:
             if kwargs['subtopic'] == 'rollcall':
-                test_service._on_isc_message(topic, message)
+                test_service.on_isc_message(topic, message)
                 assert True
             else:
                 logger.warning('Unexpected chained response')
@@ -312,7 +322,7 @@ def test_ms_on_isc_message_other_rollcall(test_service: TestService, mocker):
     topic = 'fieldedge/otherservice/rollcall'
     message = { 'uid': 'requestor-uuid' }
     logger.info(f'Mocking ISC {topic}: {message}')
-    test_service._on_isc_message(topic, message)
+    test_service.on_isc_message(topic, message)
 
 
 def test_ms_cached_property(test_service: TestService, mocker):
@@ -343,7 +353,7 @@ def test_ms_notify_properties_all(test_service: TestService, mocker):
         },
         'configurable': {
             'logLevel': {
-                'type': 'str',
+                'type': 'enum',
                 'enum': ['DEBUG', 'INFO'],
             },
             'configProp': {
@@ -352,31 +362,64 @@ def test_ms_notify_properties_all(test_service: TestService, mocker):
                 'max': 15,
             },
             'configEnum': {
-                'type': 'str',
+                'type': 'enum',
                 'enum': ['ONE', 'TWO'],
             },
         },
     }
     test_service.properties_notify(request)
-    mock_notify.assert_called_once_with(message=message, subtopic=subtopic)
+    _, called_kwargs = mock_notify.call_args
+    assert called_kwargs['subtopic'] == subtopic
+    assert called_kwargs['message'] == message
 
 
-def test_msproxy_init(test_service: TestService, mocker):
+def test_msproxy_init(mock_mqtt):
     """Ensure a microservice proxy is properly initialized."""
-    test_proxy = TestProxy(tag='testservice')
-    test_proxy.initialize()
-    assert False
+    publish, subscribe, unsubscribe = mock_mqtt
+    
+    proxy = TestProxy(
+        tag='testservice',
+        publish=publish,
+        subscribe=subscribe,
+        unsubscribe=unsubscribe,
+        init_timeout=2,
+    )
+    init_callback = Mock()
+    proxy._init_callback = init_callback
+    proxy.initialize()
+    subscribe.assert_any_call('fieldedge/testservice/event/#')
+    subscribe.assert_any_call('fieldedge/testservice/info/#')
+    message = {
+        'uid': proxy.isc_queue[0].uid,
+        'properties': {
+            'configProp': 42,
+            'infoProp': 'ready',
+        },
+        'configurable': {
+            'configProp': {'type': 'int', 'min': 0, 'max': 100},
+        }
+    }
+    proxy.on_isc_message('fieldedge/testservice/info/properties/values', message)
+    assert isinstance(proxy.properties, dict)
+    assert proxy.properties.get('configProp') == 42
+    assert proxy.properties.get('infoProp') == 'ready'
+    assert 'configProp' in proxy.isc_configurable()
+    cprop = proxy.isc_configurable().get('configProp')
+    assert isinstance(cprop, ConfigurableProperty)
+    assert cprop.type == 'int'
+    assert proxy.initialization_state.name == 'COMPLETE'
+    init_callback.assert_called_once_with(True, 'testservice')
 
 
 class StubMqtt(MqttClient):
     def __init__(self, auto_connect=False) -> None:
         pass
     
-    def subscribe(self, topic, qos):
-        return True
+    def subscribe(self, topic, qos: int = 0):
+        return
     
     def unsubscribe(self, topic):
-        return True
+        return
 
 
 proxy_call_one_count = 0
@@ -435,6 +478,7 @@ def test_complex_ms(test_complex: TestService, test_service: TestService, mocker
     assert isinstance(test_complex.features, dict) and test_complex.features
     assert 'feature' in test_complex.features
     feature = test_complex.features.get('feature')
+    assert isinstance(feature, TestFeature)
     logger.info('Feature tag: %s', feature.tag)
     assert hasattr(feature, '_custom_protected')
     assert isinstance(feature.isc_configurable(), dict)
@@ -458,6 +502,7 @@ def test_complex_ms(test_complex: TestService, test_service: TestService, mocker
     test_complex.rollcall()
     time.sleep(0.5)
     proxy = test_complex.ms_proxies['proxy']
+    assert isinstance(proxy, TestProxy)
     proxy.initialize()
     attempts = 0
     while not proxy.is_initialized and attempts < 3:
@@ -466,6 +511,7 @@ def test_complex_ms(test_complex: TestService, test_service: TestService, mocker
     assert proxy.is_initialized
     assert init_success is True
     proxy_props = proxy.properties
+    assert isinstance(proxy_props, dict)
     assert 'configEnum' in proxy_props and proxy_props['configEnum'] == 'ONE'
     assert 'configProp' in proxy_props and proxy_props['configProp'] == 2
     assert 'infoProp' in proxy_props and proxy_props['infoProp'] == 'test'

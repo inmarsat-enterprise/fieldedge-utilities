@@ -23,6 +23,7 @@ from datetime import datetime
 from logging import DEBUG
 from subprocess import TimeoutExpired, run
 from time import sleep, time
+from typing import Optional
 
 from .logger import verbose_logging
 
@@ -43,7 +44,7 @@ HOSTPIPE_LOG_ITERATION_MAX = int(os.getenv('HOSTPIPE_LOG_ITERATION_MAX', '15'))
 def host_command(command: str,
                  noresponse: bool = False,
                  timeout: float = HOSTPIPE_TIMEOUT,
-                 pipelog: str = None,
+                 pipelog: Optional[str] = None,
                  test_mode: bool = False,
                  ) -> str:
     """Sends a host command to a pipe (from the Docker container).
@@ -141,8 +142,8 @@ def _get_line_ts(line: str) -> float:
 
 
 def host_get_response(command: str,
-                      command_time: float = None,
-                      pipelog: str = None,
+                      command_time: Optional[float] = None,
+                      pipelog: Optional[str] = None,
                       timeout: float = HOSTPIPE_TIMEOUT,
                       test_mode: bool = False,
                       ) -> str:
@@ -209,13 +210,14 @@ def host_get_response(command: str,
                     if _vlog():
                         _log.debug(f'Mismatch: {logged_command} != {modcommand}'
                                    f' -> drop {len(to_remove)} response lines')
-                    response = [l for l in response if l not in to_remove]
+                    response = [ln for ln in response if ln not in to_remove]
                 else:
                     # we reached the original command so can stop parsing response
                     if _vlog():
                         _log.debug('Found target %s with %d response lines',
                                    modcommand, len(response))
-                    response = [l.split(RES_TAG, 1)[1].strip() for l in response]
+                    response = [ln.split(RES_TAG, 1)[1].strip()
+                                for ln in response]
                     break
             elif RES_TAG in line:
                 response.append(line)

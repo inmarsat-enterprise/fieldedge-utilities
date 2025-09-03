@@ -4,6 +4,7 @@
 import glob
 # import logging
 import platform
+from typing import Optional
 
 import serial.tools.list_ports
 from serial import Serial, SerialException
@@ -28,18 +29,18 @@ class SerialDevice:
     """
     def __init__(self, port_info: ListPortInfo) -> None:
         self._name: str = port_info.device
-        self._manufacturer: str = port_info.manufacturer
+        self._manufacturer: Optional[str] = port_info.manufacturer
         self._driver: str = port_info.description
         self._vid: int = port_info.vid
         self._pid: int = port_info.pid
-        self._serial_number: str = port_info.serial_number
+        self._serial_number: Optional[str] = port_info.serial_number
 
     @property
     def name(self) -> str:
         return self._name
 
     @property
-    def manufacturer(self) -> str:
+    def manufacturer(self) -> str|None:
         return self._manufacturer
 
     @property
@@ -55,7 +56,7 @@ class SerialDevice:
         return self._pid
 
     @property
-    def serial_number(self) -> str:
+    def serial_number(self) -> str|None:
         return self._serial_number
 
 
@@ -73,7 +74,7 @@ def is_valid(target: str) -> bool:
     return target in list_available_serial_ports()
 
 
-def get_devices(target: str = None) -> list:
+def get_devices(target: Optional[str] = None) -> list:
     """Returns a list of serial device information.
     
     Args:

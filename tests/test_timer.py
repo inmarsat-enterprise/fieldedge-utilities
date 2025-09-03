@@ -1,103 +1,140 @@
 import logging
-from time import sleep, time
+import time
 
-from fieldedge_utilities import timer
+import pytest
 
-call_count = 0
+from fieldedge_utilities import RepeatingTimer
 
-
-def trigger_function(arg = None, kwarg = None):
-    global call_count
-    call_count += 1
+logger = logging.getLogger()
+logging.basicConfig(level=logging.DEBUG)
 
 
-def test_timer_basic():
-    global call_count
-    start_time = time()
-    test_interval = 1
-    test_cycles = 3
-    auto_start = True
-    defer = False
-    daemon = True
-    arg = 'test_arg'
-    kwargs = {'kwarg': True}
-    t = timer.RepeatingTimer(seconds=test_interval,
-                             target=trigger_function,
-                             args=(arg,),
-                             kwargs=kwargs,
-                             name='test_create',
-                             auto_start=auto_start,
-                             defer=defer,
-                             daemon=daemon,
-                             )
-    if not auto_start:
-        t.start()
-        t.start_timer()
-    assert isinstance(t, timer.RepeatingTimer)
-    while call_count < test_cycles:
-        assert t.is_running
-        sleep(1)
-    stop_time = time()
-    t.stop_timer()
-    assert call_count == test_cycles
-    run_time = int(stop_time - start_time)
-    assert run_time == test_interval * test_cycles + test_interval * defer
-    if not daemon:
-        t.terminate()
-
-def mtest_change_interval():
-    global call_count
-    initial_interval = 3
-    new_interval = 1
-    test_cycles = 4
-    start_time = time()
-    t = timer.RepeatingTimer(seconds=initial_interval,
-                             target=trigger_function,
-                             auto_start=True,
-                             defer=True,
-                             )
-    while call_count < test_cycles:
-        if call_count == 1:
-            t.change_interval(new_interval)
-        if call_count < 1:
-            assert t.interval == initial_interval
-        else:
-            assert t.interval == new_interval
-        sleep(1)
-    end_time = time()
-    run_time = int(end_time - start_time)
-    assert run_time == initial_interval + new_interval * test_cycles
+@pytest.fixture
+def log_capture(caplog):
+    caplog.set_level(logging.DEBUG)
+    return caplog
 
 
-def sim_delay(delay: int = 3):
-    global call_count
-    log = logging.getLogger()
-    log.info('Delay called')
-    sleep(delay)
-    log.info('Delay complete')
-    call_count += 1
+def test_regular_interval():
+    calls = []
+
+    def target():
+        calls.append(time.monotonic())
+
+    timer = RepeatingTimer(
+        seconds=1,
+        target=target,
+        # sleep_chunk=0.05,
+        # auto_start=True,
+    )
+    assert timer.name == 'TargetTimerThread'
+    assert timer.target_name == target.__name__
+    timer.start()
+    timer.start_timer()
+
+    time.sleep(3.2)  # allow 3+ firings
+    timer.terminate()
+
+    assert len(calls) >= 3
+    # Verify approximate intervals (within 0.1s tolerance)
+    for i in range(1, len(calls)):
+        assert abs(calls[i] - calls[i-1] - 1) < 0.15
 
 
-def test_drift(caplog):
-    t = timer.RepeatingTimer(seconds=5,
-                             target=sim_delay,
-                             args=(0,),
-                             defer=False,
-                             max_drift=0)
-    t.start()
-    t.start_timer()
-    while call_count < 5:
-        pass
-    # for record in caplog.records:
-    #     if record.levelname == 'DEBUG':
-    #         assert 'Compensating' in record.message
+def test_long_running_target(log_capture):
+    calls = []
+
+    def target():
+        calls.append(time.monotonic())
+        logger.info('Target executing...')
+        time.sleep(1.5)  # longer than timer interval
+        logger.info('Target completed')
+
+    timer = RepeatingTimer(
+        seconds=1,
+        target=target,
+        # sleep_chunk=0.05,
+        # auto_start=True,
+    )
+    timer.start()
+    timer.start_timer()
+
+    time.sleep(5)  # allow multiple firings
+    timer.terminate()
+
+    # Because target takes longer than interval, it should fire immediately after previous finish
+    for i in range(1, len(calls)):
+        assert calls[i] >= calls[i-1]  # monotonically increasing
+        # Next fire should not be less than previous start
+        assert calls[i] - calls[i-1] >= 1.5 - 0.1
+    
+    resync = any('Resync' in rec.message for rec in log_capture.records)
+    assert not resync
 
 
-# def test_start_timer_previously_started():
-#     pass
+def test_resync_when_late(caplog):
+    calls = []
+    
+    def slow_task():
+        calls.append(time.monotonic())
+        logger.info('Target executing...')
+        time.sleep(0.6)
+        logger.info('Target complete')
+    
+    timer = RepeatingTimer(
+        seconds=1,
+        target=slow_task,
+        max_drift=0.5,
+        defer=False,
+    )
+    timer.start()
+    timer.start_timer()
+    time.sleep(2.5)
+    timer.terminate()
+    timer.join(timeout=1)
+    resync = [rec.message for rec in caplog.records if 'Resync' in rec.message]
+    assert resync, 'Expected at least one Resync log'
 
-# def test_restart_timer():
-#     pass
 
-# def test_stop_start_timer():
-#     pass
+def test_restart_and_change_interval():
+    calls = []
+
+    def target():
+        calls.append(time.monotonic())
+
+    timer = RepeatingTimer(
+        seconds=1,
+        target=target,
+        # sleep_chunk=0.05,
+    )
+    timer.start()
+    timer.start_timer()
+    time.sleep(2.2)
+
+    timer.change_interval(2, trigger_immediate=True)
+    time.sleep(2.2)
+    timer.terminate()
+
+    assert len(calls) >= 3  # 2 initial + 1+ after interval change
+
+
+def test_logging_next_trigger(log_capture):
+    calls = []
+
+    def target():
+        calls.append(time.monotonic())
+        time.sleep(0.2)
+
+    timer = RepeatingTimer(
+        seconds=1,
+        target=target,
+        # sleep_chunk=0.05,
+        # auto_start=True,
+    )
+    timer.start()
+    timer.start_timer()
+    time.sleep(1.5)
+    timer.terminate()
+
+    found = any('next trigger' in rec.message for rec in log_capture.records)
+    assert found

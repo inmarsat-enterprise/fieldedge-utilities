@@ -3,6 +3,7 @@
 import json
 import time
 from enum import IntEnum
+from typing import Optional
 
 import pytest
 
@@ -10,6 +11,8 @@ from fieldedge_utilities.properties import *
 
 
 class TestNestedObj:
+    __slots__ = ('one', 'two',)
+    
     def __init__(self) -> None:
         self.one = 1
         self.two = ['element']
@@ -28,7 +31,7 @@ class TestObj:
 
     def __init__(self) -> None:
         self._one: int = 1   #: private
-        self.two: object = TestNestedObj()
+        self.two: TestNestedObj = TestNestedObj()
         self.three = None
         self.four: TestEnum = TestEnum.FIRST
         self._five: str = 'string'   #: read-only by proxy
@@ -67,12 +70,12 @@ class TestObjToo:
     an IoT demo service.
     """
     def __init__(self, one: str) -> None:
-        self._one: str = None
+        self._one: Optional[str] = None
         self.one = one
         self.two: int = 2
 
     @property
-    def one(self) -> str:
+    def one(self) -> str|None:
         return self._one
 
     @one.setter
@@ -85,7 +88,9 @@ class TestObjToo:
 
     @property
     def one_bytes(self) -> bytearray:
-        return bytearray(bytes.fromhex(self._one))
+        if isinstance(self._one, str):
+            return bytearray(bytes.fromhex(self._one))
+        return bytearray()
 
 
 def test_snake_case():
@@ -175,12 +180,12 @@ def test_obj_too() -> TestObjToo:
 
 def test_get_class_tag(test_obj: TestObj, test_obj_too: TestObjToo):
     assert get_class_tag(TestObj) == 'testobj'
-    assert get_class_tag(test_obj) == 'testobj'
+    assert get_class_tag(test_obj) == 'testobj'     # type: ignore
     props_cls = get_class_properties(TestObj)
-    props_inst = get_class_properties(test_obj)
+    props_inst = get_class_properties(test_obj)     # type: ignore
     assert props_cls == props_inst
     props_cls_2 = get_class_properties(TestObjToo)
-    props_inst_2 = get_class_properties(test_obj_too)
+    props_inst_2 = get_class_properties(test_obj_too)   # type: ignore
     assert props_cls_2 != props_inst_2
 
 
@@ -218,6 +223,8 @@ def test_tag_properties_basic():
 
 def test_tag_properties_categorized():
     tagged_cat_props = tag_class_properties(TestObj, categorize=True)
+    assert isinstance(tagged_cat_props, dict)
+    assert all(x in tagged_cat_props for x in ['info', 'config'])
     assert all(k in tagged_cat_props for k in ['info', 'config'])
     exp_ro_untagged = ['five', 'seven', 'one_plus_six']
     exp_rw_untagged = ['two', 'three', 'four', 'six']
@@ -251,12 +258,17 @@ def test_untag_property():
 
 def test_tag_merge(test_obj: TestObj, test_obj_too: TestObjToo):
     tagged_1 = tag_class_properties(TestObj)
+    assert isinstance(tagged_1, list) and all(isinstance(x, str) for x in tagged_1)
     tagged_2 = tag_class_properties(TestObjToo)
+    assert isinstance(tagged_2, list) and all(isinstance(x, str) for x in tagged_2)
     merged = tag_merge(tagged_1, tagged_2)
     assert merged == tagged_1 + tagged_2
     tagged_cat_1 = tag_class_properties(TestObj, categorize=True)
+    assert isinstance(tagged_cat_1, dict)
     tagged_cat_2 = tag_class_properties(TestObjToo, categorize=True)
+    assert isinstance(tagged_cat_2, dict)
     merged_cat = tag_merge(tagged_cat_1, tagged_cat_2)
+    assert isinstance(merged_cat, dict)
     for cat, props in merged_cat.items():
         if cat in tagged_cat_1:
             assert all(p in props for p in tagged_cat_1[cat])
@@ -265,7 +277,16 @@ def test_tag_merge(test_obj: TestObj, test_obj_too: TestObjToo):
 
 
 def test_json_compatible(test_obj):
+    expected = {
+        '_one': 1,
+        'two': {'one': 1, 'two': ['element']},
+        'three': None,
+        'four': 'FIRST',
+        '_five': 'string',
+        '_six': 6,
+    }
     json_test_obj = json_compatible(test_obj)
+    assert json_test_obj == expected
     assert isinstance(json.dumps(json_test_obj), str)
     cat_tagged_vals = tag_class_properties(test_obj, categorize=True)
     json_categorized = json_compatible(cat_tagged_vals)
@@ -300,12 +321,12 @@ class Location(SatModemBaseAttribute):
         self.altitude: float = kwargs.get('altitude', 22)
         self.speed: float = kwargs.get('speed', 0)
         self.heading: float = kwargs.get('heading', 90)
-        self.gnss_satellites: int = kwargs.get('gnss_satellites', None)
-        self.pdop: int = kwargs.get('pdop', None)
-        self.hdop: int = kwargs.get('hdop', None)
-        self.vdop: int = kwargs.get('vdop', None)
-        self.fix_type: str = kwargs.get('fix_type', None)
-        self.fix_allowed: str = kwargs.get('fix_allowed', None)
+        self.gnss_satellites: Optional[int] = kwargs.get('gnss_satellites', None)
+        self.pdop: Optional[int] = kwargs.get('pdop', None)
+        self.hdop: Optional[int] = kwargs.get('hdop', None)
+        self.vdop: Optional[int] = kwargs.get('vdop', None)
+        self.fix_type: Optional[str] = kwargs.get('fix_type', None)
+        self.fix_allowed: Optional[str] = kwargs.get('fix_allowed', None)
 
 
 class PdpContext:
@@ -319,18 +340,18 @@ class PdpContext:
 
     """
     def __init__(self, **kwargs) -> None:
-        self.id: int = kwargs.get('id', None)
-        self.service: str = kwargs.get('service', None)
-        self.apn: str = kwargs.get('apn', None)
-        self.ip_address: str = kwargs.get('ip_address', None)
+        self.id: Optional[int] = kwargs.get('id', None)
+        self.service: Optional[str] = kwargs.get('service', None)
+        self.apn: Optional[str] = kwargs.get('apn', None)
+        self.ip_address: Optional[str] = kwargs.get('ip_address', None)
 
 
 class PdpContextEquivalent:
     def __init__(self, **kwargs) -> None:
-        self.id: int = kwargs.get('id', None)
-        self.service: str = kwargs.get('service', None)
-        self.apn: str = kwargs.get('apn', None)
-        self.ip_address: str = kwargs.get('ip_address', None)
+        self.id: Optional[int] = kwargs.get('id', None)
+        self.service: Optional[str] = kwargs.get('service', None)
+        self.apn: Optional[str] = kwargs.get('apn', None)
+        self.ip_address: Optional[str] = kwargs.get('ip_address', None)
 
     def __eq__(self, __o: object) -> bool:
         return equivalent_attributes(self, __o)

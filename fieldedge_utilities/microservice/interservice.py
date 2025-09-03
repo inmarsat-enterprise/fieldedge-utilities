@@ -3,7 +3,7 @@
 import logging
 import threading
 import time
-from typing import Any, Callable
+from typing import Any, Callable, Optional, Protocol, Union
 from uuid import uuid4
 
 from fieldedge_utilities.logger import verbose_logging
@@ -13,16 +13,34 @@ __all__ = ['IscException', 'IscTaskQueueFull', 'IscTask', 'IscTaskQueue']
 _log = logging.getLogger(__name__)
 
 
+class PublishCallback(Protocol):
+    """Protocol for calling back to a microservice to publish ISC."""
+    def __call__(self, topic: str, message: dict[str, Any], **kwargs) -> None:
+        ...
+
+
+class SubscribeCallback(Protocol):
+    """Protocol for calling back to a microservice to subscribe to ISC topic."""
+    def __call__(self, topic: str, **kwargs) -> bool:
+        ...
+
+
+class UnsubscribeCallback(Protocol):
+    """Protocol for calling back to a microservice to unsubscribe to ISC topic."""
+    def __call__(self, topic: str) -> bool:
+        ...
+
+
 class IscException(Exception):
-    """"""
+    """Base class for ISC exceptions."""
 
 
 class IscTaskQueueFull(IscException):
-    """"""
+    """ISC task queue is full."""
 
 
 class IscTaskNotReleased(IscException):
-    """"""
+    """ISC task was not released."""
 
 
 class IscTask:
@@ -48,11 +66,11 @@ class IscTask:
 
     """
     def __init__(self,
-                 uid: str = None,
-                 task_type: str = None,
-                 task_meta: Any = None,
-                 callback: Callable = None,
-                 lifetime: 'float|None' = 10,
+                 uid: Optional[str] = None,
+                 task_type: Optional[str] = None,
+                 task_meta: Optional[Any] = None,
+                 callback: Optional[Callable] = None,
+                 lifetime: Union[float, None] = 10,
                  ) -> None:
         """Initialize the Task.
         
@@ -68,7 +86,7 @@ class IscTask:
         """
         self._ts: float = round(time.time(), 3)
         self.uid: str = uid or str(uuid4())
-        self.task_type: str = task_type
+        self.task_type: Optional[str] = task_type
         self._lifetime: 'float|None' = None
         self.lifetime = lifetime
         self.task_meta = task_meta
@@ -79,7 +97,7 @@ class IscTask:
             _log.warning('Task timeout_callback is not callable')
         if callback is not None and not callable(callback):
             raise ValueError('Next task callback must be callable if not None')
-        self.callback: Callable = callback
+        self.callback: Optional[Callable] = callback
     
     @property
     def ts(self) -> float:
@@ -92,10 +110,11 @@ class IscTask:
         return round(self._lifetime, 3)
     
     @lifetime.setter
-    def lifetime(self, value: 'float|int|None'):
+    def lifetime(self, value: Union[float, int, None]):
         if value is None:
             _log.warning('Task lifetime set to None (no expiry)')
             self._lifetime = None
+            return
         elif not isinstance(value, (float, int)):
             raise ValueError('Value must be float or int')
         self._lifetime = float(value)
@@ -126,26 +145,21 @@ class IscTaskQueue(list):
         self._unblock_on_expiry = unblock_on_expiry
         self._task_blocking = threading.Event()
         self._task_blocking.set()
+        self._lock = threading.Lock()
 
     @property
-    def task_blocking(self) -> 'threading.Event|None':
-        """A threading.Event if the queue was initialized as blocking, or None.
-        """
-        if self._blocking:
-            return self._task_blocking
+    def task_blocking(self) -> Union[threading.Event, None]:
+        """A threading.Event if the queue was initialized as blocking."""
+        return self._task_blocking if self._blocking else None
 
     @property
     def is_full(self) -> bool:
         return self._blocking and len(self) > 0
     
-    @property
-    def _vlog(self) -> bool:
-        return verbose_logging('isctaskqueue')
-
     def unblock_tasks(self, unblock: bool = True):
         """Unblocks tasks if set."""
         if self._blocking and unblock is True:
-            if not self.task_blocking.is_set():
+            if self.task_blocking and not self.task_blocking.is_set():
                 _log.debug('Unblocking tasks - task_blocking.set()')
                 self.task_blocking.set()
 
@@ -163,61 +177,65 @@ class IscTaskQueue(list):
                 was not set (released).
         
         """
-        if not isinstance(task, IscTask):
-            raise ValueError('item must be IscTask type')
-        if self.is_queued(task.uid):
-            raise ValueError(f'Task {task.uid} already queued')
-        if self._blocking:
-            if len(self) == 1:
-                raise IscTaskQueueFull
-            if not self.task_blocking.is_set():
-                raise IscTaskNotReleased
-            self.task_blocking.clear()
-        if self._vlog:
-            _log.debug('Queued task: %s', task.__dict__)
-        super().append(task)
+        if not isinstance(task, IscTask) or not hasattr(task, 'uid'):
+            raise ValueError('item must be IscTask with uid')
+        with self._lock:
+            if any(t.uid == task.uid for t in self):
+                raise ValueError(f'Task {task.uid} already queued')
+            if self._blocking:
+                if len(self) == 1:
+                    raise IscTaskQueueFull
+                if self.task_blocking:
+                    if not self.task_blocking.is_set():
+                        raise IscTaskNotReleased
+                    self.task_blocking.clear()
+            if _vlog():
+                _log.debug('Queued task: %s', task.__dict__)
+            super().append(task)
 
     def peek(self,
-             task_id: str = None,
-             task_type: str = None,
-             task_meta: 'tuple[str, Any]' = None) -> 'IscTask|None':
+             task_id: Optional[str] = None,
+             task_type: Optional[str] = None,
+             task_meta: Optional[dict[str, Any]] = None,
+             ) -> Union[IscTask, None]:
         """Returns a queued task if it matches the search criteria.
         
         The task remains in the queue.
         
         Args:
-            task_id (str): optional first criteria is unique id
-            task_type (str): optional second criteria returns first match
-            task_meta (tuple): optional metadata tuple returns first match
+            task_id: optional first criteria is unique id
+            task_type: optional second criteria returns first match
+            task_meta: optional metadata filter criteria
             
         """
         if not task_id and not task_type and not task_meta:
             raise ValueError('Missing search criteria')
-        if isinstance(task_meta, tuple) and len(task_meta) != 2:
-            raise ValueError('cb_meta must be a key/value pair')
-        for task in self:
-            assert isinstance(task, IscTask)
-            if ((task_id and task.uid == task_id) or
-                (task_type and task.task_type == task_type)):
-                return task
-            if isinstance(task_meta, tuple):
-                if not isinstance(task.task_meta, dict):
-                    continue
-                for k, v in task.task_meta.items():
-                    if k == task_meta[0] and v == task_meta[1]:
-                        return task
+        if isinstance(task_meta, tuple):
+            task_meta = dict([task_meta])     # convert legacy tuple to dict
+        with self._lock:
+            for task in self:
+                assert isinstance(task, IscTask)
+                if ((task_id and task.uid == task_id) or
+                    (task_type and task.task_type == task_type)):
+                    return task
+                elif isinstance(task_meta, dict):
+                    candidate = task.task_meta
+                    if isinstance(candidate, dict):
+                        if all(k in candidate and task_meta[k] == v
+                            for k, v in task_meta.items()):
+                            return task
         return None
 
     def is_queued(self,
-                  task_id: str = None,
-                  task_type: str = None,
-                  task_meta: 'tuple[str, Any]' = None) -> bool:
+                  task_id: Optional[str] = None,
+                  task_type: Optional[str] = None,
+                  task_meta: Optional[dict[str, Any]] = None) -> bool:
         """Returns `True` if the specified task is queued.
         
         Args:
             task_id: Optional (preferred) unique search criteria.
             task_type: Optional search criteria. May not be unique.
-            cb_meta: Optional key/value search criteria.
+            task_meta: Optional key/value search criteria.
         
         Returns:
             True if the specified task is in the queue.
@@ -226,16 +244,16 @@ class IscTaskQueue(list):
         return isinstance(self.peek(task_id, task_type, task_meta), IscTask)
 
     def get(self,
-            task_id: str = None,
-            task_meta: 'tuple[str, Any]' = None,
-            unblock: bool = False) -> 'IscTask|None':
+            task_id: Optional[str] = None,
+            task_meta: Optional[dict[str, Any]] = None,
+            unblock: bool = False) -> Union[IscTask, None]:
         """Retrieves the specified task from the queue.
         
         Uses task `uid` or `task_meta` tuple.
         
         Args:
             task_id (str): The task `uid`.
-            task_meta (tuple): A `task_meta` tuple with (key, value).
+            task_meta (dict): A `task_meta` dict to match key/value pair(s).
         
         Returns:
             The specified `IscTask`, removing it from the queue.
@@ -244,26 +262,27 @@ class IscTaskQueue(list):
             `ValueError` if neither task_id nor task_meta are specified.
         
         """
-        if isinstance(task_id, str):
+        if not task_id and not task_meta:
+            raise ValueError('task_id or task_meta must be specified')
+        if isinstance(task_meta, tuple):
+            task_meta = dict(task_meta)     # convert legacy tuple to dict
+        with self._lock:
             for i, task in enumerate(self):
                 assert isinstance(task, IscTask)
-                if task.uid == task_id:
-                    self.unblock_tasks(unblock)
+                match = False
+                if task_id and task.uid == task_id:
+                    match = True
+                elif (isinstance(task_meta, dict) and
+                      isinstance(task.task_meta, dict)):
+                    if all(task.task_meta.get(k) == v
+                           for k, v in task_meta.items()):
+                        match = True
+                if match:
+                    if unblock:
+                        self.unblock_tasks(True)
                     return self.pop(i)
-            _log.warning('task_id %s not in queue', task_id)
-        elif isinstance(task_meta, tuple):
-            k, v = task_meta
-            for i, task in enumerate(self):
-                assert isinstance(task, IscTask)
-                candidate = task.task_meta
-                if (isinstance(candidate, dict) and
-                    k in candidate and candidate[k] == v):
-                    # found match
-                    self.unblock_tasks(unblock)
-                    return self.pop(i)
-            _log.warning('task_id %s not in queue', task_id)
-        else:
-            raise ValueError('task_id or meta_tag must be specified')
+        _log.warning('No matching task found in ISC queue')
+        return None
 
     def remove_expired(self):
         """Removes expired tasks from the queue.
@@ -276,38 +295,37 @@ class IscTaskQueue(list):
         """
         if len(self) == 0:
             return
-        expired: 'dict[int, str]' = {}
-        for i, task in enumerate(self):
-            assert isinstance(task, IscTask)
-            if task.lifetime is None:
-                continue
-            if time.time() - task.ts > task.lifetime:
-                expired[i] = task.uid
-        for i, uid in expired.items():
-            rem: IscTask = self.pop(i)
-            _log.warning(f'Removed expired task {rem.uid}')
-            if self._blocking and not self.task_blocking.is_set():
-                if self._unblock_on_expiry:
-                    _log.info('Unblocking expired task %s', uid)
-                    self.task_blocking.set()
-                else:
-                    _log.warning('Expired task %s still blocking', uid)
-            cb_key = 'timeout_callback'
-            if (isinstance(rem.task_meta, dict) and
-                cb_key in rem.task_meta and
-                callable(rem.task_meta[cb_key])):
-                # Callback with metadata
-                timeout_meta = { 'uid': rem.uid }
-                for k, v in rem.task_meta.items():
-                    if k in [cb_key]:
-                        continue
-                    timeout_meta[k] = v
-                rem.task_meta[cb_key](timeout_meta)
+        now = time.time()
+        with self._lock:
+            expired_indices = []
+            for i, task in enumerate(self):
+                assert isinstance(task, IscTask)
+                if task.lifetime is not None and now - task.ts > task.lifetime:
+                    expired_indices.append(i)
+            for i in sorted(expired_indices, reverse=True):
+                task: IscTask = self.pop(i)
+                _log.warning('Removed expired task %s', task.uid)
+                if (self._blocking and
+                    self.task_blocking and not self.task_blocking.is_set()):
+                    if self._unblock_on_expiry:
+                        _log.info('Unblocking expired task %s', task.uid)
+                        self.task_blocking.set()
+                    else:
+                        _log.warning('Expired task %s still blocking', task.uid)
+                if isinstance(task.task_meta, dict):
+                    cb_key = 'timeout_callback'
+                    timeout_callback = task.task_meta.get(cb_key)
+                    if callable(timeout_callback):
+                        timeout_meta = {k: v for k, v in task.task_meta.items()
+                                        if k != cb_key}
+                        timeout_meta['uid'] = task.uid
+                        timeout_callback(timeout_meta)
 
     def clear(self):
         """Removes all items from the queue."""
-        super().clear()
-        self.unblock_tasks(True)
+        with self._lock:
+            super().clear()
+            self.unblock_tasks(True)
 
     def insert(self, index, item):
         """Invalid operation."""
@@ -315,4 +333,8 @@ class IscTaskQueue(list):
 
     def extend(self, other):
         """Invalid operation."""
-        raise OSError('ISC task queue does not support insertion')
+        raise OSError('ISC task queue does not support extension')
+
+
+def _vlog() -> bool:
+    return verbose_logging('isctaskqueue')

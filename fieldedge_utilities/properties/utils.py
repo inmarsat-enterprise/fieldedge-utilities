@@ -5,71 +5,24 @@ import itertools
 import json
 import logging
 import re
-from dataclasses import dataclass, asdict, is_dataclass
+from dataclasses import asdict, is_dataclass
 from enum import Enum
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 from fieldedge_utilities.logger import verbose_logging
 
-__all__ = ['camel_case', 'snake_case', 'get_class_tag',
-           'camel_to_snake', 'snake_to_camel',
-           'get_class_properties', 'get_instance_properties_values',
-           'json_compatible', 'hasattr_static',
-           'property_is_read_only', 'property_is_async', 'tag_class_properties',
-           'tag_class_property', 'untag_class_property', 'tag_merge',
-           'equivalent_attributes', 'READ_ONLY', 'READ_WRITE',
-           'ConfigurableProperty']
+# __all__ = ['camel_case', 'snake_case', 'get_class_tag',
+#            'camel_to_snake', 'snake_to_camel',
+#            'get_class_properties', 'get_instance_properties_values',
+#            'json_compatible', 'hasattr_static',
+#            'property_is_read_only', 'property_is_async', 'tag_class_properties',
+#            'tag_class_property', 'untag_class_property', 'tag_merge',
+#            'equivalent_attributes', 'READ_ONLY', 'READ_WRITE']
 
 READ_ONLY = 'info'
 READ_WRITE = 'config'
 
 _log = logging.getLogger(__name__)
-
-
-@dataclass
-class ConfigurableProperty:
-    """Data structure for a remotely configurable property."""
-    type: str
-    min: Optional[Union[int, float]] = None
-    max: Optional[Union[int, float]] = None
-    enum: Optional[list[str]] = None
-    desc: Optional[str] = None
-    
-    def __post_init__(self):
-        if self.type not in self.supported_types().keys():
-            raise ValueError('Invalid type string')
-        if self.min is not None:
-            if not isinstance(self.min, (int, float)):
-                raise ValueError('Invalid min value')
-        if self.max is not None:
-            if not isinstance(self.max, (int, float)):
-                raise ValueError('Invalid max value')
-        if self.enum is not None:
-            # if issubclass(self.enum, Enum):
-            if hasattr(self.enum, '__members__'):
-                self.enum = list(self.enum.__members__.keys())
-            if (not isinstance(self.enum, list) or
-                not all(isinstance(e, str) and len(e) > 0 for e in self.enum)):
-                raise ValueError('Invalid enum values')
-        
-    @classmethod
-    def supported_types(cls) -> dict:
-        return {
-            'int': int,
-            'bool': bool,
-            'float': float,
-            'str': str,
-            'enum': str,
-            'list': list,
-            'dict': dict,
-        }
-    
-    def json_compatible(self) -> dict:
-        """Converts to a JSON-compatible representation."""
-        result = asdict(self)
-        if result['enum'] is not None and hasattr(result['enum'], '__members__'):
-            result['enum'] = list(result['enum'].__members__.keys())
-        return { k: v for k, v in result.items() if v is not None }
 
 
 def camel_to_snake(camel_str: str, skip_caps: bool = False) -> str:
@@ -157,7 +110,7 @@ def camel_case(original: str,
         raise ValueError('Invalid string input')
     if original.isupper() and skip_caps:
         return original
-    words = snake_case(original).split('_')
+    words = snake_case(original, skip_pascal=skip_pascal).split('_')
     if len(words) == 1:
         regex = '.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)'
         matches = re.finditer(regex, original)
@@ -186,7 +139,7 @@ def get_class_tag(cls: type) -> str:
     return cls.__class__.__name__.lower()
 
 
-def get_class_properties(cls: type, ignore: 'list[str]' = None) -> 'list[str]':
+def get_class_properties(cls: type, ignore: Optional[list[str]] = None) -> list[str]:
     """Returns non-hidden, non-callable properties/values of a Class instance.
     
     Also ignores CAPITAL_CASE attributes which are assumed to be constants.
@@ -202,39 +155,48 @@ def get_class_properties(cls: type, ignore: 'list[str]' = None) -> 'list[str]':
         ValueError if `cls` does not have a `dir()` method or is not a `type`.
         
     """
-    # helper function
-    def is_callable(attr_name):
-        attr = inspect.getattr_static(cls, attr_name)
-        if isinstance(attr, (classmethod, staticmethod)):
-            return callable(attr.__func__)
-        return callable(attr)
-    # main function
-    if not dir(cls):
-        raise ValueError('Invalid cls_instance - must have dir() method')
+    from .delegated import DelegatedProperty
+    
+    if not hasattr(cls, '__dir__'):
+        raise ValueError(f'{cls.__name__} invalid - must have dir() method')
     if isinstance(cls, type) and '__slots__' not in dir(cls):
-        _log.warning('No __slots__: attributes in __init__ will be missed')
+        _log.debug('%s has no __slots__: attributes in __init__ will be missed',
+                   cls.__name__)
     if not isinstance(ignore, list):
         ignore = []
-    attrs = [attr_name for attr_name in dir(cls)
-             if not attr_name.startswith(('_',)) and
-             attr_name not in ignore and
-             not is_callable(attr_name) and
-             not attr_name.isupper()]
-    return attrs
+    props: list[str] = []
+    for attr_name in dir(cls):
+        if attr_name.startswith('_') or attr_name in ignore or attr_name.isupper():
+            continue
+        # Use static lookup to avoid triggering descriptors
+        try:
+            attr = inspect.getattr_static(cls, attr_name)
+        except AttributeError:
+            continue
+        # Expose normal and delegated properties
+        if isinstance(attr, (property, DelegatedProperty)):
+            props.append(attr_name)
+            continue
+        # Skip methods and callables
+        if isinstance(attr, (classmethod, staticmethod)):
+            if callable(attr.__func__):
+                continue
+        if callable(attr):
+            continue
+        # Fallback: constant or class-level value
+        props.append(attr_name)
+    return props
 
 
-def get_instance_properties_values(instance: object) -> dict:
+def get_instance_properties_values(instance: object) -> dict[str, Any]:
     """Returns the instance properties and values."""
-    props_list = get_class_properties(instance)
-    props_values = {}
-    for prop in props_list:
-        props_values[prop] = getattr(instance, prop)
-    return props_values
+    props_list = get_class_properties(instance.__class__)
+    return { k: getattr(instance, k) for k in props_list }
 
 
 def json_compatible(obj: object,
                     camel_keys: bool = True,
-                    skip_caps: bool = True) -> dict:
+                    skip_caps: bool = True) -> Any:
     """Returns a dictionary compatible with `json.dumps` function.
 
     Nested objects are converted to dictionaries.
@@ -252,53 +214,101 @@ def json_compatible(obj: object,
             `json.dumps`.
 
     """
-    res = obj
-    if camel_keys:
-        if isinstance(obj, dict):
-            res = {}
-            for key, val in obj.items():
-                if ((isinstance(key, str) and key.isupper() and skip_caps) or
-                    not isinstance(key, str)):
-                    # no change
-                    camel_key = key
+    from .configurable import ConfigurableProperty
+    
+    # Handle simple base cases first
+    if isinstance(obj, Enum):
+        return obj.name
+    if obj is None or isinstance(obj, (str, int, float, bool)):
+        return obj
+    if isinstance(obj, ConfigurableProperty):
+        return {
+            k: json_compatible(v) for k, v in asdict(obj).items()
+            if v is not None
+        }
+    if isinstance(obj, dict):
+        res: dict[Any, Any] = {}
+        for k, v in obj.items():
+            if isinstance(k, str):
+                if k.isupper() and skip_caps:
+                    new_key = k
                 else:
-                    camel_key = camel_case(str(key))
-                if camel_key != key and verbose_logging('tags'):
-                    _log.debug('Changed %s to %s', key, camel_key)
-                res[camel_key] = json_compatible(val, camel_keys, skip_caps)
-        elif isinstance(obj, list):
-            res = [json_compatible(i) for i in obj]
-    try:
-        if is_dataclass(res):
-            res = asdict(res)
-        json.dumps(res)
-        if isinstance(res, Enum):
-            return res.name
-        return res
-    except TypeError:
-        try:
-            if callable(res):
-                res = f'<function:{res.__name__}>'
-            elif isinstance(res, list):
-                res = [json_compatible(v, camel_keys, skip_caps)
-                       for v in res]
-            elif isinstance(res, dict):
-                res = {k:json_compatible(v, camel_keys, skip_caps)
-                       for k, v in res.items()}
-            # elif is_dataclass(res):
-            elif hasattr(res, '__dict__'):
-                res = json_compatible(get_instance_properties_values(res),
-                                      camel_keys,
-                                      skip_caps)
-            elif hasattr(res, '__slots__'):
-                res = {s: json_compatible(getattr(res, s, None))
-                       for s in res.__slots__}
+                    new_key = camel_case(k) if camel_keys else k
             else:
-                res = '<non-serializable>'
-            return res
-        except Exception as exc:
-            _log.error(exc)
-            raise exc
+                new_key = k
+            res[new_key] = json_compatible(v, camel_keys, skip_caps)
+        return res
+    if isinstance(obj, (list, tuple)):
+        return [json_compatible(i, camel_keys, skip_caps) for i in obj]
+    if is_dataclass(obj):
+        return json_compatible(asdict(obj), camel_keys, skip_caps)  # type: ignore
+    if callable(obj):
+        name = getattr(obj, '__name__', repr(obj))
+        return f'<function:{name}'
+    if hasattr(obj, '__dict__'):
+        return json_compatible(get_instance_properties_values(obj),
+                               camel_keys, skip_caps)
+    if hasattr(obj, '__slots__'):
+        slots = getattr(obj, '__slots__')
+        if isinstance(slots, str):
+            slots = (slots,)
+        return {
+            s: json_compatible(getattr(obj, s, None), camel_keys, skip_caps)
+            for s in slots
+        }
+    try:
+        json.dumps(obj)
+        return obj
+    except Exception as exc:
+        _log.error(exc)
+        return '<non-serializable>'
+    # res = obj
+    # if camel_keys:
+    #     if isinstance(obj, dict):
+    #         res = {}
+    #         for key, val in obj.items():
+    #             if ((isinstance(key, str) and key.isupper() and skip_caps) or
+    #                 not isinstance(key, str)):
+    #                 # no change
+    #                 new_key = key
+    #             else:
+    #                 new_key = camel_case(str(key))
+    #             if new_key != key and verbose_logging('tags'):
+    #                 _log.debug('Changed %s to %s', key, new_key)
+    #             res[new_key] = json_compatible(val, camel_keys, skip_caps)
+    #     elif isinstance(obj, list):
+    #         res = [json_compatible(i) for i in obj]
+    # try:
+    #     if is_dataclass(res):
+    #         res = asdict(res)   # type: ignore
+    #     json.dumps(res)
+    #     if isinstance(res, Enum):
+    #         return res.name
+    #     return res
+    # except TypeError:
+    #     try:
+    #         if callable(res):
+    #             res = f'<function:{res.__name__}>'
+    #         elif isinstance(res, list):
+    #             res = [json_compatible(v, camel_keys, skip_caps)
+    #                    for v in res]
+    #         elif isinstance(res, dict):
+    #             res = {k:json_compatible(v, camel_keys, skip_caps)
+    #                    for k, v in res.items()}
+    #         # elif is_dataclass(res):
+    #         elif hasattr(res, '__dict__'):
+    #             res = json_compatible(get_instance_properties_values(res),
+    #                                   camel_keys,
+    #                                   skip_caps)
+    #         elif hasattr(res, '__slots__'):
+    #             res = {s: json_compatible(getattr(res, s, None))
+    #                    for s in getattr(res, '__slots__')}
+    #         else:
+    #             res = '<non-serializable>'
+    #         return res
+    #     except Exception as exc:
+    #         _log.error(exc)
+    #         raise exc
 
 
 def hasattr_static(obj: object, attr: str) -> bool:
@@ -338,12 +348,12 @@ def property_is_async(instance: object, property_name: str) -> bool:
 
 
 def tag_class_properties(cls: type,
-                         tag: str = None,
+                         tag: Optional[str] = None,
                          auto_tag: bool = True,
                          use_json: bool = True,
                          categorize: bool = False,
-                         ignore: 'list[str]' = None,
-                         ) -> 'list|dict':
+                         ignore: Optional[list[str]] = None,
+                         ) -> Union[list, dict]:
     """Retrieves the class public properties tagged with a routing prefix.
     
     If a `tag` is not provided and `auto_tag` is `True` then the lowercase name
@@ -402,7 +412,7 @@ def tag_class_properties(cls: type,
 
 
 def tag_class_property(prop: str,
-                       tag_or_cls: 'str|type' = None,
+                       tag_or_cls: Optional[Union[str, type]] = None,
                        use_json: bool = True) -> str:
     """Converts a property for ISC adding an optional tag."""
     if tag_or_cls is None:
@@ -415,15 +425,13 @@ def tag_class_property(prop: str,
         else:
             raise ValueError('tag_or_cls must be a string or class type')
         tagged = f'{tag.lower()}_{prop}'
-    if use_json:
-        return camel_case(f'{tagged}')
-    return f'{tag}_{prop}'
+    return camel_case(tagged) if use_json else tagged
 
 
 def untag_class_property(property_name: str,
                          is_tagged: bool = True,
                          include_tag: bool = False,
-                         ) -> 'str|tuple[str, str]':
+                         ) -> Union[str, tuple[str, str|None]]:
     """Reverts a JSON-format tagged property to its PEP representation.
     
     Expects a JSON-format tagged value e.g. `modemUniqueId` would return
@@ -445,12 +453,12 @@ def untag_class_property(property_name: str,
         if '_' not in prop:
             raise ValueError(f'Invalid tagged {property_name}')
         tag, prop = prop.split('_', 1)
-    if not include_tag:
-        return prop
-    return (prop, tag)
+    if include_tag:
+        return (prop, tag)
+    return prop
 
 
-def tag_merge(*args) -> 'list|dict':
+def tag_merge(*args) -> Union[list, dict]:
     """Merge multiple tagged property lists/dictionaries.
     
     Args:
@@ -501,10 +509,10 @@ def _nested_tag_merge(add: dict, merged: dict) -> dict:
 
 def equivalent_attributes(ref: object,
                           other: object,
-                          exclude: 'list[str]' = None,
+                          exclude: Optional[list[str]] = None,
                           dbg: str = '',
                           ) -> bool:
-    """Confirms attribute equivalence between objects of the same type.
+    """Recursively check that two objects have equivalent non-callable attributes.
     
     Args:
         ref: The reference object being compared to.
@@ -517,26 +525,52 @@ def equivalent_attributes(ref: object,
     """
     if not isinstance(other, type(ref)):
         return False
-    if not hasattr(ref, '__dict__') or not hasattr(other, '__dict__'):
-        return ref == other
-    if not isinstance(exclude, list):
+    if exclude is None:
         exclude = []
     if dbg:
         dbg += '.'
-    for attr in dir(ref):
+    if hasattr(ref, '__slots__'):
+        attrs = list(getattr(ref, '__slots__', []))
+    else:
+        attrs = list(getattr(ref, '__dict__', {}).keys())
+    # Add in properties defined on the class
+    for name, val in inspect.getmembers(type(ref)):
+        if isinstance(val, property):
+            attrs.append(name)
+    for attr in sorted(set(attrs)):
         if attr.startswith('__') or attr in exclude:
             continue
         if not hasattr(other, attr):
             _log.debug('Other missing %s%s', dbg, attr)
             return False
         ref_val = getattr(ref, attr)
-        if callable(ref_val):
-            continue
         other_val = getattr(other, attr)
-        if any(hasattr(ref_val, a) for a in ['__dict__', '__slots__']):
-            if not equivalent_attributes(ref_val, other_val, dbg=attr):
+        # Skip methods and functions
+        if inspect.ismethod(ref_val) or inspect.isfunction(ref_val):
+            continue
+        # Recurse if they’re objects with attributes
+        if (hasattr(ref_val, '__dict__') or hasattr(ref_val, '__slots__')) \
+           and not isinstance(ref_val, (str, bytes, int, float, bool, tuple, frozenset)):
+            if not equivalent_attributes(ref_val, other_val, exclude=exclude, dbg=dbg+attr):
                 return False
         elif ref_val != other_val:
-            _log.debug('%s%s mismatch', dbg, attr)
+            _log.debug('%s%s mismatch: %r != %r', dbg, attr, ref_val, other_val)
             return False
     return True
+    # for attr in dir(ref):
+    #     if attr.startswith('__') or attr in exclude:
+    #         continue
+    #     if not hasattr(other, attr):
+    #         _log.debug('Other missing %s%s', dbg, attr)
+    #         return False
+    #     ref_val = getattr(ref, attr)
+    #     if callable(ref_val):
+    #         continue
+    #     other_val = getattr(other, attr)
+    #     if any(hasattr(ref_val, a) for a in ['__dict__', '__slots__']):
+    #         if not equivalent_attributes(ref_val, other_val, dbg=attr):
+    #             return False
+    #     elif ref_val != other_val:
+    #         _log.debug('%s%s mismatch', dbg, attr)
+    #         return False
+    # return True

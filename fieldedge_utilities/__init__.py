@@ -22,7 +22,13 @@ from .microservice import (
 from .modem import ConnectionManager, QosMetricsManager
 from .mqtt import MqttClient, MqttError, MqttResultCode
 from .path import get_caller_name
-from .properties import ConfigurableProperty, camel_case, json_compatible, snake_case
+from .properties import (
+    ConfigurableProperty,
+    DelegatedProperty,
+    camel_case,
+    json_compatible,
+    snake_case,
+)
 from .serial import list_available_serial_ports
 from .timer import RepeatingTimer
 from .timestamp import iso_to_ts, ts_to_iso
@@ -55,6 +61,7 @@ __all__ = [
     'MqttResultCode',
     'get_caller_name',
     'ConfigurableProperty',
+    'DelegatedProperty',
     'camel_case',
     'json_compatible',
     'snake_case',

@@ -17,11 +17,11 @@ import json
 import logging
 import os
 import threading
+import time
 from atexit import register as on_exit
 from enum import IntEnum
 from socket import gaierror, timeout  # : Python<3.10 vs TimeoutError
-from time import sleep, time
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 from paho.mqtt.client import Client as PahoClient
 from paho.mqtt.client import MQTTMessage as PahoMessage
@@ -87,8 +87,8 @@ class MqttClient:
     """
     def __init__(self,
                  client_id: str = __name__,
-                 on_message: callable = None,
-                 subscribe_default: 'str|list[str]' = None,
+                 on_message: Optional[Callable[[str, Any], Any]] = None,
+                 subscribe_default: Optional[str|list[str]] = None,
                  auto_connect: bool = True,
                  connect_retry_interval: int = 5,
                  **kwargs) -> None:
@@ -96,7 +96,7 @@ class MqttClient:
         
         Args:
             client_id (str): The client ID (default imports module `__name__`)
-            on_message (callable): The callback when subscribed messages are
+            on_message (Callable): The callback when subscribed messages are
                 received as `topic`(str), `message`(dict|str).
             subscribe_default (str|list[str]): The default subscription(s)
                 established on re/connection.
@@ -152,7 +152,7 @@ class MqttClient:
         self.on_connect: 'Callable|None' = kwargs.get('on_connect', None)
         self.on_disconnect: 'Callable|None' = kwargs.get('on_disconnect', None)
         self._qos = kwargs.get('qos', 0)
-        self._thread_name: str = kwargs.get('thread_name', None)
+        self._thread_name: str = kwargs.get('thread_name', 'MqttThread')
         self._client_base_id = client_id
         self._client_id = None
         self._client_uid = kwargs.get('client_uid', True)
@@ -191,7 +191,7 @@ class MqttClient:
                 if _vlog():
                     _log.debug('Updating client_id %s with new timestamp', uid)
                 uid = self._client_base_id
-            self._client_id = f'{uid}_{int(time())}'
+            self._client_id = f'{uid}_{int(time.time())}'
 
     @property
     def is_connected(self) -> bool:
@@ -213,7 +213,7 @@ class MqttClient:
         return self._failed_connect_attempts
 
     @property
-    def on_log(self) -> Callable:
+    def on_log(self) -> Callable|None:
         return self._mqtt.on_log
 
     @on_log.setter
@@ -224,7 +224,7 @@ class MqttClient:
 
     @property
     def connect_timeout(self) -> int:
-        return int(self._mqtt._connect_timeout)
+        return int(self._connect_timeout)
 
     @connect_timeout.setter
     def connect_timeout(self, value: 'int|float'):
@@ -233,7 +233,6 @@ class MqttClient:
             # invalid value
             raise ValueError('Connect timeout must be 1..120 seconds')
         self._connect_timeout = value
-        self._mqtt._connect_timeout = float(value)
 
     @property
     def connect_retry_interval(self) -> int:
@@ -252,10 +251,10 @@ class MqttClient:
                 for arg in args:
                     _log.debug('mqtt cleanup called with arg = %s', arg)
                 _log.debug('Terminating MQTT connection')
-            except:
-                pass
+            except Exception as exc:
+                _log.error(exc)
         self._mqtt.user_data_set('terminate')
-        self._mqtt.loop_stop()
+        self._mqtt.loop_stop(force=True)
         self._mqtt.disconnect()
 
     def _unique_thread_name(self, before_names: 'list[str]') -> str:
@@ -272,52 +271,71 @@ class MqttClient:
 
     def connect(self):
         """Attempts to establish a connection to the broker and re-subscribe."""
-        try:
-            if _vlog():
-                _log.debug('Attempting MQTT broker connection to %s as %s',
-                           self._host, self.client_id)
-            self._mqtt.reinitialise(client_id=self.client_id)
-            self.connect_timeout = self._connect_timeout   #: just in case
-            self._mqtt.user_data_set(None)
-            self._mqtt.on_connect = self._mqtt_on_connect
-            self._mqtt.on_disconnect = self._mqtt_on_disconnect
-            self._mqtt.on_subscribe = self._mqtt_on_subscribe
-            self._mqtt.on_message = self._mqtt_on_message
-            if self._username or self._password:
-                self._mqtt.username_pw_set(username=self._username,
-                                           password=self._password)
-            if self._port == 8883:
-                self._mqtt.tls_set(ca_certs=self._ca_certs,
-                                   certfile=self._certfile,
-                                   keyfile=self._keyfile)
-                # self._mqtt.tls_insecure_set(False)
-            self._mqtt.connect(host=self._host,
-                               port=self._port,
-                               keepalive=self._keepalive,
-                               bind_address=self._bind_address)
-            threads_before = threading.enumerate()
-            self._mqtt.loop_start()
-            threads_after = threading.enumerate()
-            new_thread = list(set(threads_after) - set(threads_before))[0]
-            before_names = [t.name for t in threads_before]
-            new_thread.name = self._unique_thread_name(before_names)
-            _log.debug('New MQTT client thread: %s', new_thread.name)
-            return
-        except (ConnectionError, TimeoutError, gaierror, timeout) as exc:
-            self._mqtt.loop_stop()
-            self._failed_connect_attempts += 1
-            _log.error('Failed attempt %d to connect to %s (%s)',
-                       self._failed_connect_attempts, self._host, exc)
-            if not self.auto_connect or self.connect_retry_interval <= 0:
-                raise ConnectionError(str(exc)) from exc
-            _log.debug('Retrying in %d seconds', self.connect_retry_interval)
-            sleep(self.connect_retry_interval)
-            self.connect()
+        if not self.client_id:
+            raise ConnectionError('Missing client ID')
+        if _vlog():
+            _log.debug('Attempting MQTT broker connection to %s as %s',
+                       self._host, self.client_id)
+        while True:
+            try:
+                # Reinitialize the client cleanly
+                self._mqtt.reinitialise(client_id=self.client_id)
+                # self.connect_timeout = self._connect_timeout   #: just in case
+                self._mqtt.user_data_set(None)
+                self._mqtt.on_connect = self._mqtt_on_connect
+                self._mqtt.on_disconnect = self._mqtt_on_disconnect
+                self._mqtt.on_subscribe = self._mqtt_on_subscribe
+                self._mqtt.on_message = self._mqtt_on_message
+                if self._username or self._password:
+                    self._mqtt.username_pw_set(
+                        username=self._username,
+                        password=self._password or None,
+                    )
+                if self._port == 8883:
+                    self._mqtt.tls_set(
+                        ca_certs=self._ca_certs,
+                        certfile=self._certfile,
+                        keyfile=self._keyfile,
+                    )
+                    # self._mqtt.tls_insecure_set(False)
+                self._mqtt.connect(host=self._host,
+                                   port=self._port,
+                                   keepalive=self._keepalive,
+                                   bind_address=self._bind_address)
+                threads_before = threading.enumerate()
+                self._mqtt.loop_start()
+                threads_after = threading.enumerate()
+                new_threads = list(set(threads_after) - set(threads_before))
+                if new_threads:
+                    new_thread = new_threads[0]
+                    before_names = [t.name for t in threads_before]
+                    try:
+                        new_thread.name = self._unique_thread_name(before_names)
+                        _log.debug('New MQTT client thread: %s',
+                                   new_thread.name)
+                    except Exception as exc:
+                        _log.warning('Unable to rename MQTT thread: %s', exc)
+                # Wait for connection event or timeout
+                start = time.time()
+                deadline = start + self.connect_timeout
+                while not self.is_connected and time.time() < deadline:
+                    time.sleep(0.1)
+                if not self.is_connected:
+                    raise TimeoutError('MQTT connection timed out')
+                return   # success
+            except (ConnectionError, TimeoutError, gaierror, timeout) as exc:
+                self._failed_connect_attempts += 1
+                _log.error('Failed attempt %d to connect to %s (%s)',
+                           self._failed_connect_attempts, self._host, exc)
+                if not self.auto_connect or self.connect_retry_interval <= 0:
+                    raise ConnectionError(str(exc)) from exc
+                _log.debug('Retrying in %d seconds', self.connect_retry_interval)
+                time.sleep(self.connect_retry_interval)
 
     def disconnect(self):
         """Attempts to disconnect from the broker."""
         self._mqtt.user_data_set('terminate')
-        self._mqtt.loop_stop()
+        self._mqtt.loop_stop(force=True)
         self._mqtt.disconnect()
 
     def _mqtt_on_connect(self,
@@ -331,7 +349,7 @@ class MqttClient:
             if _vlog():
                 _log.debug('Established MQTT connection to %s', self._host)
             for sub, meta in self.subscriptions.items():
-                self._mqtt_subscribe(sub, qos=meta.get('qos', None))
+                self._mqtt_subscribe(sub, qos=meta.get('qos', 0))
             if callable(self.on_connect):
                 self.on_connect(client, userdata, flags, result_code)
         else:
@@ -348,8 +366,11 @@ class MqttClient:
             if mid == 0:
                 _log.warning('Received mid=%d expected > 0', mid)
             self._subscriptions[topic]['mid'] = mid
+            self._subscriptions[topic]['pending'] = False
         else:
-            _log.error('MQTT Error %s subscribing to %s', result, topic)
+            _log.error('Subscribe failed for %s (%s)',
+                       topic, _get_mqtt_result(result))
+            del self._subscriptions[topic]
 
     def subscribe(self, topic: str, qos: int = 0) -> None:
         """Adds a subscription.
@@ -364,7 +385,7 @@ class MqttClient:
         """
         if _vlog():
             _log.debug('Adding subscription %s (qos=%d)', topic, qos)
-        self._subscriptions[topic] = {'qos': qos, 'mid': 0}
+        self._subscriptions[topic] = {'qos': qos, 'mid': 0, 'pending': True}
         if self.is_connected:
             self._mqtt_subscribe(topic, qos)
         else:
@@ -375,15 +396,13 @@ class MqttClient:
                            userdata: Any,
                            mid: int,
                            granted_qos: 'tuple[int]'):
-        match = ''
         for topic, detail in self.subscriptions.items():
             if mid == detail.get('mid', None):
                 _log.info('Subscribed to %s (mid=%d, granted_qos=%s)',
                           topic, mid, granted_qos)
-                match = topic
-                break
-        if not match:
-            _log.error('Unable to match mid=%d to pending subscription', mid)
+                detail['pending'] = False
+                return
+        _log.error('Unable to match mid=%d to pending subscription', mid)
 
     def is_subscribed(self, topic: str) -> bool:
         """Returns True if the specified topic is an active subscription."""
@@ -408,7 +427,8 @@ class MqttClient:
                        message.topic, message.qos, payload)
             if userdata:
                 _log.debug('MQTT client userdata: %s', userdata)
-        self.on_message(message.topic, payload)
+        if callable(self.on_message):
+            self.on_message(message.topic, payload)
 
     def _mqtt_unsubscribe(self, topic: str):
         if _vlog():
@@ -451,7 +471,7 @@ class MqttClient:
                 message: 'str|dict|None',
                 qos: int = 1,
                 camel_keys: bool = False,
-                wait_for_publish: float = None,
+                wait_for_publish: Optional[float] = None,
                 ) -> bool:
         """Publishes a message to a MQTT topic.
 
@@ -483,10 +503,16 @@ class MqttClient:
             qos = 1
         publish_info = self._mqtt.publish(topic=topic, payload=message, qos=qos)
         if wait_for_publish:
-            try:
-                publish_info.wait_for_publish(wait_for_publish)
-            except (ValueError, RuntimeError) as exc:
-                _log.error("Wait error: %s", exc)
+            start = time.time()
+            while not publish_info.is_published():
+                if not self.is_connected:
+                    _log.error('MQTT disconnected during publish on topic %s',
+                               topic)
+                    return False
+                if time.time() - start > wait_for_publish:
+                    _log.error('Timeout waiting for publish on topic %s', topic)
+                    return False
+                time.sleep(0.05)
         if publish_info.rc != MqttResultCode.SUCCESS:
             _log.error('Publishing error %d (%s)',
                        publish_info.rc, _get_mqtt_result(publish_info.rc))

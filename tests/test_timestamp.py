@@ -8,7 +8,7 @@ def test_ts_to_iso():
     iso = timestamp.ts_to_iso(ts)
     assert isinstance(iso, str)
     assert len(iso) == 20
-    iso_ms = timestamp.ts_to_iso(ts, ms=True)
+    iso_ms = timestamp.ts_to_iso(ts, include_ms=True)
     assert len(iso_ms) == 24
     ts_spec = 1609459200
     iso_spec = timestamp.ts_to_iso(ts_spec)
@@ -23,6 +23,6 @@ def test_iso_to_ts():
     iso_ms = '2021-01-01T00:00:00.123Z'
     ts = timestamp.iso_to_ts(iso_ms)
     assert ts == 1609459200
-    ts_ms = timestamp.iso_to_ts(iso_ms, ms=True)
+    ts_ms = timestamp.iso_to_ts(iso_ms, include_ms=True)
     assert ts_ms == 1609459200.123
 

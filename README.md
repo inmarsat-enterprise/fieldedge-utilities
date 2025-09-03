@@ -16,8 +16,9 @@ restarted, and interval changed.
 * A simplified **`mqtt`** client that automatically (re)onnects
 (by default to a local `fieldedge-broker`).
 * Helper functions for managing files and **`path`** on different OS.
-* An interface for the FieldEdge **`hostpipe`** service for sending host
-commands from a Docker container, with request/result captured in a logfile.
+* An interface for the FieldEdge **`hostpipe`** or **`hostrequest`** service
+for sending host commands from a Docker container, with request/result captured
+in a logfile.
 * Helper functions **`ip.interfaces`** for finding and validating IP interfaces
 and addresses/subnets.
 * A defined set of common **`ip.protocols`** used for packet analysis and
@@ -26,6 +27,9 @@ satellite data traffic optimisation.
 * Utilities for converting **`timestamp`**s between unix and ISO 8601
 * **`properties`** manipulation and conversion between JSON and PEP style,
 and derived from classes or instances.
+    * **`ConfigurableProperty`** for improved ISC configuration handling.
+    * **`DelegatedProperty`** for subclass conversions of method to property
+    with optional caching.
 * Classes useful for implementing **`microservice`**s based on MQTT
 inter-service communications and task workflows:
     * **`interservice`** communications tasks and searchable queue.

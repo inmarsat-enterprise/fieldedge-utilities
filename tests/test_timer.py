@@ -78,7 +78,7 @@ def test_resync_when_late(caplog):
     def slow_task():
         calls.append(time.monotonic())
         logger.info('Target executing...')
-        time.sleep(0.6)
+        time.sleep(1.6)
         logger.info('Target complete')
     
     timer = RepeatingTimer(

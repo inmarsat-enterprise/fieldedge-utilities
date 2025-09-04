@@ -259,7 +259,7 @@ class MqttClient:
 
     def _unique_thread_name(self, before_names: 'list[str]') -> str:
         basename = 'MqttThread'
-        if self._thread_name:
+        if self._thread_name != basename:
             basename += f'-{self._thread_name}'
         new_name = basename
         number = 1

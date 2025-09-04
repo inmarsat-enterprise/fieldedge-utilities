@@ -117,21 +117,27 @@ class DelegatedProperty(Generic[T]):
         inst_dict: dict[str, Any] = object.__getattribute__(instance, '__dict__')
         notified = False
 
+        # 0) Check temporary cache override if present
+        if self.name is None:
+            raise AttributeError('No name for property')
+        override_key = f'__cache_ttl_override_{self.name}'
+        ttl = inst_dict.get(override_key, self.cache_ttl)
+        
         # 1) cache check
         cached = inst_dict.get(self._cache_name, _MISSING)
         if cached is not _MISSING:
-            if self.cache_ttl is None:
+            if ttl is None:
                 return cached  # forever
-            if self.cache_ttl > 0:
+            if ttl > 0:
                 t_cached = inst_dict.get(self._time_name, 0.0)
-                if (now - t_cached) < self.cache_ttl:
+                if (now - t_cached) < ttl:
                     return cached
                 if self._log_getter and not notified:
                     caller = get_caller_name(depth=2, mth=True)
                     _log.info('Refreshing expired %s cache... (for: %s, ttl: %s)',
-                              self.name, caller, self.cache_ttl)
+                              self.name, caller, ttl)
                     notified = True
-            if self.cache_ttl == 0:
+            if ttl == 0:
                 # clean stale cache entries then fall through
                 inst_dict.pop(self._cache_name, None)
                 inst_dict.pop(self._time_name, None)
@@ -175,7 +181,7 @@ class DelegatedProperty(Generic[T]):
                     if self._log_getter and not notified:
                         caller = get_caller_name(depth=2, mth=True)
                         _log.info('Getting new %s... (for: %s, ttl: %s)',
-                                  self.name, caller, self.cache_ttl)
+                                  self.name, caller, ttl)
                         notified = True
                     getter = object.__getattribute__(instance, getter_name)
                 except AttributeError:
@@ -184,7 +190,7 @@ class DelegatedProperty(Generic[T]):
                 value = getter()
 
         # 5) write cache if configured
-        if self.cache_ttl is None or self.cache_ttl > 0:
+        if ttl is None or ttl > 0:
             now = time.monotonic()  # update time based on query response
             inst_dict[self._cache_name] = value
             inst_dict[self._time_name] = now

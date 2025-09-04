@@ -1,7 +1,7 @@
 """A Feature class for use as a child of a `Microservice`.
 """
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, TypeAlias
 
 from fieldedge_utilities.properties import (
     camel_case,
@@ -15,6 +15,9 @@ from .interservice import IscTaskQueue
 __all__ = ['Feature']
 
 
+OptCallback: TypeAlias = Optional[Callable[..., None]]
+
+
 class Feature(ABC):
     """Template for a microservice feature as a child of the microservice.
     
@@ -26,30 +29,32 @@ class Feature(ABC):
     __slots__ = ['_task_queue', '_task_notify', '_task_complete', '_task_fail',
                  '_props']
 
-    def __init__(self,
-                 task_queue: Optional[IscTaskQueue] = None,
-                 task_notify: Optional[Callable[..., None]] = None,
-                 task_complete: Optional[Callable[..., None]] = None,
-                 task_fail: Optional[Callable[..., None]] = None,
-                 **kwargs) -> None:
+    def __init__(self, **kwargs) -> None:
         """Initializes the feature.
         
         Additional keyword arguments passed in each become a property/value.
         
         Args:
-            task_queue (`IscTaskQueue`): The parent microservice ISC task queue.
-            task_notify (`Callable[[str, dict]]`): The parent `notify`
+            **task_queue (`IscTaskQueue`): The parent microservice ISC task queue.
+            **task_notify (`Callable[[str, dict]]`): The parent `notify`
                 method for MQTT publish.
-            task_complete (`Callable[[str, dict]]`): A parent task
+            **task_complete (`Callable[[str, dict]]`): A parent task
                 completion function to receive task `uid` and `task_meta`.
-            task_fail (`Callable`): An optional parent function to call if the
+            **task_fail (`Callable`): An optional parent function to call if the
                 task fails.
         """
-        super().__init__(**kwargs)
-        self._task_queue = task_queue
-        self._task_notify = task_notify
-        self._task_complete = task_complete
-        self._task_fail = task_fail
+        try:
+            super().__init__(**kwargs)
+        except TypeError:
+            try:
+                super().__init__()
+            except TypeError:
+                # Some exotic bases may require positional args only
+                pass
+        self._task_queue: Optional[IscTaskQueue] = kwargs.pop('task_queue', None)
+        self._task_notify: OptCallback = kwargs.pop('task_notify', None)
+        self._task_complete: OptCallback = kwargs.pop('task_complete', None)
+        self._task_fail: OptCallback = kwargs.pop('task_fail', None)
         self._props: dict[str, Any] = dict(kwargs)
 
     def __getattr__(self, name):

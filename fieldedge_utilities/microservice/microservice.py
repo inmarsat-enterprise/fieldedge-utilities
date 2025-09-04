@@ -65,10 +65,10 @@ class DictTrigger(dict):
 class QueuedCallback:
     """A queued callback intended to be monitored from the MainThread."""
     def __init__(self,
-                 callback: 'Callable[..., None]',
+                 callback: Callable[..., None],
                  *args,
                  **kwargs) -> None:
-        self.callback: 'Callable[[Any], None]' = callback
+        self.callback: Callable[[Any], None] = callback
         self.args: tuple = args
         self.kwargs: dict = kwargs
 
@@ -123,12 +123,15 @@ class Microservice(ABC, Generic[F, P]):
         isc_poll_interval: int = kwargs.get('isc_poll_interval', 1)
         self._subscriptions = [ 'fieldedge/+/rollcall/#' ]
         self._subscriptions.append(f'fieldedge/{self.tag}/request/#')
-        self._mqttc_local = MqttClient(client_id=mqtt_client_id,
-                                       subscribe_default=self._subscriptions,
-                                       on_connect=self._on_isc_connect,
-                                       on_message=self.on_isc_message,
-                                       auto_connect=auto_connect,
-                                       qos=int(kwargs.get('qos', MQTT_DFLT_QOS)))
+        self._mqttc_local = MqttClient(
+            client_id=mqtt_client_id,
+            subscribe_default=self._subscriptions,
+            on_connect=self._on_isc_connect,
+            on_message=self.on_isc_message,
+            auto_connect=auto_connect,
+            qos=int(kwargs.get('qos', MQTT_DFLT_QOS)),
+            thread_name=kwargs.get('thread_name', 'IscThread'),
+        )
         self._default_publish_topic = f'fieldedge/{self._tag}'
         self._hidden_properties: list[str] = [
             'features',
@@ -190,15 +193,23 @@ class Microservice(ABC, Generic[F, P]):
     def _refresh_properties(self) -> list[str]:
         """Refreshes the class properties."""
         with self._lock:
-            self.property_cache.remove('properties')
-            self.property_cache.remove('isc_properties')
+            cached_maps = ['properties', 'properties_by_type',
+                           'isc_properties', 'isc_properties_by_type',
+                           'feature_properties']
+            for cm in cached_maps:
+                self.property_cache.remove(cm)
+            # self.property_cache.remove('properties')
+            # self.property_cache.remove('isc_properties')
             ignore = self._hidden_properties
             properties = get_class_properties(self.__class__, ignore)
+            # Build and cache per-feature property map once
+            feature_props: dict[str, list[str]] = {}
             for tag, feature in self.features.items():
-                feature_props = feature.properties_list()
-                for prop in feature_props:
+                feature_props[tag] = feature.properties_list()
+                for prop in feature_props[tag]:
                     properties.append(f'{tag}_{prop}')
             self.property_cache.cache(properties, 'properties', None)
+            self.property_cache.cache(feature_props, 'feature_properties', None)
             return properties
 
     @staticmethod
@@ -234,6 +245,11 @@ class Microservice(ABC, Generic[F, P]):
     @property
     def properties_by_type(self) -> dict[str, list[str]]:
         """Public properties lists of the class tagged `info` or `config`."""
+        cached = self.property_cache.get_cached('properties_by_type')
+        if cached:
+            return cached
+        categorized = self._categorized(self.properties)
+        self.property_cache.cache(categorized, 'properties_by_type', None)
         return self._categorized(self.properties)
 
     def property_hide(self, prop_name: str):
@@ -263,27 +279,34 @@ class Microservice(ABC, Generic[F, P]):
     def _refresh_isc_properties(self) -> list[str]:
         """Refreshes the cached ISC properties list."""
         with self._lock:
+            self.property_cache.remove('isc_properties_by_type')
             ignore = set(self._hidden_properties) | set(self._hidden_isc_properties)
             tag = self.tag if self._isc_tags else None
             isc_properties = [tag_class_property(prop, tag)
-                            for prop in self.properties if prop not in ignore]
+                              for prop in self.properties if prop not in ignore]
             self.property_cache.cache(isc_properties, 'isc_properties', None)
             return isc_properties
 
     @property
     def isc_properties_by_type(self) -> dict[str, list[str]]:
         """ISC exposed properties tagged `info` or `config`."""
+        cached = self.property_cache.get_cached('isc_properties_by_type')
+        if cached:
+            return cached
+        feature_props = (
+            self.property_cache.get_cached('feature_properties') or {}
+        )
         # subfunction
         def feature_prop(prop) -> 'tuple[object, str]':
             fprop, ftag = untag_class_property(prop, True, True)
             if not isinstance(ftag, str):
                 raise ValueError('Unable to determine feature tag')
             feature = self.features.get(ftag, None)
-            if feature and fprop in feature.properties_list():
+            if feature and fprop in feature_props.get(ftag, ()):
                 return (feature, fprop)
             raise ValueError(f'Unknown tag {prop}')
         # main function
-        categorized = {}
+        categorized: dict[str, list[str]] = {}
         for isc_prop in self.isc_properties:
             prop, tag = untag_class_property(isc_prop, self._isc_tags, True)
             if self._isc_tags:
@@ -300,6 +323,7 @@ class Microservice(ABC, Generic[F, P]):
                 else:
                     obj, prop = feature_prop(isc_prop)
             self._categorize_prop(obj, prop, categorized, isc_prop)
+        self.property_cache.cache(categorized, 'isc_properties_by_type', None)
         return categorized
 
     def isc_get_property(self, isc_property: str) -> Any:

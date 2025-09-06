@@ -5,7 +5,7 @@ import itertools
 import json
 import logging
 import re
-from dataclasses import asdict, is_dataclass
+from dataclasses import fields, is_dataclass
 from enum import Enum
 from typing import Any, Optional, Union
 
@@ -220,6 +220,7 @@ def json_compatible(obj: object,
     """Returns a dictionary compatible with `json.dumps` function.
 
     Nested objects are converted to dictionaries.
+    Supports `json_compatible` override method on object.
     
     `LOG_VERBOSE` optional key: `tags`
     
@@ -234,18 +235,15 @@ def json_compatible(obj: object,
             `json.dumps`.
 
     """
-    from .configurable import ConfigurableProperty
-    
-    # Handle simple base cases first
+    # First check for override method
+    method = getattr(obj, 'json_compatible', None)
+    if callable(method):
+        return method()
+    # Handle simple base cases next
     if isinstance(obj, Enum):
         return obj.name
     if obj is None or isinstance(obj, (str, int, float, bool)):
         return obj
-    if isinstance(obj, ConfigurableProperty):
-        return {
-            k: json_compatible(v) for k, v in asdict(obj).items()
-            if v is not None
-        }
     if isinstance(obj, dict):
         res: dict[Any, Any] = {}
         for k, v in obj.items():
@@ -261,10 +259,14 @@ def json_compatible(obj: object,
     if isinstance(obj, (list, tuple)):
         return [json_compatible(i, camel_keys, skip_caps) for i in obj]
     if is_dataclass(obj):
-        return json_compatible(asdict(obj), camel_keys, skip_caps)  # type: ignore
+        as_dict = { f.name: getattr(obj, f.name) for f in fields(obj) }
+        for name, attr in type(obj).__dict__.items():
+            if isinstance(attr, property) and not name.startswith('_'):
+                as_dict[name] = getattr(obj, name)
+        return json_compatible(as_dict, camel_keys, skip_caps)  # type: ignore
     if callable(obj):
         name = getattr(obj, '__name__', repr(obj))
-        return f'<function:{name}'
+        return f'<function:{name}>'
     if hasattr(obj, '__dict__'):
         return json_compatible(get_instance_properties_values(obj),
                                camel_keys, skip_caps)

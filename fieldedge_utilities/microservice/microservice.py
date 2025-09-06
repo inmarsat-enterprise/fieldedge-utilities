@@ -130,7 +130,7 @@ class Microservice(ABC, Generic[F, P]):
             on_message=self.on_isc_message,
             auto_connect=auto_connect,
             qos=int(kwargs.get('qos', MQTT_DFLT_QOS)),
-            thread_name=kwargs.get('thread_name', 'IscThread'),
+            thread_name=kwargs.get('thread_name', 'ISC'),
         )
         self._default_publish_topic = f'fieldedge/{self._tag}'
         self._hidden_properties: list[str] = [
@@ -149,14 +149,19 @@ class Microservice(ABC, Generic[F, P]):
         ]
         self._rollcall_properties: list[str] = []
         self._publisher_queue = Queue()
-        self._publisher_thread = Thread(target=self._publisher,
-                                        name=f'{self.tag}_publisher',
-                                        daemon=True)
+        self._publisher_thread = Thread(
+            target=self._publisher,
+            name=f'{self.tag}_publisher',
+            daemon=True,
+        )
         self._publisher_thread.start()
         self.isc_queue = IscTaskQueue()
-        self._isc_timer = RepeatingTimer(seconds=isc_poll_interval,
-                                         target=self.isc_queue.remove_expired,
-                                         name='IscTaskExpiryTimer')
+        self._isc_timer = RepeatingTimer(
+            seconds=isc_poll_interval,
+            target=self.isc_queue.remove_expired,
+            name=f'{self.__class__.__name__}IscTaskExpiryTimer',
+            auto_start=True,
+        )
         self._lock = RLock()
         self.features: dict[str, F] = DictTrigger(
             modify_callback=self._refresh_properties)
@@ -716,11 +721,12 @@ class Microservice(ABC, Generic[F, P]):
                 response['properties'] = self.isc_properties
         else:
             subtopic = 'info/properties/values'
+            req_props: list = request.get('properties', [])
+            all_props = not req_props or 'all' in req_props
+            if all_props:
+                req_props = self.isc_properties
             dbg_prop = None
             try:
-                req_props: list = request.get('properties', [])
-                if not req_props or 'all' in req_props:
-                    req_props = self.isc_properties
                 response['properties'] = {}
                 res_props = response['properties']
                 props_source = self.isc_properties
@@ -744,13 +750,14 @@ class Microservice(ABC, Generic[F, P]):
                     for prop in req_props:
                         dbg_prop = prop
                         res_props[prop] = self.isc_get_property(prop)
-                configurable = self.isc_configurable()
-                if (configurable and
-                    all(isinstance(v, ConfigurableProperty) 
-                        for v in configurable.values())):
-                    response['configurable'] = {
-                        k: v.json_compatible() for k, v in configurable.items()
-                    }
+                if not all_props:
+                    configurable = self.isc_configurable()
+                else:
+                    configurable = {k: v for k, v in self.isc_configurable().items()
+                                    if k in req_props}
+                if configurable:
+                    response['configurable'] = {k: v.json_compatible()
+                                                for k, v in configurable.items()}
             except (AttributeError) as exc:
                 response = { 'uid': request_id, 'error': f'{dbg_prop}: {exc}' }
         if _vlog(self.tag):
@@ -906,20 +913,6 @@ class Microservice(ABC, Generic[F, P]):
             
         """
         return self.isc_queue.get(task_id, task_meta)
-
-    def task_expiry_enable(self, enable: bool = True):
-        """Starts or stops periodic checking for expired ISC tasks.
-        
-        Args:
-            enable: If `True` (default) starts the checks, else stops checking.
-            
-        """
-        if enable:
-            if not self._isc_timer.is_alive():
-                self._isc_timer.start()
-            self._isc_timer.start_timer()
-        else:
-            self._isc_timer.stop_timer()
 
 
 def _vlog(tag: str) -> bool:

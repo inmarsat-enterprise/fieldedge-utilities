@@ -47,9 +47,13 @@ def _require_paramiko():
 
 def _get_ssh_info() -> SshInfo|None:
     try:
-        return SshInfo(os.getenv('SSH_HOST'),   # type: ignore
-                       os.getenv('SSH_USER'),   # type: ignore
-                       os.getenv('SSH_PASS'))   # type: ignore
+        host = os.getenv('SSH_HOST')
+        user = os.getenv('SSH_USER')
+        passwd = os.getenv('SSH_PASS')
+        if not all(isinstance(x, str) and len(x) > 0
+                   for x in [host, user, passwd]):
+            return None
+        return SshInfo(host, user, passwd)  # type: ignore
     except Exception:
         return None
 

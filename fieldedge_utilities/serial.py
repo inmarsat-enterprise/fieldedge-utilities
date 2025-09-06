@@ -92,7 +92,7 @@ def get_devices(target: Optional[str] = None) -> list:
     return devices
 
 
-def list_available_serial_ports(skip: 'list[str]|None' = None) -> 'list[str]':
+def list_available_serial_ports(skip: Optional[list[str]] = None) -> list[str]:
     """Get a list of the available serial ports.
     
     Args:

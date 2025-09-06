@@ -18,7 +18,7 @@ _log = logging.getLogger(__name__)
 
 class GnssFixType(IntEnum):
     """Enumerated fix type from NMEA-0183 standard."""
-    FIX_NONE = 1
+    NONE = 1
     FIX_2D = 2
     FIX_3D = 3
 
@@ -36,7 +36,7 @@ class GnssFixQuality(IntEnum):
     SIMULATION = 8
 
 
-@dataclass
+@dataclass(slots=True)
 class GnssLocation:
     """A location class."""
     latitude: Optional[float] = None

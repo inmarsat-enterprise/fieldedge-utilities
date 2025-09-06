@@ -257,10 +257,10 @@ class MqttClient:
         self._mqtt.loop_stop(force=True)
         self._mqtt.disconnect()
 
-    def _unique_thread_name(self, before_names: 'list[str]') -> str:
+    def _unique_thread_name(self, before_names: list[str]) -> str:
         basename = 'MqttThread'
         if self._thread_name != basename:
-            basename += f'-{self._thread_name}'
+            basename += f'{self._thread_name.replace("Thread", "")}'
         new_name = basename
         number = 1
         for name in before_names:

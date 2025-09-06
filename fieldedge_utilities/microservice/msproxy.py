@@ -85,15 +85,18 @@ class MicroserviceProxy(ABC):
         )
         self._init_timeout: int = kwargs.get('init_timeout', 10)
         self._cache_lifetime: Optional[int] = kwargs.get('cache_lifetime')
-        self._prop_timeout = int(kwargs.get('proxy_property_timeout',
-                                            os.getenv('PROXY_PROPERTY_TIMEOUT',
-                                                      '35')))
+        self._prop_timeout = int(
+            kwargs.get('proxy_property_timeout',
+                       os.getenv('PROXY_PROPERTY_TIMEOUT', '35'))
+        )
         self._isc_poll_interval: int = kwargs.get('isc_poll_interval', 1)
         self.isc_queue = IscTaskQueue(blocking=True)
-        self._isc_timer = RepeatingTimer(seconds=self._isc_poll_interval,
-                                         target=self.isc_queue.remove_expired,
-                                         name='IscTaskExpiryTimer',
-                                         auto_start=True)
+        self._isc_timer = RepeatingTimer(
+            seconds=self._isc_poll_interval,
+            target=self.isc_queue.remove_expired,
+            name=f'{self.__class__.__name__}IscTaskExpiryTimer',
+            auto_start=True,
+        )
         self._proxy_properties: Optional[dict[str, Any]] = None
         self._property_cache: PropertyCache = PropertyCache()
         self._isc_configurable: dict[str, ConfigurableProperty] = {}
@@ -152,7 +155,7 @@ class MicroserviceProxy(ABC):
                 self._proxy_event.clear()
             self.query_properties(['all'], task_meta)
         received = self._proxy_event.wait(self._prop_timeout)
-        if received or not self._proxy_properties:
+        if not received or not self._proxy_properties:
             _log.warning('Timeout waiting for proxy properties')
             raise TimeoutError('Proxy properties not received within'
                                f' {self._prop_timeout} seconds')
@@ -186,7 +189,7 @@ class MicroserviceProxy(ABC):
         task_meta = { 'set': name }
         self.query_properties({ name: value }, task_meta, **kwargs)
 
-    def properties_set(self, props_dict: dict, **kwargs):
+    def properties_set(self, props_dict: dict[str, Any], **kwargs):
         """Sets multiple proxy property values."""
         if (not isinstance(props_dict, dict) or
             not all(isinstance(p, str) for p in props_dict)):
@@ -194,7 +197,7 @@ class MicroserviceProxy(ABC):
         task_meta = { 'set': list(props_dict.keys()) }
         self.query_properties(props_dict, task_meta, **kwargs)
     
-    def isc_configurable(self) -> 'dict[str, ConfigurableProperty]':
+    def isc_configurable(self) -> dict[str, ConfigurableProperty]:
         """Get the map of configurable properties."""
         return self._isc_configurable
     
@@ -213,7 +216,7 @@ class MicroserviceProxy(ABC):
                 self.isc_queue.task_blocking.set()
             raise err
 
-    def task_handle(self, response: dict, unblock: bool = False) -> bool:
+    def task_handle(self, response: dict[str, Any], unblock: bool = False) -> bool:
         """Returns True if the task was handled, after triggering any callback.
         
         Args:
@@ -240,7 +243,7 @@ class MicroserviceProxy(ABC):
             _log.warning('Task queue still blocking with no callback')
         return True
 
-    def task_complete(self, task_meta: Optional[dict] = None):
+    def task_complete(self, task_meta: Optional[dict[str, Any]] = None):
         """Call to complete a task and remove from the blocking queue."""
         if not isinstance(task_meta, dict):
             _log.debug('No task metadata provided for completion - ignoring')
@@ -275,7 +278,7 @@ class MicroserviceProxy(ABC):
         self._isc_configurable = {}
         self.isc_queue.clear()
 
-    def _init_fail(self, task_meta: Optional[dict] = None):
+    def _init_fail(self, task_meta: Optional[dict[str, Any]] = None):
         """Calls back with a failure on initialization failure/timeout."""
         self._init = InitializationState.NONE
         if callable(self._init_callback):
@@ -286,8 +289,8 @@ class MicroserviceProxy(ABC):
 
     def query_properties(self,
                          properties: Union[dict, list],
-                         task_meta: Optional[dict] = None,
-                         query_meta: Optional[dict] = None,
+                         task_meta: Optional[dict[str, Any]] = None,
+                         query_meta: Optional[dict[str, Any]] = None,
                          **kwargs):
         """Gets or sets the microservice properties via MQTT.
         
@@ -308,9 +311,9 @@ class MicroserviceProxy(ABC):
         else:
             method = 'get'
         if isinstance(task_meta, dict):
-            lifetime = task_meta.get('timeout', 10)
+            lifetime = task_meta.get('timeout', self._prop_timeout)
         else:
-            lifetime = 10
+            lifetime = self._prop_timeout
         prop_task = IscTask(task_type=f'property_{method}',
                             task_meta=task_meta,
                             callback=self.update_proxy_properties,
@@ -332,8 +335,8 @@ class MicroserviceProxy(ABC):
         self._publish(topic, message)
 
     def update_proxy_properties(self,
-                                message: dict,
-                                task_meta: Optional[dict] = None):
+                                message: dict[str, Any],
+                                task_meta: Optional[dict[str, Any]] = None):
         """Updates the proxy property dictionary with queried values.
         
         If querying all properties, pushes values into warm storage under
@@ -394,7 +397,7 @@ class MicroserviceProxy(ABC):
                     meta = task_meta.get('initialize')
                 self._init_callback(True, meta)
 
-    def publish(self, topic: str, message: dict, qos: int = 0):
+    def publish(self, topic: str, message: dict[str, Any], qos: int = 0):
         """Publishes to MQTT via the parent."""
         if not callable(self._publish):
             raise ValueError('publish callback not defined')
@@ -413,7 +416,7 @@ class MicroserviceProxy(ABC):
         self._unsubscribe(topic)
 
     @abstractmethod
-    def on_isc_message(self, topic: str, message: dict) -> bool:
+    def on_isc_message(self, topic: str, message: dict[str, Any]) -> bool:
         """Processes MQTT messages for the proxy.
         
         Required method. Called by the parent's MQTT message handler.

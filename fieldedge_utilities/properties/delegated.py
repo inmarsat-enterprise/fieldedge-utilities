@@ -1,10 +1,10 @@
 """Delegated Property class with optional caching.
 """
+import inspect
 import logging
 import time
-import inspect
 from contextlib import contextmanager
-from typing import Callable, Generic, Optional, TypeVar, Any
+from typing import Any, Callable, Generic, Optional, TypeVar
 
 from fieldedge_utilities.path import get_caller_name
 
@@ -17,6 +17,14 @@ __all__ = [
 
 T = TypeVar("T")
 _MISSING = object()
+LOG_LEVELS = (
+    0,  # disabled
+    logging.CRITICAL,
+    logging.ERROR,
+    logging.WARNING,
+    logging.INFO,
+    logging.DEBUG,
+)
 
 _log = logging.getLogger(__name__)
 
@@ -77,7 +85,7 @@ class DelegatedProperty(Generic[T]):
     def __init__(self,
                  name: Optional[str] = None,
                  cache_ttl: float | None = 0,
-                 log_getter: bool = False,
+                 log_getter: int = 0,
                  writable: bool = False,
                  ):
         """
@@ -88,6 +96,8 @@ class DelegatedProperty(Generic[T]):
         """
         self.name = name
         self.cache_ttl = cache_ttl
+        if not isinstance(log_getter, int) or log_getter not in LOG_LEVELS:
+            raise ValueError('Invalid log_getter level')
         self._log_getter = log_getter
         self._writable = writable
         self._func: Optional[Callable[[Any], T]] = None
@@ -134,8 +144,9 @@ class DelegatedProperty(Generic[T]):
                     return cached
                 if self._log_getter and not notified:
                     caller = get_caller_name(depth=2, mth=True)
-                    _log.info('Refreshing expired %s cache... (for: %s, ttl: %s)',
-                              self.name, caller, ttl)
+                    _log.log(self._log_getter,
+                             'Refreshing expired %s cache (for: %s, ttl: %s)',
+                             self.name, caller, ttl)
                     notified = True
             if ttl == 0:
                 # clean stale cache entries then fall through

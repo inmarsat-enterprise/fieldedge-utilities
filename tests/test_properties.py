@@ -7,7 +7,24 @@ from typing import Optional
 
 import pytest
 
-from fieldedge_utilities.properties import *
+from fieldedge_utilities.gnss import GnssFixQuality, GnssFixType, GnssLocation
+from fieldedge_utilities.properties import (
+    camel_case,
+    equivalent_attributes,
+    get_class_properties,
+    get_class_tag,
+    get_instance_properties_values,
+    hasattr_static,
+    json_compatible,
+    pascal_case,
+    property_is_async,
+    property_is_read_only,
+    snake_case,
+    tag_class_properties,
+    tag_class_property,
+    tag_merge,
+    untag_class_property,
+)
 
 
 class TestNestedObj:
@@ -93,7 +110,7 @@ class TestObjToo:
         return bytearray()
 
 
-def test_snake_case():
+def test_snake_case(test_str: str, expected: str):
     snake = 'test_string'
     camel = 'testString'
     capital = 'TEST_STRING'
@@ -121,6 +138,20 @@ def test_camel_case():
     assert camel_case(pascal, skip_pascal=True) == pascal
     with pytest.raises(ValueError):
         camel_case('')
+
+
+def test_pascal_case():
+    snake = 'test_string'
+    camel = 'testString'
+    capital = 'TEST_STRING'
+    pascal = 'TestString'
+    assert pascal_case(snake) == pascal
+    assert pascal_case(camel) == pascal
+    assert pascal_case(capital) == pascal
+    assert pascal_case(capital, True) == capital
+    assert pascal_case(pascal) == pascal
+    with pytest.raises(ValueError):
+        pascal_case('')
 
 
 def test_json_camel():
@@ -275,16 +306,70 @@ def test_tag_merge(test_obj: TestObj, test_obj_too: TestObjToo):
         if cat in tagged_cat_2:
             assert all(p in props for p in tagged_cat_2[cat])
 
-
-def test_json_compatible(test_obj):
-    expected = {
-        '_one': 1,
-        'two': {'one': 1, 'two': ['element']},
-        'three': None,
-        'four': 'FIRST',
-        '_five': 'string',
-        '_six': 6,
+response = {
+    'properties': {
+        'modemLocation': {
+            'latitude': 45.12345,
+            'longitude': -75.45678,
+            'altitude': 112.8,
+            'fix_quality': GnssFixQuality.GPS_SPS,
+            'fix_type': GnssFixType.FIX_3D,
+            'hdop': 1.4,
+            'heading': 334.8,
+            'speed': 0,
+            'timestamp': 0,
+            'time_iso': '1970-01-01T00:00:00Z',
+        }
+    },
+    'configurable': {
+        'logLevel': {'type': 'enum'}
     }
+}
+@pytest.mark.parametrize(
+    'test_obj, expected',
+    [
+        (
+            TestObj(),
+            {
+                '_one': 1,
+                'two': {'one': 1, 'two': ['element']},
+                'three': None,
+                'four': 'FIRST',
+                '_five': 'string',
+                '_six': 6,
+            }
+        ),
+        (
+            GnssLocation(
+                45.12345,
+                -75.45678,
+                100,
+                0,
+                0,
+                timestamp=0,
+                fix_type=GnssFixType.FIX_3D,
+                fix_quality=GnssFixQuality.DGPS,
+            ),
+            {
+                'latitude': 45.12345,
+                'longitude': -75.45678,
+                'altitude': 100,
+                'speed': 0,
+                'heading': 0,
+                # below are filtered out by GnssLocation.json_compatible()
+                # 'hdop': None,
+                # 'pdop': None,
+                # 'vdop': None,
+                # 'satellites': None,
+                'timestamp': 0,
+                'fixType': 'FIX_3D',
+                'fixQuality': 'DGPS',
+                'isoTime': '1970-01-01T00:00:00Z'
+            }
+        )
+    ]
+)
+def test_json_compatible(test_obj, expected):
     json_test_obj = json_compatible(test_obj)
     assert json_test_obj == expected
     assert isinstance(json.dumps(json_test_obj), str)

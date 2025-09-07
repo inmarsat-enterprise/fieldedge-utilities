@@ -1,6 +1,7 @@
 """Test cases for microservices.properties.
 """
 import json
+import logging
 import time
 from enum import IntEnum
 from typing import Optional
@@ -242,6 +243,26 @@ def test_get_class_properties_ignore():
     assert not any(prop not in expected for prop in props)
 
 
+def test_get_class_properties_noslots(caplog):
+    caplog.set_level(logging.DEBUG)
+    class TestNoSlots:
+        def __init__(self):
+            self.one = 1
+    
+    class TestNoSlotsRaises:
+        def __init__(self, two: int):
+            self.two = two
+    
+    props = get_class_properties(TestNoSlots)
+    assert 'one' in props
+    props_inst = get_class_properties(TestNoSlots()) # type: ignore case if an obj is passed
+    assert props_inst == props
+    with caplog.at_level(logging.WARNING):
+        props_too = get_class_properties(TestNoSlotsRaises)
+    assert 'two' not in props_too
+    assert any('__slots__' in message for message in caplog.messages)
+
+
 def test_tag_properties_basic():
     notag_tag = get_class_tag(TestObj)
     ignore = ['six', 'seven']
@@ -341,11 +362,11 @@ response = {
         ),
         (
             GnssLocation(
-                45.12345,
-                -75.45678,
-                100,
-                0,
-                0,
+                latitude=45.12345,
+                longitude=-75.45678,
+                altitude=100,
+                speed=0,
+                heading=0,
                 timestamp=0,
                 fix_type=GnssFixType.FIX_3D,
                 fix_quality=GnssFixQuality.DGPS,

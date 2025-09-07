@@ -110,35 +110,41 @@ def get_class_tag(cls: type) -> str:
 def get_class_properties(cls: type, ignore: Optional[list[str]] = None) -> list[str]:
     """Returns non-hidden, non-callable properties/values of a Class instance.
     
-    Also ignores CAPITAL_CASE attributes which are assumed to be constants.
+    Ignores CAPITAL_CASE attributes which are assumed to be constants.
+    If the class has no __slots__ attributes may be missed but an attempt is
+    made to instantiate the class to mitigate this before logging a warning.
     
     Args:
         cls: The Class whose properties will be derived
-        ignore: A list of names to ignore (optional)
+        ignore: A list of attribute names to ignore (optional)
     
     Returns:
         A list of exposed property names.
         
     Raises:
-        ValueError if `cls` does not have a `dir()` method or is not a `type`.
+        ValueError if `cls` does not have a `__dir__` attribute.
         
     """
     from .delegated import DelegatedProperty
     
     if not hasattr(cls, '__dir__'):
         raise ValueError(f'{cls.__name__} invalid - must have dir() method')
+    inst = cls if isinstance(cls, type) else None
     if isinstance(cls, type) and '__slots__' not in dir(cls):
-        _log.debug('%s has no __slots__: attributes in __init__ will be missed',
-                   cls.__name__)
+        try:
+            inst = cls()
+        except Exception:
+            _log.warning('%s has no __slots__: __init__ attributes will be lost',
+                         cls.__name__)
     if not isinstance(ignore, list):
         ignore = []
     props: list[str] = []
-    for attr_name in dir(cls):
+    for attr_name in dir(inst or cls):
         if attr_name.startswith('_') or attr_name in ignore or attr_name.isupper():
             continue
         # Use static lookup to avoid triggering descriptors
         try:
-            attr = inspect.getattr_static(cls, attr_name)
+            attr = inspect.getattr_static(inst or cls, attr_name)
         except AttributeError:
             continue
         # Expose normal and delegated properties

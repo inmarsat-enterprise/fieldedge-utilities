@@ -8,6 +8,7 @@ import time
 from typing import Callable, Optional
 
 from .logger import verbose_logging
+from .properties import pascal_case
 
 
 _log = logging.getLogger(__name__)
@@ -58,8 +59,7 @@ class RepeatingTimer(threading.Thread):
             raise ValueError('sleep_chunk must be > 0')
         self.target_name = getattr(target, '__name__', str(target))
         if not isinstance(name, str) or len(name) == 0:
-            name = (f'{self.target_name[0].upper() + self.target_name[1:]}'
-                    'TimerThread')
+            name = (f'{pascal_case(self.target_name)}TimerThread')
         super().__init__(name=name, daemon=daemon)
         
         self._interval = seconds

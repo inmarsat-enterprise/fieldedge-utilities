@@ -2,7 +2,6 @@
 
 """
 import logging
-import math
 import threading
 import time
 from typing import Callable, Optional
@@ -40,7 +39,7 @@ class RepeatingTimer(threading.Thread):
 
     def __init__(
         self,
-        seconds: float,
+        seconds: float|int,
         target: Callable,
         args: Optional[tuple] = None,
         kwargs: Optional[dict] = None,
@@ -62,7 +61,7 @@ class RepeatingTimer(threading.Thread):
             name = (f'{pascal_case(self.target_name)}TimerThread')
         super().__init__(name=name, daemon=daemon)
         
-        self._interval = seconds
+        self._interval: float|int = seconds
         self.target = target
         self.args = args or ()
         self.kwargs = kwargs or {}
@@ -105,46 +104,39 @@ class RepeatingTimer(threading.Thread):
 
     def _schedule_from_now(self):
         """Reset the cadence to `now + interval`."""
-        if not self.is_running:
+        if not self.is_running or self.interval <= 0:
+            self._next_deadline = None
             return
         now = time.monotonic()
         self._next_deadline = now + self.interval
-        _log.debug('Resync next trigger at %.3f (%0.3f)',
-                   self._next_deadline, now)
+        _log.debug('Resync next trigger in %0.1f seconds', self.interval)
 
-    def _advance_on_schedule(self, scheduled: float, finished: float):
+    def _advance_on_schedule(self, scheduled: Optional[float], finished: float):
         """Advance deadline after target execution.
         
         - If lateness exceeds max_drift abandon cadence and resync from now.
         - Else if still within interval bump to the next interval.
         - Else skip missed slots but keep original cadence.
         """
-        if not self.is_running:
+        if not self.is_running or self.interval <= 0 or scheduled is None:
+            self._next_deadline = None
             return
-        now = time.monotonic()
+
         next_deadline = scheduled + self.interval
         if finished <= next_deadline:
-            # Still on track
             self._next_deadline = next_deadline
         elif (self.max_drift is not None and
-              (finished - scheduled) > self.interval + self.max_drift):
-                # Too late: abandon original cadence, resync from now
-                self._schedule_from_now()
+            (finished - scheduled) > self.interval + self.max_drift):
+            self._schedule_from_now()
         else:
-            # Missed one or more slots jump forward but preserve cadence
             adjust = max(0, finished - next_deadline)
             self._next_deadline = finished + adjust
-            if self._last_fire:
-                elapsed = finished - self._last_fire
-                intervals_missed = math.floor(elapsed / self.interval)
-                _log.debug('Missed %d interval(s) (%0.3f)', intervals_missed, now)
-
+    
     def _call_target(self):
         try:
             if _vlog():
-                _log.debug('Calling %s (%0.3f) with args=%s kwargs=%s',
+                _log.debug('Calling %s with args=%s kwargs=%s',
                            self.target_name,
-                           time.monotonic(),
                            self.args,
                            self.kwargs)
             self.target(*self.args, **self.kwargs)
@@ -155,70 +147,62 @@ class RepeatingTimer(threading.Thread):
     # ----- Thread loop -----
 
     def run(self):
-        initial_trigger = False
         while not self._terminate_event.is_set():
+            # Wait until started
             self._start_event.wait()
             if self._terminate_event.is_set():
                 break
 
-            if self.interval <= 0:
-                # Disabled: wait for changes/restart
+            with self._lock:
+                interval = self._interval
+
+            if interval <= 0:
+                # Timer disabled: wait for interval change
                 self._reset_event.wait(timeout=0.2)
                 self._reset_event.clear()
                 continue
 
-            # Initialize next deadline if missing
+            now = time.monotonic()
             if self._next_deadline is None:
-                now = time.monotonic()
-                _log.info('%d-second interval started (%0.3f)',
-                          self.interval, now)
+                # Set initial deadline
+                self._next_deadline = now + interval if self.defer else now
                 if not self.defer:
-                    initial_trigger = True
-                    self._last_fire = now
-                    self._next_deadline = self._last_fire + self.interval
                     self._call_target()
-                else:
-                    self._next_deadline = now + self.interval
+                    self._last_fire = now
+                    self._next_deadline = now + interval
 
-            # Main loop while running
             while self.is_running and not self._terminate_event.is_set():
                 now = time.monotonic()
                 remaining = (self._next_deadline or now) - now
 
-                # Wait in small chunks so we can log/observe resets
-                while (remaining > 0 and
-                       self.is_running and
-                       not self._terminate_event.is_set()):
+                # Wait in small chunks, wake on reset
+                while remaining > 0 and self.is_running and not self._terminate_event.is_set():
                     if _vlog():
-                        _log.debug('%s countdown: %.2fs',
-                                   self.name, remaining)
-                    # Non-busy sleep but Wake early if reset arrives
-                    if self._reset_event.wait(timeout=min(self.sleep_chunk,
-                                                          remaining)):
+                        _log.debug('%s countdown: %.2fs', self.name, remaining)
+                    if self._reset_event.wait(timeout=min(self.sleep_chunk, remaining)):
                         self._reset_event.clear()
                         self._schedule_from_now()
                         break
                     now = time.monotonic()
                     remaining = (self._next_deadline or now) - now
                 else:
-                    # Either time elapsed or we stopped/terminated
+                    # Time elapsed
                     if not self.is_running or self._terminate_event.is_set():
                         break
-                    now = time.monotonic()
-                    if not initial_trigger:
-                        self._last_fire = now
-                        self._call_target()
-                    finished = time.monotonic()
-                    self._advance_on_schedule(self._next_deadline, finished)
-                    initial_trigger = False
-                    if _vlog():
-                        _log.debug('Triggered %s at %0.3f (duration %0.2f)'
-                                   ' next trigger in %0.3f',
-                                   self.target_name,
-                                   self._last_fire,
-                                   finished - (self._last_fire or now),
-                                   self._next_deadline - time.monotonic())
 
+                    with self._lock:
+                        interval = self._interval
+
+                    if interval <= 0:
+                        # Interval became 0 while waiting, disable timer
+                        self._next_deadline = None
+                        break
+
+                    now = time.monotonic()
+                    self._last_fire = now
+                    self._call_target()
+                    self._advance_on_schedule(self._next_deadline, now)
+                
     # ----- External controls -----
 
     def start_timer(self):
@@ -237,41 +221,51 @@ class RepeatingTimer(threading.Thread):
         """Restart the timer.
         
         If `trigger_immediate` is True, fire now else wait one full interval.
-        
         Default is the opposite of `defer` configuration.
         """
-        now = time.monotonic()
-        if trigger_immediate is None or not isinstance(trigger_immediate, bool):
+        with self._lock:
+            interval = self._interval
+        if interval <= 0:
+            self._next_deadline = None
+            self._start_event.set()
+            self._reset_event.set()
+            if notify:
+                _log.info('Timer disabled (interval=0)')
+            return
+        if trigger_immediate is None:
             trigger_immediate = not self.defer
+        now = time.monotonic()
+        self._last_fire = None
+        if trigger_immediate:
+            self._next_deadline = now
+        else:
+            self._next_deadline = now + self.interval
         self._start_event.set()
         self._reset_event.set()
-        if trigger_immediate and self.interval > 0:
-            self._call_target()
-            self._last_fire = now
-            self._next_deadline = self._last_fire + self.interval
         if notify:
-            _log.info('%d-second interval restarted %s(%0.3f)',
-                      self.interval,
-                      '(immediate trigger) ' if trigger_immediate else '',
-                      now)
+            _log.info('Restarted interval=%0.1f%s', interval,
+                      ', immediate trigger' if trigger_immediate else '')
 
-    def change_interval(self, seconds: int, trigger_immediate: Optional[bool] = None):
+    def change_interval(self, seconds: int, trigger_immediate: bool = False):
         if not isinstance(seconds, int) or seconds < 0:
             raise ValueError('seconds must be integer >= 0')
         with self._lock:
             old = self._interval
             self._interval = seconds
+        if seconds <= 0:
+            self._next_deadline = None
+            self._reset_event.set()
+            _log.info('Interval disabled (was %0.1f)', old)
+            return
         _log.info('Interval changed (old: %0.1f s; new: %0.1f s)'
                   ' (trigger_immediate=%s)', old, seconds, trigger_immediate)
-        if trigger_immediate is None or not isinstance(trigger_immediate, bool):
-            trigger_immediate = not self.defer
         self.restart_timer(trigger_immediate, notify=False)
 
     def terminate(self):
         self.stop_timer(notify=False)
         self._terminate_event.set()
         self._reset_event.set()
-        _log.info('Interval terminated (%0.3f)', time.monotonic())
+        _log.info('Timer terminated (%0.3f)', time.monotonic())
 
 
 def _vlog() -> bool:

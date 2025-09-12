@@ -319,7 +319,8 @@ class MicroserviceProxy(ABC):
                             callback=self.update_proxy_properties,
                             lifetime=lifetime)
         self.task_add(prop_task)
-        _log.debug('%sting %s properties %s', method, self.tag, properties)
+        _log.debug('%sting %s properties %s',
+                   method.title(), self.tag, properties)
         topic = f'{self._base_topic}/request/properties/{method}'
         message = {
             'uid': prop_task.uid,

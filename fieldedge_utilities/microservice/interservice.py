@@ -87,7 +87,7 @@ class IscTask:
         self._ts: float = round(time.time(), 3)
         self.uid: str = uid or str(uuid4())
         self.task_type: Optional[str] = task_type
-        self._lifetime: 'float|None' = None
+        self._lifetime: float|None = None
         self.lifetime = lifetime
         self.task_meta = task_meta
         if (isinstance(task_meta, dict) and
@@ -104,10 +104,8 @@ class IscTask:
         return self._ts
     
     @property
-    def lifetime(self) -> 'float|None':
-        if self._lifetime is None:
-            return None
-        return round(self._lifetime, 3)
+    def lifetime(self) -> float|None:
+        return self.lifetime
     
     @lifetime.setter
     def lifetime(self, value: Union[float, int, None]):
@@ -120,7 +118,7 @@ class IscTask:
         self._lifetime = float(value)
 
 
-class IscTaskQueue(list):
+class IscTaskQueue:
     """Order-independent searchable task queue for interservice communications.
     
     By default the depth is None (infinite) and supports multiple tasks.
@@ -146,6 +144,8 @@ class IscTaskQueue(list):
         self._task_blocking = threading.Event()
         self._task_blocking.set()
         self._lock = threading.Lock()
+        self._items: list[IscTask]
+        self._index: dict[str, IscTask] = {}   # uid -> task
 
     @property
     def task_blocking(self) -> Union[threading.Event, None]:
@@ -155,6 +155,14 @@ class IscTaskQueue(list):
     @property
     def is_full(self) -> bool:
         return self._blocking and len(self) > 0
+    
+    def __len__(self) -> int:
+        with self._lock:
+            return len(self._items)
+        
+    def __iter__(self):
+        with self._lock:
+            return iter(self._items.copy())
     
     def unblock_tasks(self, unblock: bool = True):
         """Unblocks tasks if set."""
@@ -180,24 +188,25 @@ class IscTaskQueue(list):
         if not isinstance(task, IscTask) or not hasattr(task, 'uid'):
             raise ValueError('item must be IscTask with uid')
         with self._lock:
-            if any(t.uid == task.uid for t in self):
+            if task.uid in self._index:
                 raise ValueError(f'Task {task.uid} already queued')
             if self._blocking:
                 if len(self) == 1:
                     raise IscTaskQueueFull
-                if self.task_blocking:
-                    if not self.task_blocking.is_set():
-                        raise IscTaskNotReleased
+                if self.task_blocking and not self.task_blocking.is_set():
+                    raise IscTaskNotReleased
+                if isinstance(self.task_blocking, threading.Event):
                     self.task_blocking.clear()
             if _vlog():
                 _log.debug('Queued task: %s', task.__dict__)
-            super().append(task)
+            self._items.append(task)
+            self._index[task.uid] = task
 
     def peek(self,
              task_id: Optional[str] = None,
              task_type: Optional[str] = None,
              task_meta: Optional[dict[str, Any]] = None,
-             ) -> Union[IscTask, None]:
+             ) -> Optional[IscTask]:
         """Returns a queued task if it matches the search criteria.
         
         The task remains in the queue.
@@ -213,17 +222,14 @@ class IscTaskQueue(list):
         if isinstance(task_meta, tuple):
             task_meta = dict([task_meta])     # convert legacy tuple to dict
         with self._lock:
-            for task in self:
-                assert isinstance(task, IscTask)
-                if ((task_id and task.uid == task_id) or
-                    (task_type and task.task_type == task_type)):
-                    return task
-                elif isinstance(task_meta, dict):
-                    candidate = task.task_meta
-                    if isinstance(candidate, dict):
-                        if all(k in candidate and task_meta[k] == v
-                            for k, v in task_meta.items()):
-                            return task
+            for task in self._items:
+                if task_id is not None and task.uid != task_id:
+                    continue
+                if task_type is not None and task.task_type != task_type:
+                    continue
+                if task_meta is not None and task.task_meta != task_meta:
+                    continue
+                return task
         return None
 
     def is_queued(self,
@@ -246,7 +252,8 @@ class IscTaskQueue(list):
     def get(self,
             task_id: Optional[str] = None,
             task_meta: Optional[dict[str, Any]] = None,
-            unblock: bool = False) -> Union[IscTask, None]:
+            task_type: Optional[str] = None,
+            unblock: bool = False) -> Optional[IscTask]:
         """Retrieves the specified task from the queue.
         
         Uses task `uid` or `task_meta` tuple.
@@ -267,20 +274,18 @@ class IscTaskQueue(list):
         if isinstance(task_meta, tuple):
             task_meta = dict(task_meta)     # convert legacy tuple to dict
         with self._lock:
-            for i, task in enumerate(self):
-                assert isinstance(task, IscTask)
-                match = False
-                if task_id and task.uid == task_id:
-                    match = True
-                elif (isinstance(task_meta, dict) and
-                      isinstance(task.task_meta, dict)):
-                    if all(task.task_meta.get(k) == v
-                           for k, v in task_meta.items()):
-                        match = True
-                if match:
-                    if unblock:
-                        self.unblock_tasks(True)
-                    return self.pop(i)
+            for i, task in enumerate(self._items):
+                if task_id is not None and task.uid != task_id:
+                    continue
+                if task_type is not None and task.task_type != task_type:
+                    continue
+                if task_meta is not None and task.task_meta != task_meta:
+                    continue
+                removed = self._items.pop(i)
+                self._index.pop(removed.uid, None)
+                if unblock:
+                    self.unblock_tasks(True)
+                return removed
         _log.warning('No matching task found in ISC queue')
         return None
 
@@ -293,47 +298,45 @@ class IscTaskQueue(list):
         will be called with the cb_meta kwargs.
         
         """
-        if len(self) == 0:
+        if not self._items:
             return
         now = time.time()
+        expired: list[IscTask] = []
         with self._lock:
-            expired_indices = []
-            for i, task in enumerate(self):
-                assert isinstance(task, IscTask)
+            for i in reversed(range(len(self._items))):
+                task = self._items[i]
                 if task.lifetime is not None and now - task.ts > task.lifetime:
-                    expired_indices.append(i)
-            for i in sorted(expired_indices, reverse=True):
-                task: IscTask = self.pop(i)
-                _log.warning('Removed expired task %s', task.uid)
-                if (self._blocking and
-                    self.task_blocking and not self.task_blocking.is_set()):
-                    if self._unblock_on_expiry:
-                        _log.info('Unblocking expired task %s', task.uid)
-                        self.task_blocking.set()
-                    else:
-                        _log.warning('Expired task %s still blocking', task.uid)
-                if isinstance(task.task_meta, dict):
-                    cb_key = 'timeout_callback'
-                    timeout_callback = task.task_meta.get(cb_key)
-                    if callable(timeout_callback):
-                        timeout_meta = {k: v for k, v in task.task_meta.items()
-                                        if k != cb_key}
-                        timeout_meta['uid'] = task.uid
+                    removed = self._items.pop(i)
+                    self._index.pop(removed.uid, None)
+                    expired.append(self._items.pop(i))
+                    _log.warning('Removed expired task %s', removed.uid)
+                    if (self._blocking and self.task_blocking and 
+                        not self.task_blocking.is_set()):
+                        if self._unblock_on_expiry:
+                            _log.info('Unblocking expired task %s', removed.uid)
+                            self.task_blocking.set()
+                        else:
+                            _log.warning('Expired task %s still blocking',
+                                         removed.uid)
+        for task in expired:
+            if isinstance(task.task_meta, dict):
+                timeout_callback = task.task_meta.get('timeout_callback')
+                if callable(timeout_callback):
+                    timeout_meta = {k: v for k, v in task.task_meta.items()
+                                    if k != 'timeout_callback'}
+                    timeout_meta['uid'] = task.uid
+                    timeout_meta['timeout'] = time.time()
+                    try:
                         timeout_callback(timeout_meta)
+                    except Exception:
+                        _log.exception('Error in timeout for %s', task.uid)
 
     def clear(self):
         """Removes all items from the queue."""
         with self._lock:
-            super().clear()
+            self._items.clear()
+            self._index.clear()
             self.unblock_tasks(True)
-
-    def insert(self, index, item):
-        """Invalid operation."""
-        raise OSError('ISC task queue does not support insertion')
-
-    def extend(self, other):
-        """Invalid operation."""
-        raise OSError('ISC task queue does not support extension')
 
 
 def _vlog() -> bool:

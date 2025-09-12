@@ -454,7 +454,7 @@ class Microservice(ABC, Generic[F, P]):
         base = { camel_case(k): v for k, v in base.items() }
         for prop in self.isc_properties_by_type['config']:
             if prop not in base:
-                _log.warning('Missing config detail for %s', prop)
+                _log.debug('Missing config detail for %s', prop)
         return base
 
     @property

@@ -750,7 +750,7 @@ class Microservice(ABC, Generic[F, P]):
                     for prop in req_props:
                         dbg_prop = prop
                         res_props[prop] = self.isc_get_property(prop)
-                if not all_props:
+                if all_props:
                     configurable = self.isc_configurable()
                 else:
                     configurable = {k: v for k, v in self.isc_configurable().items()

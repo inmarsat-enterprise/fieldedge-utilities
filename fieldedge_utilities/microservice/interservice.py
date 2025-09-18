@@ -144,7 +144,7 @@ class IscTaskQueue:
         self._task_blocking = threading.Event()
         self._task_blocking.set()
         self._lock = threading.Lock()
-        self._items: list[IscTask]
+        self._items: list[IscTask] = []
         self._index: dict[str, IscTask] = {}   # uid -> task
 
     @property

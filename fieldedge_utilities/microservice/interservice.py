@@ -227,8 +227,12 @@ class IscTaskQueue:
                     continue
                 if task_type is not None and task.task_type != task_type:
                     continue
-                if task_meta is not None and task.task_meta != task_meta:
-                    continue
+                if task_meta is not None:
+                    if task.task_meta is None:
+                        return None
+                    if not all(k in task.task_meta and task.task_meta[k] == v
+                               for k, v in task_meta.items()):
+                        continue
                 return task
         return None
 

@@ -105,7 +105,7 @@ class IscTask:
     
     @property
     def lifetime(self) -> float|None:
-        return self.lifetime
+        return self._lifetime
     
     @lifetime.setter
     def lifetime(self, value: Union[float, int, None]):
@@ -154,7 +154,7 @@ class IscTaskQueue:
 
     @property
     def is_full(self) -> bool:
-        return self._blocking and len(self) > 0
+        return self._blocking and len(self._items) > 0
     
     def __len__(self) -> int:
         with self._lock:
@@ -191,7 +191,7 @@ class IscTaskQueue:
             if task.uid in self._index:
                 raise ValueError(f'Task {task.uid} already queued')
             if self._blocking:
-                if len(self) == 1:
+                if len(self._items) == 1:
                     raise IscTaskQueueFull
                 if self.task_blocking and not self.task_blocking.is_set():
                     raise IscTaskNotReleased
@@ -308,7 +308,7 @@ class IscTaskQueue:
                 if task.lifetime is not None and now - task.ts > task.lifetime:
                     removed = self._items.pop(i)
                     self._index.pop(removed.uid, None)
-                    expired.append(self._items.pop(i))
+                    expired.append(removed)
                     _log.warning('Removed expired task %s', removed.uid)
                     if (self._blocking and self.task_blocking and 
                         not self.task_blocking.is_set()):

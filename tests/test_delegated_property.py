@@ -21,6 +21,7 @@ class Base:
             'changes_slowly': 0,
             'changes_fast': 0,
         }
+        self._value = 0
     
     def get_reads(self) -> dict[str, int]:
         return self._reads
@@ -41,6 +42,14 @@ class Base:
         self._changes_fast += 5
         logger.info('Checked changes_fast source: %d', self._changes_fast)
         return self._changes_fast
+    
+    def get_value(self) -> int:
+        return self._value
+    
+    def set_value(self, value: int):
+        if not isinstance(value, int):
+            raise ValueError('Must be integer')
+        self._value = value
 
 
 class Demo(Base):
@@ -72,6 +81,14 @@ class Demo(Base):
         'changes_fast',
         cache_ttl=1,
     )
+    
+    @DelegatedProperty(cache_ttl=1)
+    def value(self) -> int: # type: ignore
+        return self.get_value()
+    
+    @value.setter
+    def value(self, v: int):
+        self.set_value(v)
 
 
 def test_normal_caching_behavior():
